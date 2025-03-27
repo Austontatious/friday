@@ -2,3 +2,4 @@
 __pycache__/
 *.pyc
 *.so
+models/deepseek-coder-6.7b-instruct.Q4_K_M.gguf
