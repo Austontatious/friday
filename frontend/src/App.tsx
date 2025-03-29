@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import "./App.css";
 
+// ChatInput Component
 function ChatInput({ onSend }: { onSend: (message: string) => void }) {
   const [input, setInput] = useState("");
 
@@ -30,11 +31,14 @@ function ChatInput({ onSend }: { onSend: (message: string) => void }) {
   );
 }
 
+// Main App Component
 function App() {
   const [code, setCode] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
-  const BACKEND_URL = "http://localhost:8001";
+
+  // Dynamically determine backend URL
+  const BACKEND_URL = `${window.location.origin.replace(/:\d+$/, "")}:8001/process`;
 
   const handleTask = async (task: string) => {
     setLoading(true);
@@ -118,4 +122,3 @@ function App() {
 }
 
 export default App;
-
