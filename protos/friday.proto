@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package friday;
+
+// Task types supported by FRIDAY
+enum TaskType {
+  UNKNOWN = 0;
+  CODE_EXPLANATION = 1;
+  CODE_GENERATION = 2;
+  DEBUGGING = 3;
+  TEST_GENERATION = 4;
+  DOCUMENTATION = 5;
+  GENERAL_CONVERSATION = 6;
+}
+
+// AI model types available for task execution
+enum ModelType {
+  DEEPSEEK = 0;
+  CLAUDE = 1;
+  CHAT_O1 = 2;
+}
+
+// Task priority levels
+enum Priority {
+  LOW = 0;
+  MEDIUM = 1;
+  HIGH = 2;
+}
+
+// Context information for task execution
+message Context {
+  string session_id = 1;
+  repeated string previous_tasks = 2;
+  map<string, string> metadata = 3;
+  float confidence_score = 4;
+  repeated string relevant_documents = 5;
+}
+
+// Task definition
+message Task {
+  string task_id = 1;
+  TaskType type = 2;
+  string input = 3;
+  Context context = 4;
+  Priority priority = 5;
+  ModelType preferred_model = 6;
+  float confidence_threshold = 7;
+  repeated string dependencies = 8;
+}
+
+// Task result
+message TaskResult {
+  string task_id = 1;
+  bool success = 2;
+  string output = 3;
+  float confidence_score = 4;
+  ModelType executed_by = 5;
+  string error_message = 6;
+  Context updated_context = 7;
+}
+
+// AI model capabilities
+message ModelCapabilities {
+  ModelType model_type = 1;
+  repeated TaskType supported_tasks = 2;
+  float min_confidence = 3;
+  float max_confidence = 4;
+  int32 max_tokens = 5;
+  float average_latency = 6;
+}
+
+// Service definition
+service FridayService {
+  // Process a task with context
+  rpc ProcessTask(Task) returns (TaskResult) {}
+  
+  // Get model capabilities
+  rpc GetModelCapabilities(ModelType) returns (ModelCapabilities) {}
+  
+  // Update context with new information
+  rpc UpdateContext(Context) returns (Context) {}
+  
+  // Stream task progress
+  rpc StreamTaskProgress(Task) returns (stream TaskResult) {}
+} 
