@@ -6,7 +6,9 @@ import logging
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from memory import MemoryManager
-from persona import PersonaManager, ModelType
+from persona import PersonaManager
+from model_types import ModelType
+from model_loader import initialize_model_loader
 from task_manager import TaskManager
 from confidence_evaluator import ConfidenceEvaluator
 from typing import Dict, Any, Optional
@@ -14,31 +16,72 @@ import grpc
 from concurrent import futures
 import asyncio
 from datetime import datetime
+from config import config
 
 # Initialize core components
 memory = MemoryManager()
 persona = PersonaManager()
+initialize_model_loader(persona)
 task_manager = TaskManager()
 confidence_evaluator = ConfidenceEvaluator()
 
 app = FastAPI(title="FRIDAY AI Assistant")
 
-# Enable CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Setup logging
 LOG_FILE = "friday.log"
 logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.INFO,
+    level=getattr(logging, config.LOG_LEVEL),
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
+# Add file and console handlers
+logger = logging.getLogger()
+logger.handlers = []  # Clear existing handlers
+
+# Add file handler
+file_handler = logging.FileHandler(LOG_FILE)
+file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+logger.addHandler(file_handler)
+
+# Add console handler
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+logger.addHandler(console_handler)
+
+logging.info("FRIDAY logging initialized")
+logging.info(f"Configuration: {config.to_dict()}")
+
+# Add CORS logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logging.info(f"Request: {request.method} {request.url}")
+    logging.info(f"Headers: {dict(request.headers)}")
+    response = await call_next(request)
+    logging.info(f"Response status: {response.status_code}")
+    return response
+
+# Enable CORS with centralized configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600  # Cache preflight requests for 1 hour
+)
+
+# Add response headers middleware
+@app.middleware("http")
+async def add_response_headers(request: Request, call_next):
+    response = await call_next(request)
+    origin = request.headers.get("origin")
+    if origin in config.ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    return response
 
 class Friday:
     def __init__(self):
@@ -49,48 +92,94 @@ class Friday:
         """Process user input with advanced AI components."""
         try:
             # Check memory for context
-            context = memory.retrieve_context(user_input)
+            try:
+                context = memory.retrieve_context(user_input)
+                logging.info(f"Retrieved context: {len(context)} items")
+            except Exception as e:
+                logging.error(f"Error retrieving context: {e}")
+                context = []
             
             # Evaluate confidence
-            confidence_score = confidence_evaluator.evaluate(user_input, context)
+            try:
+                confidence_score = confidence_evaluator.evaluate(user_input, context)
+                logging.info(f"Confidence score: {confidence_score}")
+            except Exception as e:
+                logging.error(f"Error evaluating confidence: {e}")
+                confidence_score = 0.5
             
             # Determine task type
-            task_type = self.identify_task(user_input)
+            try:
+                task_type = self.identify_task(user_input)
+                logging.info(f"Identified task type: {task_type}")
+            except Exception as e:
+                logging.error(f"Error identifying task type: {e}")
+                task_type = "general_conversation"
             
             # Execute task with RAG augmentation
-            result = task_manager.execute_task(user_input, task_type, context)
+            try:
+                result = task_manager.execute_task(user_input, task_type, context)
+                logging.info(f"Task executed successfully: {result.get('task_id')}")
+            except Exception as e:
+                error_msg = str(e) if e else "Unknown error occurred"
+                logging.error(f"Error executing task: {error_msg}")
+                raise RuntimeError(f"Failed to execute task: {error_msg}")
             
             # Update context
-            self.context.update(result["updated_context"])
+            self.context.update(result.get("updated_context", {}))
             
             # Store in memory
-            memory.store_context(
-                text=user_input,
-                metadata={
-                    "task_type": task_type,
-                    "confidence_score": confidence_score,
-                    "response": result["output"]
-                }
-            )
+            try:
+                memory.store_context(
+                    text=user_input,
+                    metadata={
+                        "task_type": task_type,
+                        "confidence_score": confidence_score,
+                        "response": result.get("response", "")
+                    }
+                )
+                logging.info("Context stored successfully")
+            except Exception as e:
+                logging.error(f"Error storing context: {e}")
+                # Continue even if memory storage fails
             
             # Stream progress if websocket is connected
             if websocket:
-                await websocket.send_json({
-                    "type": "progress",
-                    "task_id": result["task_id"],
-                    "status": "completed"
-                })
+                try:
+                    await websocket.send_json({
+                        "type": "progress",
+                        "task_id": result.get("task_id", ""),
+                        "status": "completed"
+                    })
+                except Exception as e:
+                    logging.error(f"Error sending websocket message: {e}")
             
             return result
             
         except Exception as e:
-            logging.error(f"Error processing input: {e}")
+            error_msg = str(e) if e else "Unknown error occurred"
+            logging.error(f"Error processing input: {error_msg}")
+            error_response = {
+                "error": error_msg,
+                "status": "failed",
+                "details": {
+                    "timestamp": datetime.now().isoformat(),
+                    "input": user_input,
+                    "task_type": task_type if 'task_type' in locals() else None,
+                    "confidence_score": confidence_score if 'confidence_score' in locals() else None
+                }
+            }
+            
             if websocket:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": str(e)
-                })
-            raise HTTPException(status_code=500, detail=str(e))
+                try:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": error_msg,
+                        "details": error_response
+                    })
+                except Exception as ws_error:
+                    logging.error(f"Error sending error message via websocket: {ws_error}")
+            
+            raise RuntimeError(error_msg)
 
     def identify_task(self, user_input: str) -> str:
         """Identify task type from user input."""
@@ -112,16 +201,64 @@ friday = Friday()
 @app.post("/process")
 async def process_input(request: Request):
     """Process user input through FRIDAY."""
-    data = await request.json()
-    user_input = data.get("input", "")
-    logging.info(f"Received /process request: {user_input}")
-    
     try:
-        result = await friday.process_input(user_input)
-        return result
+        # Parse and validate request body
+        try:
+            data = await request.json()
+            if not isinstance(data, dict):
+                raise ValueError("Request body must be a JSON object")
+            
+            user_input = data.get("input", "")
+            if not user_input or not isinstance(user_input, str):
+                raise ValueError("Input must be a non-empty string")
+                
+            logging.info(f"Received /process request: {user_input}")
+        except json.JSONDecodeError as e:
+            error_msg = f"Invalid JSON in request body: {str(e)}"
+            logging.error(error_msg)
+            raise HTTPException(
+                status_code=400,
+                detail={"error": error_msg, "status": "failed"}
+            )
+        except ValueError as e:
+            error_msg = str(e)
+            logging.error(error_msg)
+            raise HTTPException(
+                status_code=400,
+                detail={"error": error_msg, "status": "failed"}
+            )
+        
+        # Process input
+        try:
+            result = await friday.process_input(user_input)
+            return result
+        except Exception as e:
+            error_msg = str(e) if e else "Unknown error occurred"
+            logging.error(f"Error in /process: {error_msg}")
+            error_response = {
+                "error": error_msg,
+                "status": "failed",
+                "details": {
+                    "timestamp": datetime.now().isoformat(),
+                    "input": user_input
+                }
+            }
+            raise HTTPException(status_code=500, detail=error_response)
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        logging.error(f"Error in /process: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e) if e else "Unknown error occurred"
+        logging.error(f"Unexpected error in /process: {error_msg}")
+        error_response = {
+            "error": error_msg,
+            "status": "failed",
+            "details": {
+                "timestamp": datetime.now().isoformat(),
+                "input": user_input if 'user_input' in locals() else None
+            }
+        }
+        raise HTTPException(status_code=500, detail=error_response)
 
 @app.post("/process/explain")
 async def explain_code(request: Request):
@@ -181,27 +318,75 @@ async def get_model_capabilities():
         for model_type in ModelType
     }
 
-# Smart port management
-def get_available_port(start=8001, end=8100):
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy"}
+
+def get_available_port(start=None, end=None):
+    """Find an available port in the given range."""
+    start = start or config.PORT_RANGE["start"]
+    end = end or config.PORT_RANGE["end"]
+    
     for port in range(start, end):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) != 0:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind((config.HOST, port))
                 return port
-    raise OSError("No available ports found in the specified range.")
+        except OSError:
+            continue
+    raise OSError(f"No available ports found in range {start}-{end}")
 
 def kill_process_on_port(port):
-    cmd = f"sudo lsof -ti:{port} | xargs sudo kill -9"
-    os.system(cmd)
+    """Kill any process running on the specified port."""
+    try:
+        if os.name == 'nt':  # Windows
+            os.system(f'for /f "tokens=5" %a in (\'netstat -aon ^| findstr :{port}\') do taskkill /F /PID %a')
+        else:  # Linux/Mac
+            os.system(f"lsof -ti:{port} | xargs kill -9")
+    except Exception as e:
+        logging.warning(f"Failed to kill process on port {port}: {e}")
 
 if __name__ == "__main__":
+    logging.info("Starting FRIDAY server...")
     try:
-        port = get_available_port()
-        print(f"🚀 FRIDAY is online at http://localhost:{port}/docs")
-        logging.info(f"FRIDAY is online at http://localhost:{port}/docs")
-        uvicorn.run(app, host="0.0.0.0", port=port, reload=True)
-    except OSError:
-        print(f"⚠️ Port conflict detected on 8001. Trying to fix...")
-        kill_process_on_port(8001)
-        port = get_available_port()
-        print(f"🚀 FRIDAY is online at http://localhost:{port}/docs")
-        uvicorn.run(app, host="0.0.0.0", port=port, reload=True)
+        # Use configured port or find an available one
+        port = config.BACKEND_PORT
+        if port == 0:
+            try:
+                port = get_available_port()
+                logging.info(f"Using dynamically assigned port: {port}")
+            except OSError as e:
+                logging.error(f"Failed to find available port: {e}")
+                raise
+
+        # Try to kill any existing process on the port
+        kill_process_on_port(port)
+
+        # Log server startup information
+        logging.info(f"Starting FRIDAY server on port {port}")
+        logging.info(f"Server will be accessible at http://localhost:{port}")
+        logging.info(f"API documentation available at http://localhost:{port}/docs")
+
+        # Start the server with proper reload configuration
+        uvicorn.run(
+            "friday:app",
+            host=config.HOST,
+            port=port,
+            reload=True,
+            reload_dirs=["."],  # Only watch the current directory
+            reload_delay=config.RELOAD_DELAY,  # Add delay to prevent rapid reloads
+            log_level=config.LOG_LEVEL.lower(),
+            workers=1,  # Single worker to avoid model loading issues
+            loop="auto",  # Use the best event loop for the platform
+            limit_concurrency=1000,  # Increase concurrent connections limit
+            timeout_keep_alive=30,  # Keep connections alive longer
+            access_log=True,  # Enable access logging
+            use_colors=True,  # Enable colored output
+            proxy_headers=True,  # Trust proxy headers
+            server_header=True,  # Add server header
+            date_header=True  # Add date header
+        )
+    except Exception as e:
+        logging.error(f"Failed to start server: {e}")
+        raise

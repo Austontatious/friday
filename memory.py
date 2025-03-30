@@ -52,16 +52,24 @@ class MemoryManager:
 
     def retrieve_context(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
         """Retrieve relevant contexts using FAISS similarity search."""
-        # Generate query embedding
-        query_embedding = self.encoder.encode(query)
-        
-        # Search in FAISS index
-        distances, indices = self.index.search(
-            np.array([query_embedding]).astype('float32'), k
-        )
-        
-        # Return relevant contexts
-        return [self.contexts[i] for i in indices[0] if i < len(self.contexts)]
+        try:
+            # Check if index is empty
+            if self.index.ntotal == 0:
+                return []
+                
+            # Generate query embedding
+            query_embedding = self.encoder.encode(query)
+            
+            # Search in FAISS index
+            distances, indices = self.index.search(
+                np.array([query_embedding]).astype('float32'), k
+            )
+            
+            # Return relevant contexts
+            return [self.contexts[i] for i in indices[0] if i < len(self.contexts)]
+        except Exception as e:
+            logging.error(f"Error retrieving context: {e}")
+            return []
 
     def update_context(self, context_id: str, new_text: str, new_metadata: Optional[Dict[str, Any]] = None) -> bool:
         """Update existing context with new information."""

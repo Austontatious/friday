@@ -1,29 +1,34 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { TaskManager } from "./components/TaskManager";
+import { apiService } from "./services/api";
+import { TaskResponse } from "./types";
 import "./App.css";
 
 // ChatInput Component
-function ChatInput({ onSend }: { onSend: (message: string) => void }) {
+function ChatInput({ onSend, disabled }: { onSend: (message: string) => void; disabled: boolean }) {
   const [input, setInput] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || disabled) return;
     onSend(input.trim());
     setInput("");
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full flex mt-4">
+    <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto flex mt-4">
       <input
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder="Ask FRIDAY something..."
-        className="flex-grow px-4 py-2 rounded-l-lg border border-cyan-500 bg-black text-cyan-300 focus:outline-none"
+        disabled={disabled}
+        className="flex-grow px-4 py-2 rounded-l-lg border border-cyan-500 bg-black text-cyan-300 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
       />
       <button
         type="submit"
-        className="px-4 py-2 bg-cyan-500 text-black font-bold rounded-r-lg hover:bg-cyan-400 transition"
+        disabled={disabled}
+        className="px-4 py-2 bg-cyan-500 text-black font-bold rounded-r-lg hover:bg-cyan-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Send
       </button>
@@ -36,87 +41,94 @@ function App() {
   const [code, setCode] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Dynamically determine backend URL
-  const BACKEND_URL = `${window.location.origin.replace(/:\d+$/, "")}:8001/process`;
+  useEffect(() => {
+    const initializeApi = async () => {
+      try {
+        await apiService.getModelCapabilities();
+        setIsInitialized(true);
+      } catch (err) {
+        setError("Failed to connect to FRIDAY. Please make sure the backend server is running.");
+        console.error('API initialization error:', err);
+      }
+    };
 
-  const handleTask = async (task: string) => {
-    setLoading(true);
-    setResponse("Processing...");
+    initializeApi();
+  }, []);
 
-    try {
-      const res = await fetch(`${BACKEND_URL}/${task}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
+  const handleTaskComplete = (taskResponse: TaskResponse) => {
+    setResponse(taskResponse.response);
+    setError(null);
+  };
 
-      const data = await res.json();
-      setResponse(data.response);
-    } catch (err) {
-      setResponse("Error communicating with FRIDAY.");
-    }
-
-    setLoading(false);
+  const handleError = (errorMessage: string) => {
+    setError(errorMessage);
+    setResponse("");
   };
 
   const handleSend = async (message: string) => {
+    if (!isInitialized) {
+      setError("FRIDAY is still initializing. Please wait a moment.");
+      return;
+    }
+
     setLoading(true);
+    setError(null);
     setResponse("Thinking...");
 
     try {
-      const res = await fetch(`${BACKEND_URL}/explain`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: message }),
-      });
-
-      const data = await res.json();
-      setResponse(data.response);
+      const result = await apiService.processInput(message);
+      setResponse(result.response);
     } catch (err) {
-      setResponse("FRIDAY encountered an error.");
+      setError(err instanceof Error ? err.message : "FRIDAY encountered an error.");
+      setResponse("");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
+
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-black text-cyan-400 font-mono flex flex-col items-center justify-center p-4">
+        <h1 className="text-4xl mb-4 text-cyan-300 drop-shadow-glow">FRIDAY</h1>
+        <div className="text-xl animate-pulse">Initializing...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-cyan-400 font-mono flex flex-col items-center justify-start p-4">
       <h1 className="text-4xl mb-4 text-cyan-300 drop-shadow-glow">FRIDAY</h1>
 
-      <ChatInput onSend={handleSend} />
+      <ChatInput onSend={handleSend} disabled={loading} />
 
       <textarea
         placeholder="Paste your code here..."
-        className="w-full max-w-2xl h-48 p-3 bg-zinc-900 text-cyan-300 rounded-xl border border-cyan-700 mb-4 shadow-inner"
+        className="w-full max-w-2xl h-48 p-3 bg-zinc-900 text-cyan-300 rounded-xl border border-cyan-700 mb-4 shadow-inner mt-4"
         value={code}
         onChange={(e) => setCode(e.target.value)}
+        disabled={loading}
       />
 
-      <div className="flex gap-4 mb-6">
-        <button
-          onClick={() => handleTask("explain")}
-          className="bg-blue-700 hover:bg-blue-500 px-4 py-2 rounded-lg shadow-glow"
-        >
-          Explain
-        </button>
-        <button
-          onClick={() => handleTask("fix_bugs")}
-          className="bg-yellow-600 hover:bg-yellow-400 px-4 py-2 rounded-lg shadow-glow"
-        >
-          Fix Bugs
-        </button>
-        <button
-          onClick={() => handleTask("generate_tests")}
-          className="bg-green-700 hover:bg-green-500 px-4 py-2 rounded-lg shadow-glow"
-        >
-          Write Tests
-        </button>
-      </div>
+      <TaskManager 
+        onTaskComplete={handleTaskComplete} 
+        onError={handleError}
+        code={code}
+      />
 
-      <div className="w-full max-w-2xl bg-zinc-800 text-cyan-200 rounded-xl p-4 border border-cyan-700 shadow-inner whitespace-pre-wrap">
-        {loading ? "Running task..." : response}
-      </div>
+      {error && (
+        <div className="w-full max-w-2xl mt-4 p-4 bg-red-900/30 text-red-300 rounded-xl border border-red-700">
+          {error}
+        </div>
+      )}
+
+      {response && (
+        <div className="w-full max-w-2xl mt-4 bg-zinc-800 text-cyan-200 rounded-xl p-4 border border-cyan-700 shadow-inner whitespace-pre-wrap">
+          {loading ? "Running task..." : response}
+        </div>
+      )}
     </div>
   );
 }
