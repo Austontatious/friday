@@ -169,6 +169,48 @@
       "description": "Always ensure correct working directory, handle file watching and reloads gracefully, and monitor process termination and restart",
       "priority": "high",
       "actions": ["ensure_correct_working_directory", "handle_file_watching_and_reloads_gracefully", "monitor_process_termination_and_restart"]
+    },
+    {
+      "name": "Handle placeholder features causing problems",
+      "description": "When encountering placeholder code for future features that is causing current issues (like circular imports), document it in CHANGELOG.md and temporarily remove or disable the problematic code until properly implemented.",
+      "priority": "high",
+      "actions": ["document_in_changelog", "temporarily_remove_problematic_code", "add_todo_comment"]
+    },
+    {
+      "name": "Optimize Memory Usage for Language Models",
+      "description": "When working with large language models, implement memory-efficient strategies to prevent OOM (Out Of Memory) kills. This includes reducing context window sizes, decreasing batch sizes, implementing proper cleanup, and adding memory monitoring.",
+      "priority": "critical",
+      "actions": [
+        "reduce_context_window",
+        "decrease_batch_size",
+        "implement_model_cleanup",
+        "add_memory_monitoring",
+        "document_memory_optimizations"
+      ],
+      "memory_guidelines": {
+        "context_window": {
+          "default": 2048,
+          "minimum": 1024,
+          "maximum": 4096,
+          "description": "Balance between context size and memory usage"
+        },
+        "batch_size": {
+          "default": 128,
+          "minimum": 64,
+          "maximum": 256,
+          "description": "Smaller batches use less memory but may process slower"
+        },
+        "cleanup_strategy": {
+          "unload_after_use": true,
+          "garbage_collect": true,
+          "description": "Explicitly unload models and trigger GC when not in use"
+        },
+        "monitoring": {
+          "track_memory_usage": true,
+          "log_thresholds": [70, 85, 95],
+          "description": "Track and log memory usage percentage"
+        }
+      }
     }
   ],
   "global_settings": {
