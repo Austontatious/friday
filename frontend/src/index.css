@@ -8,3 +8,16 @@
   }
 }
 
+/* Global animation keyframes (if not defined via Tailwind keyframes) */
+@keyframes fridayPulse {
+  0% {
+    box-shadow: 0 0 12px #00FFFF, 0 0 24px #00FFFF55;
+  }
+  50% {
+    box-shadow: 0 0 16px #00FFFF, 0 0 32px #00FFFF99;
+  }
+  100% {
+    box-shadow: 0 0 12px #00FFFF, 0 0 24px #00FFFF55;
+  }
+}
+

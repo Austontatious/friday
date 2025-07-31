@@ -1,74 +1,64 @@
 import os
-import logging
-from typing import Dict, Any
+from enum import Enum
+from typing import List, Optional, Dict
+from pydantic import BaseModel
 
-class Config:
+# === Model Type Enum ===
+class ModelType(Enum):
+    MISTRAL = "mistral"
+    FRIDAY = "friday"
+    LLAMA = "llama"
+    DEEPSEEK = "deepseek"
+    HUGINN = "huginn"
+
+# === Model Configuration Schema ===
+class ModelConfig(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    model_type: Optional[ModelType] = None
+    path: str
+    capabilities: Optional[List[str]] = []
+    context_length: Optional[int] = 4096
+    quantized: Optional[bool] = False
+    temperature: Optional[float] = 1.0
+    top_p: Optional[float] = 1.0
+    repetition_penalty: Optional[float] = 1.1
+    stop: Optional[List[str]] = []
+    prompt_style: Optional[str] = "chatml"
+    n_gpu_layers: Optional[int] = 0
+
+# === ModelConfigManager ===
+class ModelConfigManager:
     def __init__(self):
-        # Server Configuration
-        self.HOST = os.getenv("HOST", "0.0.0.0")
-        self.BACKEND_PORT = int(os.getenv("FRIDAY_PORT", "8001"))
-        self.FRONTEND_PORT = int(os.getenv("REACT_APP_BACKEND_PORT", "8001"))
-        
-        # Model Configuration
-        self.DEEPSEEK_MODEL_PATH = os.getenv("DEEPSEEK_MODEL_PATH", "models/deepseek-coder-6.7b-instruct.Q4_K_M.gguf")
-        self.LLAMA_MODEL_PATH = os.getenv("LLAMA_MODEL_PATH", "models/llama-2-7b-chat.Q4_K_M.gguf")
-        
-        # Logging Configuration
-        self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-        
-        # API Keys
-        self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-        
-        # CORS Configuration
-        self.ALLOWED_ORIGINS = [
-            f"http://localhost:{self.FRONTEND_PORT}",
-            f"http://127.0.0.1:{self.FRONTEND_PORT}",
-            f"http://localhost:{self.BACKEND_PORT}",
-            f"http://127.0.0.1:{self.BACKEND_PORT}"
-        ]
-        
-        # Port Range for Dynamic Port Allocation
-        self.PORT_RANGE = {
-            "start": 8001,
-            "end": 8100
-        }
-        
-        # Server Timeouts
-        self.SERVER_TIMEOUT = 30
-        self.RELOAD_DELAY = 2
-        
-        # Validate configuration
-        self._validate_config()
-        
-    def _validate_config(self) -> None:
-        """Validate the configuration and raise errors if invalid."""
-        if not os.path.exists(self.DEEPSEEK_MODEL_PATH):
-            raise FileNotFoundError(f"DeepSeek model not found at {self.DEEPSEEK_MODEL_PATH}")
-            
-        if not os.path.exists(self.LLAMA_MODEL_PATH):
-            logging.warning(f"Llama model not found at {self.LLAMA_MODEL_PATH}. Some features may be limited.")
-            
-        if not self.ANTHROPIC_API_KEY:
-            logging.warning("ANTHROPIC_API_KEY not set. Some features may be limited.")
-            
-        if self.BACKEND_PORT == self.FRONTEND_PORT:
-            raise ValueError("Backend and frontend ports cannot be the same")
-            
-        if self.PORT_RANGE["start"] > self.PORT_RANGE["end"]:
-            raise ValueError("Port range start must be less than end")
-            
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert configuration to dictionary for logging/debugging."""
-        return {
-            "host": self.HOST,
-            "backend_port": self.BACKEND_PORT,
-            "frontend_port": self.FRONTEND_PORT,
-            "log_level": self.LOG_LEVEL,
-            "allowed_origins": self.ALLOWED_ORIGINS,
-            "port_range": self.PORT_RANGE,
-            "server_timeout": self.SERVER_TIMEOUT,
-            "reload_delay": self.RELOAD_DELAY
+        self.configs: Dict[ModelType, ModelConfig] = {
+            ModelType.DEEPSEEK: ModelConfig(
+                path="/workspace/ai-lab/models/deepseek-coder/deepseek-coder-6.7b-instruct-q4_K_M.gguf",
+                context_length=16384,
+                n_gpu_layers=32
+            ),
+            ModelType.FRIDAY: ModelConfig(
+                path="/workspace/ai-lab/models/Friday_0.2.2.1/friday_q8.gguf",
+                context_length=8192,
+                n_gpu_layers=32,
+                temperature=1.2,
+                top_p=0.85,
+                repetition_penalty=1.1,
+                stop=["<|EOT|>"],
+                prompt_style="chatml"
+            ),
+            ModelType.HUGINN: ModelConfig(
+                path="/workspace/ai-lab/models/tinyllama-chat-1.1b/tinyllama-chat-1.1b_q8_0.gguf",
+                context_length=2048,
+                n_gpu_layers=32,
+                temperature=1.5,
+                top_p=0.3,
+                repetition_penalty=1.0,
+                stop=["<|im_end|>", "<|im_start|>"],
+                prompt_style="chatml"
+            ),
         }
 
-# Create global config instance
-config = Config() 
+# ✅ Final: create global instance AFTER defining the class
+model_config_manager = ModelConfigManager()
+
+

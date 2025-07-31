@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, Any, Optional, Callable
-from model_types import ModelType
+from .model_config import ModelType, model_config
 
 class ModelError(Exception):
     """Base class for model-related errors."""
@@ -16,6 +16,10 @@ class ModelInferenceError(ModelError):
 
 class ModelConfigError(ModelError):
     """Error raised when there is a configuration error."""
+    pass
+
+class TaskExecutionError(ModelError):
+    """Error raised when task execution fails."""
     pass
 
 class ErrorHandler:

@@ -1,5 +1,14 @@
 export type TaskType = 'explain' | 'fix_bugs' | 'generate_tests' | 'document' | 'optimize';
 
+export type ModelResponse = {
+  result?: {
+        raw?: string;
+        cleaned?: string;
+    };
+    affect?: string;
+}
+
+
 export interface TaskResponse {
   response: string;
   task_id?: string;

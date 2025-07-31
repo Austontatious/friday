@@ -1,6 +1,6 @@
 import re
 from typing import Dict, Any, Optional
-from model_types import ModelType
+from .model_config import ModelType, model_config
 
 class ResponseFormatter:
     @staticmethod
@@ -52,7 +52,7 @@ class ResponseFormatter:
                             ResponseFormatter.format_code_block(code)
                         )
                         
-            elif model_type == ModelType.LLAMA:
+            elif model_type == ModelType.OPENCHAT:
                 # Llama responses are typically more conversational
                 formatted_response = response
                 
@@ -77,7 +77,26 @@ class ResponseFormatter:
         except Exception as e:
             # If formatting fails, return original response
             return response
-            
+    
+    @staticmethod
+    def extract_final_answer(text: str) -> str:
+        """
+        Extracts the assistant's final response from a ChatML-style prompt.
+        Truncates at the stop token or end marker.
+        """
+        # Find the assistant section
+        if "<|im_start|>assistant" in text:
+            parts = text.split("<|im_start|>assistant", 1)[1]
+        else:
+            return text.strip()
+
+        # Truncate at end marker if present
+        for stop_token in ["<|im_end|>", "</s>", "<|EOT|>"]:
+            if stop_token in parts:
+                parts = parts.split(stop_token)[0]
+
+        return parts.strip()
+
     @staticmethod
     def format_error_response(error: Exception) -> str:
         """Format error response for display."""

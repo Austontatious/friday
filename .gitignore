@@ -1,5 +1,66 @@
-.venv/
+
+# Bytecode and build junk
 __pycache__/
 *.pyc
-*.so
-models/deepseek-coder-6.7b-instruct.Q4_K_M.gguf
+*.pyo
+*.log
+
+# Dependency folders
+node_modules/
+pip-cache/
+
+# Temp & cache
+tmp/
+cache/
+logs/
+database/
+friday_temp_restore/
+
+# Models and outputs
+
+# Model weights & large files
+*.bin
+*.onnx
+*.tar
+*.gz
+*.zip
+*.7z
+*.pickle
+*.npz
+*.h5
+
+# ChromaDB artifacts
+chromadb/
+
+# VSCode artifacts
+.vscode/
+
+# Frontend build artifacts
+dist/
+build/
+
+# Prevent accidentally committing large files
+*.bak
+*.old
+*.tmp
+*.log.*
+
+
+models/
+results/
+*.gguf
+*.ckpt
+*.safetensors
+*.pt
+
+# Zip files / builds
+*.zip
+
+# Ignore local test artifacts
+fix_log.txt
+friday.log
+
+/workspace/ai-lab/friday/tmp/
+/workspace/ai-lab/friday/NOT Frday App Stuff/
+/workspace/ai-lab/friday/frontend/node_modules/
+

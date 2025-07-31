@@ -1,0 +1,105 @@
+---
+
+# 📁 FRIDAY Project Structure (May 2025 Snapshot)
+
+## 🧠 Backend (/friday/)
+
+* `server.py`: FastAPI entrypoint with CORS, logging, and lifecycle setup
+* `backend_core.py`: Main control logic for routing, startup
+* `model_loader_core.py`: Loads GGUF models via `llama.cpp`, manages quantized inference
+* `task_manager.py`: Routes tasks by type to correct model
+* `persona.py`: Chat formatting, template logic, model-specific handling
+* `memory.py`: Vector store interface (ChromaDB), embeds and retrieves prior interactions
+* `context.py`: API routes for storing/retrieving context
+* `model_config.py`: Static config registry with model paths and parameters
+* `model_types.py`: Model/Task enums and routing logic
+* `process_manager.py`: Manages subprocesses, lifecycle
+* `response_formatter.py`: Final output cleanup and role tagging
+* `error_handler.py`: Captures and logs backend errors
+* `routes/`: Contains FastAPI router logic (`friday_routes.py`, `code_routes.py`)
+* `fine-tune/`: Local scripts for OpenChat and Mixtral tuning
+* `scripts/`: Shell and CLI utilities
+* `chroma/`, `chromadb/`: Chroma vector DB
+* `cache/`, `database/`, `logs/`, `results/`: Runtime artifacts
+* `model_monitor.py`: Tracks latency, memory, response success
+
+## 💡 Key Backed Files
+
+* `friday_test.py`: E2E test harness
+* `config.py`: ENV loading and app-wide flags
+* `start.sh`: Startup script
+* `template_loader.py`: Loads `.j2` prompt templates
+* `prompt_templates.py`: Python interface to Jinja2 templates
+
+---
+
+## 🖼️ Frontend (/frontend/)
+
+* Built with **React**, **Vite**, **Chakra UI**, and **Tailwind**
+* `src/`: App.tsx entrypoint, `components/`, `services/api.ts` (backend connector)
+* `public/`: Static assets
+* `vite.config.ts`: Vite bundler configuration
+* `tailwind.config.js`: Tailwind theme overrides
+* `Friday theme.txt`: Notes on visual branding or theming
+* `frontend.zip`: Exported live bundle (May 2)
+* `src.zip`: Raw source (May 2)
+
+---
+
+# 🧬 Architecture Summary
+
+## 🔧 API Layer
+
+* `POST /process`: General task routing
+* `GET /models/capabilities`: Model support information
+* `GET /friday/status`: Health check
+* `GET /friday/monitor`: Prometheus-compatible metrics
+* `GET/POST /context/*`: Memory interaction endpoints
+
+## 🤖 Model Management
+
+* Dynamic model routing by `TaskType`
+* Primary models:
+
+  * `OpenChat 7B` (core assistant)
+  * `Mixtral` (logic and reasoning)
+  * `DeepSeek` (code-oriented tasks)
+* Uses `llama.cpp` via `AutoGPTQ`, `GGUF`, and LoRA patching when available
+
+## 🧠 Memory Layer
+
+* Context embedding via `sentence-transformers`
+* Stores into Chroma vector DB
+* Retrieves similar past interactions for context injection
+
+## 🧪 Task Routing
+
+* Tasks classified → model selected → formatted via template → routed to model
+* Result stored in memory and returned to frontend
+
+---
+
+# 📜 CHANGELOG (May 2, 2025)
+
+## Added
+
+* Zipped frontend and backend snapshots
+* `model_config.py`: Unified model parameters
+* `model_loader_core.py`: Modular GGUF loader
+* `response_formatter.py`: Added for frontend-ready formatting
+* `Friday theme.txt`: Frontend visual spec
+
+## Changed
+
+* Model routing now defaults to OpenChat unless task type is logic/code
+* Full support for 3-model cascade (OpenChat, Mixtral, DeepSeek)
+* Upgraded `task_manager.py` to inject memory context on all inputs
+
+## Fixed
+
+* Frontend import errors in `App.tsx`
+* Backend port sync with `.env.local` generation
+* FastAPI error responses now catch `ValidationError` and `RuntimeError`
+
+---
+

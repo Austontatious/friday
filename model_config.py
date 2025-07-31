@@ -1,152 +1,64 @@
-import os
-import logging
-from typing import Dict, Any, List
-from dataclasses import dataclass
-from config import config
-from model_types import ModelType
+from enum import Enum
+from typing import Dict
 
-@dataclass
-class TokenConfig:
-    bos_token_id: int
-    eos_token_id: int
-    eot_token_id: int
-    pad_token_id: int
-    special_tokens: Dict[str, str]
-    special_eog_ids: List[int]
-    special_eos_ids: List[int]
-    special_bos_ids: List[int]
-    special_pad_ids: List[int]
+class ModelType(Enum):
+    DEEPSEEK = "deepseek"
+    HUGINN = "huginn"
+    FRIDAY = "friday"  # ✅ add this
 
-@dataclass
+
 class ModelConfig:
-    name: str
-    token_config: TokenConfig
-    architecture: str = "llama"
-    context_length: int = 16384
-    embedding_length: int = 4096
-    feed_forward_length: int = 11008
-    attention_head_count: int = 32
-    attention_head_count_kv: int = 32
-    block_count: int = 32
-    rope_dimension_count: int = 128
-    rope_freq_base: float = 100000.0
-    rope_scale_linear: float = 4.0
-    layer_norm_rms_epsilon: float = 0.000001
-    tokenizer_model: str = "gpt2"
+    def __init__(self, path: str, context_length: int = 2048, n_gpu_layers: int = 32,
+                 temperature: float = 0.7, top_p: float = 0.9, repetition_penalty: float = 1.1,
+                 stop: list = None, prompt_style: str = "chatml", max_tokens: int = 256):  # <--- ADD THIS
+        self.path = path
+        self.context_length = context_length
+        self.n_gpu_layers = n_gpu_layers
+        self.temperature = temperature
+        self.top_p = top_p
+        self.repetition_penalty = repetition_penalty
+        self.stop = stop or []
+        self.prompt_style = prompt_style
+        self.max_tokens = max_tokens  # <--- ADD THIS
+
 
 class ModelConfigManager:
     def __init__(self):
-        self.configs: Dict[str, ModelConfig] = {
-            ModelType.DEEPSEEK.value: ModelConfig(
-                name="deepseek-ai_deepseek-coder-6.7b-instruct",
-                token_config=TokenConfig(
-                    bos_token_id=32013,
-                    eos_token_id=32021,
-                    eot_token_id=32014,
-                    pad_token_id=32014,
-                    special_tokens={
-                        "bos": "REDACTED_SPECIAL_TOKEN",
-                        "eos": "REDACTED_SPECIAL_TOKEN",
-                        "eot": "REDACTED_SPECIAL_TOKEN",
-                        "pad": "REDACTED_SPECIAL_TOKEN",
-                        "fim_prefix": "REDACTED_SPECIAL_TOKEN",
-                        "fim_suffix": "REDACTED_SPECIAL_TOKEN",
-                        "fim_middle": "REDACTED_SPECIAL_TOKEN"
-                    },
-                    special_eog_ids=[32014, 32021],
-                    special_eos_ids=[32021],
-                    special_bos_ids=[32013],
-                    special_pad_ids=[32014]
-                ),
+        self.configs: Dict[ModelType, ModelConfig] = {
+            
+            ModelType.DEEPSEEK: ModelConfig(
+                path="/workspace/ai-lab/models/deepseek-coder-merged/deepseek_6.7b_merged_q8_0.gguf",
                 context_length=16384,
-                embedding_length=4096
+                n_gpu_layers=32
             ),
-            ModelType.LLAMA.value: ModelConfig(
-                name="llama-2-7b-chat",
-                token_config=TokenConfig(
-                    bos_token_id=1,
-                    eos_token_id=2,
-                    eot_token_id=2,
-                    pad_token_id=0,
-                    special_tokens={
-                        "bos": "<s>",
-                        "eos": "</s>",
-                        "eot": "</s>",
-                        "pad": "<pad>"
-                    },
-                    special_eog_ids=[2],
-                    special_eos_ids=[2],
-                    special_bos_ids=[1],
-                    special_pad_ids=[0]
-                ),
-                context_length=4096,
-                embedding_length=4096
-            )
-        }
-        
-        self._validate_configs()
-        
-    def _validate_configs(self) -> None:
-        """Validate model configurations."""
-        models_to_remove = []
-        
-        for model_name, model_config in self.configs.items():
-            # First check if model exists
-            model_path = getattr(config, f"{model_name.upper()}_MODEL_PATH", None)
-            if not os.path.exists(model_path):
-                if model_name == ModelType.DEEPSEEK.value:
-                    raise FileNotFoundError(f"{model_name} model not found at {model_path}")
-                else:
-                    logging.warning(f"{model_name} model not found at {model_path}. Some features may be limited.")
-                    models_to_remove.append(model_name)
-                    continue  # Skip further validation for models to be removed
-                    
-            # Validate special tokens
-            if model_config.token_config.eos_token_id not in model_config.token_config.special_eos_ids:
-                raise ValueError(f"{model_name} EOS token not in special tokens")
-            if model_config.token_config.eot_token_id not in model_config.token_config.special_eog_ids:
-                logging.warning(f"{model_name} EOT token not in special tokens - fixing")
-                # Add the token to the list
-                model_config.token_config.special_eog_ids.append(model_config.token_config.eot_token_id)
-                
-            # Validate context length
-            if model_config.context_length < 2048:
-                logging.warning(f"{model_name} context length ({model_config.context_length}) is less than recommended minimum (2048)")
-        
-        # Remove models after iteration
-        for model_name in models_to_remove:
-            self.configs.pop(model_name)
-        
-    def get_model_config(self, model_type: str) -> ModelConfig:
-        """Get configuration for a specific model type."""
-        if model_type not in self.configs:
-            raise ValueError(f"Model type {model_type} not found")
-        return self.configs[model_type]
-        
-    def get_token_config(self, model_type: str) -> TokenConfig:
-        """Get token configuration for a specific model type."""
-        return self.get_model_config(model_type).token_config
-        
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert configurations to dictionary for logging/debugging."""
-        return {
-            model_name: {
-                "name": config.name,
-                "architecture": config.architecture,
-                "context_length": config.context_length,
-                "token_config": {
-                    "bos_token_id": config.token_config.bos_token_id,
-                    "eos_token_id": config.token_config.eos_token_id,
-                    "eot_token_id": config.token_config.eot_token_id,
-                    "pad_token_id": config.token_config.pad_token_id,
-                    "special_eog_ids": config.token_config.special_eog_ids,
-                    "special_eos_ids": config.token_config.special_eos_ids,
-                    "special_bos_ids": config.token_config.special_bos_ids,
-                    "special_pad_ids": config.token_config.special_pad_ids
-                }
-            }
-            for model_name, config in self.configs.items()
+            ModelType.FRIDAY: ModelConfig(
+                path="/workspace/ai-lab/models/Friday_0.2.2.1/friday_Q6_K.gguf",
+                context_length=8192,
+                n_gpu_layers=32,
+                temperature=1.2,
+                top_p=0.85,
+                repetition_penalty=1.1,
+                stop=["<|EOT|>"],
+                prompt_style="chatml",
+                max_tokens=1024  # <--- Adjust to desired output length
+            ),
+
+            ModelType.HUGINN: ModelConfig(
+                path="/workspace/ai-lab/models/tinyllama-chat-1.1b/tinyllama-chat-1.1b_q8_0.gguf",  # ✅ update if different
+                context_length=2048,
+                n_gpu_layers=32,
+                temperature=1.5,
+                top_p=0.3,
+                repetition_penalty=1.0,
+                stop=["<|im_end|>", "<|im_start|>"],
+                prompt_style="chatml"
+            ),
+
+
         }
 
-# Create global config instance
-model_config = ModelConfigManager() 
+    def get(self, model_type: ModelType) -> ModelConfig:
+        return self.configs[model_type]
+
+model_config = ModelConfigManager()
+

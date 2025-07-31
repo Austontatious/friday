@@ -1,0 +1,36 @@
+{
+  "name": "friday",
+  "displayName": "FRIDAY",
+  "description": "Your AI coding assistant built on DeepSeek and Phi-3.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "activationEvents": [
+    "onCommand:friday.askAnything"
+  ],
+  "main": "./src/extension.ts",
+  "contributes": {
+    "commands": [
+      {
+        "command": "friday.askAnything",
+        "title": "Ask FRIDAY Anything"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./"
+    "build": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/node-fetch": "^2.6.12",
+    "@types/vscode": "^1.x.x",
+    "@vscode/test-electron": "^2.x.x",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}

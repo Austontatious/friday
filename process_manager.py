@@ -5,9 +5,9 @@ import subprocess
 import time
 import requests
 import threading
-from typing import Dict, Optional, List
+from typing import Dict, Any, Optional
 from pathlib import Path
-from config import config
+from .config import config
 
 class ProcessManager:
     def __init__(self):

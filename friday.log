@@ -1,3 +1,0 @@
-2025-03-29 16:25:33,909 - ERROR - Error in semantic similarity evaluation: 'list' object has no attribute 'values'
-2025-03-29 16:25:34,077 - ERROR - Error in clarity evaluation: 'NoneType' object is not subscriptable
-2025-03-29 16:25:34,077 - ERROR - Error in context relevance evaluation: 'list' object has no attribute 'values'

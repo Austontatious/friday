@@ -1,0 +1,4 @@
+logs/ found in /mnt/ai-lab/friday/
+llama.cpp/build/ found in /mnt/ai-lab/friday/
+pipelines/ found in /mnt/ai-lab/friday/
+docker/ found in /mnt/ai-lab/friday/
