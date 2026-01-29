@@ -42,6 +42,13 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added `/api/capabilities` endpoint and shared health-check helpers
+- Expanded backend compose env to pass capability flags + service URLs into the container
+- Why: allow frontend gating and make enabled/available reporting consistent with env config
+- Flags added/changed: none (existing flags now propagated into container)
+- How to test: `curl http://localhost:9001/api/capabilities`
+- Known issues: gesture/vector availability are reported as false (stubbed)
+
 - Added in-proc jobs store with `/api/jobs` create/status/result endpoints
 - /readyz now reports jobs backend status (memory or redis)
 - Why: establish async job pattern before multimodal work
