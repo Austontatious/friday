@@ -64,3 +64,4 @@ friday.log
 /workspace/ai-lab/friday/NOT Frday App Stuff/
 /workspace/ai-lab/friday/frontend/node_modules/
 
+.env.legacy
