@@ -13,6 +13,11 @@ Text + Voice:
 Full suite:
 - enable everything + verify GPU availability
 
+## Optional model services (profiles)
+- Compose wiring lives in `docker-compose.models.yml` and is **opt-in** via profiles.
+- Example (core + llm only):
+  - `docker compose -f docker-compose.yaml -f docker-compose.models.yml --profile llm up -d`
+
 ## Health
 - Backend: `/healthz` (basic) and `/readyz` (checks downstream deps)
 - Each service must expose `/health`

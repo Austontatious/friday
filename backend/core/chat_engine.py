@@ -39,7 +39,7 @@ async def run_chat(payload: Dict[str, Any]) -> Dict[str, Any]:
     except LLMConfigError as exc:
         raise ChatError("llm_not_configured", "LLM not configured", str(exc), False, 503)
     except LLMRequestError as exc:
-        raise ChatError("llm_error", "LLM request failed", str(exc), True, 502)
+        raise ChatError("llm_unhealthy", "LLM request failed", str(exc), True, 502)
     except Exception as exc:
         raise ChatError("chat_failed", "Chat failed", str(exc), True, 500)
 

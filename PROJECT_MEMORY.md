@@ -42,6 +42,14 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added model compose wiring files: `docker-compose.models.yml`, `.env.models.example`
+- Updated `/readyz` to report per-service status and honor *_ENABLED flags
+- Updated chat error mapping to return `llm_unhealthy` when a configured LLM is unreachable
+- Why: wire optional model services behind profiles without auto-start
+- Flags added/changed: FRIDAY_CODER_ENABLED, FRIDAY_VISION_ENABLED, FRIDAY_OMNI_ENABLED, FRIDAY_STT_ENABLED, FRIDAY_TTS_ENABLED
+- How to test: `docker compose -f docker-compose.yaml -f docker-compose.models.yml config > /tmp/compose.merged.yml`
+- Known issues: none (models remain opt-in)
+
 - Added `tools/pull_models.sh` model fetcher (HF + GitHub) with manifest output
 - Why: standardize model pulls and repos for Phase 1 multimodal stack
 - Flags added/changed: none
