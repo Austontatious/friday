@@ -42,6 +42,15 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Replaced `.env` with Phase 0 defaults (LLM disabled) and archived `.env` -> `.env.legacy`
+- Rewired model profiles to service names `llm`, `stt`, `tts`, `vision`, `avatar` in `docker-compose.models.yml`
+- Updated `.env.models.example` to minimal opt-in toggles
+- Updated `/readyz` service keys to match URL env names (LLM_BASE_URL, STT_BASE_URL, etc.)
+- Why: keep Phase 0 runnable while wiring optional models behind profiles
+- Flags added/changed: FRIDAY_LLM_ENABLED default set to 0 in `.env.example`
+- How to test: `docker compose -f docker-compose.yaml -f docker-compose.models.yml config > /tmp/compose.merged.yml`
+- Known issues: none (models remain opt-in)
+
 - Normalized service health probes to use `/v1/models` when base URLs end in `/v1`
 
 - Added model compose wiring files: `docker-compose.models.yml`, `.env.models.example`

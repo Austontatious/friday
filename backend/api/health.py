@@ -22,11 +22,10 @@ def readyz():
 
     services = {
         "llm": llm_status,
-        "coder": _service_status("FRIDAY_CODER_ENABLED", "CODER_BASE_URL"),
-        "vision": _service_status("FRIDAY_VISION_ENABLED", "VLM_BASE_URL"),
-        "omni": _service_status("FRIDAY_OMNI_ENABLED", "OMNI_BASE_URL"),
+        "vision": _service_status("FRIDAY_VISION_ENABLED", "VISION_BASE_URL"),
         "stt": _service_status("FRIDAY_STT_ENABLED", "STT_BASE_URL"),
         "tts": _service_status("FRIDAY_TTS_ENABLED", "TTS_BASE_URL"),
+        "avatar": _service_status("FRIDAY_AVATAR_ENABLED", "AVATAR_BASE_URL"),
     }
 
     ok = all(_is_ok(status) for status in services.values())

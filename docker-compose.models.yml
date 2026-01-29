@@ -1,7 +1,6 @@
 services:
-  llm-core:
+  llm:
     image: vllm/vllm-openai:latest
-    container_name: friday-llm-core
     profiles: ["models", "llm"]
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
@@ -14,48 +13,34 @@ services:
       --port 8000
       --served-model-name friday-core
       --max-model-len 32768
-    ports:
-      - "8000:8000"
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: ${FRIDAY_LLM_GPU_COUNT:-1}
+              count: 1
               capabilities: [gpu]
     networks:
       - friday_net
 
-  llm-coder:
-    image: vllm/vllm-openai:latest
-    container_name: friday-llm-coder
-    profiles: ["models", "coder"]
-    environment:
-      - HF_TOKEN=${HF_TOKEN:-}
-    volumes:
-      - ./services/models/code/qwen3-coder-30b-a3b-fp8:/models/coder:ro
-      - ./services/hf-cache:/root/.cache/huggingface
+  stt:
+    image: python:3.11-slim
+    profiles: ["models", "voice", "stt"]
     command: >
-      --model /models/coder
-      --host 0.0.0.0
-      --port 8000
-      --served-model-name friday-coder
-      --max-model-len 32768
-    ports:
-      - "8001:8000"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: ${FRIDAY_CODER_GPU_COUNT:-1}
-              capabilities: [gpu]
+      bash -lc "echo 'STT scaffold (disabled until implemented)' && sleep infinity"
     networks:
       - friday_net
 
-  vlm:
+  tts:
+    image: python:3.11-slim
+    profiles: ["models", "voice", "tts"]
+    command: >
+      bash -lc "echo 'TTS scaffold (disabled until implemented)' && sleep infinity"
+    networks:
+      - friday_net
+
+  vision:
     image: vllm/vllm-openai:latest
-    container_name: friday-vlm
     profiles: ["models", "vision"]
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
@@ -68,67 +53,23 @@ services:
       --port 8000
       --served-model-name friday-vlm
       --max-model-len 32768
-    ports:
-      - "8002:8000"
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: ${FRIDAY_VLM_GPU_COUNT:-1}
+              count: 1
               capabilities: [gpu]
     networks:
       - friday_net
 
-  omni:
-    image: vllm/vllm-openai:latest
-    container_name: friday-omni
-    profiles: ["models", "omni", "voice"]
-    environment:
-      - HF_TOKEN=${HF_TOKEN:-}
-    volumes:
-      - ./services/models/omni/qwen3-omni-30b-a3b:/models/omni:ro
-      - ./services/hf-cache:/root/.cache/huggingface
-    command: >
-      --model /models/omni
-      --host 0.0.0.0
-      --port 8000
-      --served-model-name friday-omni
-      --max-model-len 32768
-    ports:
-      - "8003:8000"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: ${FRIDAY_OMNI_GPU_COUNT:-1}
-              capabilities: [gpu]
-    networks:
-      - friday_net
-
-  stt:
-    image: python:3.11-slim
-    container_name: friday-stt
-    profiles: ["models", "voice", "stt"]
+  avatar:
+    image: node:20-slim
+    profiles: ["models", "avatar"]
     working_dir: /app
     volumes:
-      - ./services/repos/faster-whisper:/app:ro
-      - ./services/models/stt/faster-whisper-large-v3:/models/stt:ro
+      - ./services/avatar:/app
     command: >
-      bash -lc "echo 'STT service scaffolded (not implemented here yet)' && sleep infinity"
-    ports:
-      - "8004:8001"
-    networks:
-      - friday_net
-
-  tts:
-    image: python:3.11-slim
-    container_name: friday-tts
-    profiles: ["models", "voice", "tts"]
-    command: >
-      bash -lc "echo 'TTS service scaffolded (not implemented here yet)' && sleep infinity"
-    ports:
-      - "8005:8002"
+      bash -lc "echo 'Avatar service scaffold (disabled until implemented)' && sleep infinity"
     networks:
       - friday_net
