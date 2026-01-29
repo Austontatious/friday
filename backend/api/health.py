@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import socket
 from pathlib import Path
 from typing import Any, Dict, Tuple
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter
@@ -21,6 +23,7 @@ def healthz():
 def readyz():
     llm_status = llm_client.status()
     memory_status = _memory_status()
+    jobs_status = _jobs_status()
 
     services = {
         "llm": llm_status,
@@ -30,11 +33,12 @@ def readyz():
         "avatar": _service_status("FRIDAY_AVATAR_ENABLED", "AVATAR_BASE_URL"),
     }
 
-    ok = all(_is_ok(status) for status in services.values()) and _is_ok(memory_status)
+    ok = all(_is_ok(status) for status in services.values()) and _is_ok(memory_status) and _is_ok(jobs_status)
     return {
         "ok": ok,
         "services": services,
         "memory": memory_status,
+        "jobs": jobs_status,
     }
 
 
@@ -63,6 +67,23 @@ def _memory_status() -> Dict[str, Any]:
     return {"enabled": True, "status": "healthy" if ok else "unhealthy", "detail": detail}
 
 
+def _jobs_status() -> Dict[str, Any]:
+    enabled = _env_bool("FRIDAY_JOBS_ENABLED", "0")
+    if not enabled:
+        return {"enabled": False, "status": "disabled"}
+
+    backend = os.getenv("FRIDAY_QUEUE_BACKEND", "memory").strip().lower() or "memory"
+    if backend == "memory":
+        return {"enabled": True, "status": "healthy", "detail": "memory"}
+    if backend == "redis":
+        redis_url = os.getenv("REDIS_URL", "").strip()
+        if not redis_url:
+            return {"enabled": True, "status": "not_configured", "detail": "missing_redis_url"}
+        ok, detail = _probe_redis(redis_url)
+        return {"enabled": True, "status": "healthy" if ok else "unhealthy", "detail": detail}
+    return {"enabled": True, "status": "not_configured", "detail": f"unsupported_backend:{backend}"}
+
+
 def _normalize_url(url: str) -> str:
     base = url.rstrip("/")
     if base.endswith("/v1"):
@@ -84,6 +105,19 @@ def _probe_dir(path: str) -> Tuple[bool, str]:
         return True, "writable"
     except Exception as exc:
         return False, f"unwritable:{exc}"
+
+
+def _probe_redis(url: str) -> Tuple[bool, str]:
+    parsed = urlparse(url)
+    host = parsed.hostname
+    port = parsed.port or 6379
+    if not host:
+        return False, "invalid_redis_url"
+    try:
+        with socket.create_connection((host, port), timeout=2):
+            return True, "reachable"
+    except Exception as exc:
+        return False, f"unreachable:{exc}"
 
 
 def _probe(url: str) -> Tuple[bool, str]:

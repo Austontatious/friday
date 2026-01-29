@@ -42,6 +42,13 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added in-proc jobs store with `/api/jobs` create/status/result endpoints
+- /readyz now reports jobs backend status (memory or redis)
+- Why: establish async job pattern before multimodal work
+- Flags added/changed: none
+- How to test: `curl -X POST http://localhost:9001/api/jobs -H 'Content-Type: application/json' -d '{}'`
+- Known issues: jobs are queued-only (no worker yet)
+
 - Upgraded memory to tiered store (T0 in-memory + optional T1 JSONL persistence) with vector stub
 - /readyz now verifies persistence directory is writable when memory persistence is enabled
 - Why: keep Phase 1 memory reliable while adding persistence behind FRIDAY_MEMORY_PERSIST_ENABLED
