@@ -42,6 +42,13 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Upgraded memory to tiered store (T0 in-memory + optional T1 JSONL persistence) with vector stub
+- /readyz now verifies persistence directory is writable when memory persistence is enabled
+- Why: keep Phase 1 memory reliable while adding persistence behind FRIDAY_MEMORY_PERSIST_ENABLED
+- Flags added/changed: none
+- How to test: set `FRIDAY_MEMORY_PERSIST_ENABLED=1`, start backend, then `curl http://localhost:9001/readyz`
+- Known issues: vector tier is stubbed (no-op)
+
 - Added identity middleware to assign stable `user_id` via header/cookie and attach `X-Friday-User` response header
 - Updated `/api/chat` to carry request `user_id` and return a friendly LLM-disabled response (HTTP 200)
 - Why: establish stable identity buckets and keep text-only chat usable while LLM is disabled

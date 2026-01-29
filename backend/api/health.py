@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import httpx
@@ -19,6 +20,7 @@ def healthz():
 @router.get("/readyz")
 def readyz():
     llm_status = llm_client.status()
+    memory_status = _memory_status()
 
     services = {
         "llm": llm_status,
@@ -28,11 +30,11 @@ def readyz():
         "avatar": _service_status("FRIDAY_AVATAR_ENABLED", "AVATAR_BASE_URL"),
     }
 
-    ok = all(_is_ok(status) for status in services.values())
+    ok = all(_is_ok(status) for status in services.values()) and _is_ok(memory_status)
     return {
         "ok": ok,
         "services": services,
-        "memory": True,
+        "memory": memory_status,
     }
 
 
@@ -51,6 +53,16 @@ def _service_status(enabled_key: str, url_key: str) -> Dict[str, Any]:
     return {"enabled": True, "status": "healthy" if ok else "unhealthy", "detail": detail}
 
 
+def _memory_status() -> Dict[str, Any]:
+    enabled = _env_bool("FRIDAY_MEMORY_PERSIST_ENABLED", "0")
+    if not enabled:
+        return {"enabled": False, "status": "disabled"}
+
+    data_dir = os.getenv("FRIDAY_DATA_DIR", "/data")
+    ok, detail = _probe_dir(data_dir)
+    return {"enabled": True, "status": "healthy" if ok else "unhealthy", "detail": detail}
+
+
 def _normalize_url(url: str) -> str:
     base = url.rstrip("/")
     if base.endswith("/v1"):
@@ -59,6 +71,19 @@ def _normalize_url(url: str) -> str:
         prefix = base.split("/v1", 1)[0] + "/v1"
         return f"{prefix}/models"
     return base
+
+
+def _probe_dir(path: str) -> Tuple[bool, str]:
+    try:
+        candidate = Path(path)
+        candidate.mkdir(parents=True, exist_ok=True)
+        test_file = candidate / ".friday_write_check"
+        with test_file.open("w", encoding="utf-8") as handle:
+            handle.write("ok")
+        test_file.unlink(missing_ok=True)
+        return True, "writable"
+    except Exception as exc:
+        return False, f"unwritable:{exc}"
 
 
 def _probe(url: str) -> Tuple[bool, str]:

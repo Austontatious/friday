@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import Any, Dict
 
 from backend.core.llm import llm_client, LLMDisabledError, LLMConfigError, LLMRequestError
@@ -28,10 +29,18 @@ def _resolve_user_id(payload: Dict[str, Any]) -> str:
     )
 
 
+def _history_limit() -> int:
+    try:
+        limit = int(os.getenv("FRIDAY_CONTEXT_TURNS", "20"))
+    except ValueError:
+        return 20
+    return max(limit, 0)
+
+
 async def run_chat(payload: Dict[str, Any]) -> Dict[str, Any]:
     prompt = payload.get("prompt") or payload.get("message") or payload.get("text")
     user_id = _resolve_user_id(payload)
-    history = _memory.load_thread(user_id)
+    history = _memory.load_thread(user_id, limit=_history_limit())
 
     try:
         reply = await llm_client.generate(prompt, history)
