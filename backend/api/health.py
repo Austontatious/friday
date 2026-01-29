@@ -52,10 +52,21 @@ def _service_status(enabled_key: str, url_key: str) -> Dict[str, Any]:
     return {"enabled": True, "status": "healthy" if ok else "unhealthy", "detail": detail}
 
 
+def _normalize_url(url: str) -> str:
+    base = url.rstrip("/")
+    if base.endswith("/v1"):
+        return f"{base}/models"
+    if "/v1/" in base:
+        prefix = base.split("/v1", 1)[0] + "/v1"
+        return f"{prefix}/models"
+    return base
+
+
 def _probe(url: str) -> Tuple[bool, str]:
     timeout = float(os.getenv("FRIDAY_SERVICE_HEALTH_TIMEOUT", "2"))
+    target = _normalize_url(url)
     try:
-        resp = httpx.get(url, timeout=timeout)
+        resp = httpx.get(target, timeout=timeout)
         if resp.status_code < 400:
             return True, "reachable"
         return False, f"bad_status_{resp.status_code}"

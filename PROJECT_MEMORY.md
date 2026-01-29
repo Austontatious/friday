@@ -42,6 +42,8 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Normalized service health probes to use `/v1/models` when base URLs end in `/v1`
+
 - Added model compose wiring files: `docker-compose.models.yml`, `.env.models.example`
 - Updated `/readyz` to report per-service status and honor *_ENABLED flags
 - Updated chat error mapping to return `llm_unhealthy` when a configured LLM is unreachable
