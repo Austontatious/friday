@@ -42,6 +42,13 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added tool schema/validation engine, built-in memory tools, and evaluation harness
+- Added stub service endpoints + service contracts doc for STT/TTS/Vision/Avatar
+- Why: make tools deterministic and testable while keeping future modalities inert
+- Flags added/changed: FRIDAY_TOOLS_ENABLED, FRIDAY_TOOLS_REQUIRE_CONFIRM
+- How to test: `python tools/eval/smoke_eval.py` (with backend running for API checks)
+- Known issues: tool calls still require explicit approval to execute
+
 - Added prompt assembly pipeline with capabilities + memory bundle + FRIDAY exec profile
 - Updated chat loop to use memory bundle retrieval and LLM message generation
 - Added prompt profile/model class envs for control loop tuning

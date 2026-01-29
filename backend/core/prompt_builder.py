@@ -4,6 +4,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from backend.core.capabilities import get_capabilities
+from backend.tools.engine import tool_schema_list
 
 
 _PROMPT_PROFILES = {
@@ -56,6 +57,9 @@ def build_messages(
 
     capabilities = get_capabilities()
     identity = memory_bundle.get("identity", {})
+
+    if tool_schema is None:
+        tool_schema = tool_schema_list()
 
     system_sections = [
         system_policy,

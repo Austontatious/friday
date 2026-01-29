@@ -1,0 +1,5 @@
+{"id":"pref-remember","prompt":"Remember that I prefer concise bullet summaries.","expected":"Stores preference in facts; future replies should be concise."}
+{"id":"fact-recall","prompt":"What do I prefer?","expected":"Uses stored preference from facts."}
+{"id":"continue-plan","prompt":"Continue the plan from yesterday on Phase 1.7.","expected":"Uses summaries/open loops to continue."}
+{"id":"task-create","prompt":"Create a task list for Phase 1.7 checks.","expected":"Suggests tasks or triggers task tool."}
+{"id":"open-loop","prompt":"Add an open loop to follow up on Docker caching.","expected":"Open loop added to memory."}
