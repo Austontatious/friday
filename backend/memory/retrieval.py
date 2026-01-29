@@ -32,6 +32,7 @@ def build_identity_snapshot(facts: List[Dict[str, Any]]) -> Dict[str, List[Dict[
 
 def retrieve_bundle(
     user_id: str,
+    workspace_id: str,
     prompt: str,
     memory: MemoryStore,
     facts: FactsStore,
@@ -40,13 +41,13 @@ def retrieve_bundle(
     facts_limit: int = 10,
     summaries_limit: int = 5,
 ) -> Dict[str, Any]:
-    recent_turns = memory.load_thread(user_id, limit=limit_turns)
-    relevant_facts = facts.search(user_id, prompt, limit=facts_limit)
-    relevant_summaries = summaries.search(user_id, prompt, limit=summaries_limit)
-    open_loops = summaries.list_open_loops(user_id)
-    commitments = summaries.list_commitments(user_id)
-    tasks = summaries.list_tasks(user_id, status="open")
-    identity = build_identity_snapshot(facts.list_facts(user_id, limit=50))
+    recent_turns = memory.load_thread(user_id, workspace_id, limit=limit_turns)
+    relevant_facts = facts.search(user_id, workspace_id, prompt, limit=facts_limit)
+    relevant_summaries = summaries.search(user_id, workspace_id, prompt, limit=summaries_limit)
+    open_loops = summaries.list_open_loops(user_id, workspace_id)
+    commitments = summaries.list_commitments(user_id, workspace_id)
+    tasks = summaries.list_tasks(user_id, workspace_id, status="open")
+    identity = build_identity_snapshot(facts.list_facts(user_id, workspace_id, limit=50))
 
     return {
         "recent_turns": recent_turns,

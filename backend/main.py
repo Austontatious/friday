@@ -10,6 +10,7 @@ from backend.api.chat import router as chat_router
 from backend.api.capabilities import router as capabilities_router
 from backend.api.health import router as health_router
 from backend.api.jobs import router as jobs_router
+from backend.api.memory_debug import router as memory_debug_router
 from backend.api.stubs import router as stubs_router
 from backend.middleware.identity import IdentityMiddleware
 from backend.tools import builtins as _tool_builtins  # register built-in tools
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router, prefix="/api")
     app.include_router(capabilities_router, prefix="/api")
     app.include_router(jobs_router, prefix="/api")
+    app.include_router(memory_debug_router, prefix="/api")
     app.include_router(stubs_router, prefix="/api")
     app.include_router(health_router)
 

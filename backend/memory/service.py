@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import os
-import re
 import threading
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend.jobs.store import JobStoreError, get_store
@@ -37,21 +35,22 @@ class MemoryService:
         self._facts_store = FactsStore(self._data_dir)
         self._summaries_store = SummariesStore(self._data_dir)
         self._facts_limit = _env_int("FRIDAY_MEMORY_FACTS_RETRIEVAL_LIMIT", 10)
-        self._summaries_limit = _env_int("FRIDAY_MEMORY_SUMMARIES_RETRIEVAL_LIMIT", 5)
+        self._summaries_limit = _env_int("FRIDAY_MEMORY_SUMMARY_RETRIEVAL_LIMIT", 5)
         self._consolidation_enabled = _env_bool("FRIDAY_MEMORY_CONSOLIDATION_ENABLED", "0")
         self._summary_every_n = _env_int("FRIDAY_MEMORY_SUMMARY_EVERY_N_TURNS", 20)
 
-    def append_turn(self, user_id: str, role: str, content: str, meta: Optional[Dict[str, Any]] = None) -> None:
-        self._conversation.append(user_id, role, content, meta=meta)
+    def append_turn(self, user_id: str, workspace_id: str, role: str, content: str, meta: Optional[Dict[str, Any]] = None) -> None:
+        self._conversation.append(user_id, workspace_id, role, content, meta=meta)
         if self._summaries_enabled:
-            self._summaries_store.increment_turns(user_id, count=1)
+            self._summaries_store.increment_turns(user_id, workspace_id, count=1)
 
-    def load_recent_turns(self, user_id: str, limit: int) -> List[Dict[str, Any]]:
-        return self._conversation.load_thread(user_id, limit=limit)
+    def load_recent_turns(self, user_id: str, workspace_id: str, limit: int) -> List[Dict[str, Any]]:
+        return self._conversation.load_thread(user_id, workspace_id, limit=limit)
 
-    def retrieve(self, user_id: str, prompt: str, limit_turns: int) -> Dict[str, Any]:
-        return retrieve_bundle(
+    def retrieve(self, user_id: str, workspace_id: str, prompt: str, limit_turns: int) -> Dict[str, Any]:
+        bundle = retrieve_bundle(
             user_id=user_id,
+            workspace_id=workspace_id,
             prompt=prompt,
             memory=self._conversation,
             facts=self._facts_store,
@@ -60,10 +59,20 @@ class MemoryService:
             facts_limit=self._facts_limit,
             summaries_limit=self._summaries_limit,
         )
+        if not self._facts_enabled:
+            bundle["relevant_facts"] = []
+            bundle["identity"] = {}
+        if not self._summaries_enabled:
+            bundle["relevant_summaries"] = []
+            bundle["open_loops"] = []
+            bundle["commitments"] = []
+            bundle["tasks"] = []
+        return bundle
 
     def remember_fact(
         self,
         user_id: str,
+        workspace_id: str,
         key: str,
         value: str,
         tags: Optional[List[str]] = None,
@@ -75,6 +84,7 @@ class MemoryService:
             raise ValueError("Facts store disabled")
         return self._facts_store.upsert_fact(
             user_id=user_id,
+            workspace_id=workspace_id,
             key=key,
             value=value,
             tags=tags,
@@ -83,52 +93,62 @@ class MemoryService:
             pinned=pinned,
         )
 
-    def forget_fact(self, user_id: str, key: str) -> int:
+    def forget_fact(self, user_id: str, workspace_id: str, key: str) -> int:
         if not self._facts_enabled:
             raise ValueError("Facts store disabled")
-        return self._facts_store.delete_fact(user_id, key)
+        return self._facts_store.delete_fact(user_id, workspace_id, key)
 
-    def list_facts(self, user_id: str, tag: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def list_facts(self, user_id: str, workspace_id: str, tag: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         if not self._facts_enabled:
             return []
-        return self._facts_store.list_facts(user_id, tag=tag, limit=limit)
+        return self._facts_store.list_facts(user_id, workspace_id, tag=tag, limit=limit)
 
-    def add_open_loop(self, user_id: str, item: str) -> Dict[str, Any]:
+    def add_open_loop(self, user_id: str, workspace_id: str, item: str) -> Dict[str, Any]:
         if not self._summaries_enabled:
             raise ValueError("Summaries disabled")
-        return self._summaries_store.add_open_loop(user_id, item)
+        return self._summaries_store.add_open_loop(user_id, workspace_id, item)
 
-    def resolve_open_loop(self, user_id: str, loop_id: str) -> bool:
+    def resolve_open_loop(self, user_id: str, workspace_id: str, loop_id: str) -> bool:
         if not self._summaries_enabled:
             raise ValueError("Summaries disabled")
-        return self._summaries_store.resolve_open_loop(user_id, loop_id)
+        return self._summaries_store.resolve_open_loop(user_id, workspace_id, loop_id)
 
-    def add_task(self, user_id: str, title: str, notes: Optional[str] = None) -> Dict[str, Any]:
+    def add_task(self, user_id: str, workspace_id: str, title: str, notes: Optional[str] = None) -> Dict[str, Any]:
         if not self._summaries_enabled:
             raise ValueError("Summaries disabled")
-        return self._summaries_store.add_task(user_id, title, notes)
+        return self._summaries_store.add_task(user_id, workspace_id, title, notes)
 
-    def list_open_loops(self, user_id: str) -> List[Dict[str, Any]]:
+    def list_open_loops(self, user_id: str, workspace_id: str) -> List[Dict[str, Any]]:
         if not self._summaries_enabled:
             return []
-        return self._summaries_store.list_open_loops(user_id)
+        return self._summaries_store.list_open_loops(user_id, workspace_id)
 
-    def list_tasks(self, user_id: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_tasks(self, user_id: str, workspace_id: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
         if not self._summaries_enabled:
             return []
-        return self._summaries_store.list_tasks(user_id, status=status)
+        return self._summaries_store.list_tasks(user_id, workspace_id, status=status)
 
-    def list_commitments(self, user_id: str) -> List[Dict[str, Any]]:
+    def list_commitments(self, user_id: str, workspace_id: str) -> List[Dict[str, Any]]:
         if not self._summaries_enabled:
             return []
-        return self._summaries_store.list_commitments(user_id)
+        return self._summaries_store.list_commitments(user_id, workspace_id)
 
-    def search_logs(self, user_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def get_summary(self, user_id: str, workspace_id: str, thread_id: str = "default") -> Dict[str, Any]:
+        if not self._summaries_enabled:
+            return {}
+        return self._summaries_store.load(user_id, workspace_id, thread_id)
+
+    def consolidate_now(self, user_id: str, workspace_id: str, thread_id: str = "default") -> Dict[str, Any]:
+        if not (self._summaries_enabled and self._facts_enabled):
+            raise ValueError("Summaries or facts store disabled")
+        return consolidate(user_id, workspace_id, thread_id, self._conversation, self._facts_store, self._summaries_store)
+
+    def search_logs(self, user_id: str, workspace_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
         query_lower = query.lower()
 
         if self._conversation.persist_enabled():
-            path = self._conversation.thread_path(user_id)
+            path = self._conversation.thread_path(user_id, workspace_id)
             if path.exists():
                 for line in path.read_text(encoding="utf-8").splitlines():
                     if not line:
@@ -138,7 +158,7 @@ class MemoryService:
                         if len(results) >= limit:
                             return results
 
-        for entry in self._conversation.load_thread(user_id, limit=200):
+        for entry in self._conversation.load_thread(user_id, workspace_id, limit=200):
             content = str(entry.get("content", ""))
             if query_lower in content.lower():
                 results.append({"role": entry.get("role"), "content": content})
@@ -147,10 +167,10 @@ class MemoryService:
 
         return results
 
-    def maybe_consolidate(self, user_id: str, thread_id: str = "default") -> Optional[str]:
+    def maybe_consolidate(self, user_id: str, workspace_id: str, thread_id: str = "default") -> Optional[str]:
         if not (self._summaries_enabled and self._facts_enabled and self._consolidation_enabled):
             return None
-        summary_state = self._summaries_store.load(user_id, thread_id)
+        summary_state = self._summaries_store.load(user_id, workspace_id, thread_id)
         turns_since = int(summary_state.get("turns_since_summary", 0))
         if turns_since < max(self._summary_every_n, 1):
             return None
@@ -158,16 +178,16 @@ class MemoryService:
         try:
             store = get_store()
         except JobStoreError:
-            consolidate(user_id, thread_id, self._conversation, self._facts_store, self._summaries_store)
+            consolidate(user_id, workspace_id, thread_id, self._conversation, self._facts_store, self._summaries_store)
             return None
 
-        job = store.create({"type": "memory_consolidation", "user_id": user_id, "thread_id": thread_id})
+        job = store.create({"type": "memory_consolidation", "user_id": user_id, "workspace_id": workspace_id, "thread_id": thread_id})
         job_id = job["job_id"]
 
         def _run() -> None:
             store.set_status(job_id, "running")
             try:
-                result = consolidate(user_id, thread_id, self._conversation, self._facts_store, self._summaries_store)
+                result = consolidate(user_id, workspace_id, thread_id, self._conversation, self._facts_store, self._summaries_store)
                 store.set_result(job_id, result)
             except Exception as exc:
                 store.set_error(job_id, str(exc))

@@ -42,6 +42,20 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added debug gating for tool error turns (default drop), vendor import guard script, and regression check helper
+- Why: avoid tool-error feedback loops and add a lightweight pre-import tripwire
+- Flags added/changed: FRIDAY_DEBUG_TOOL_ERRORS
+- How to test: run the eval tripwire command from `docs/RUNBOOK.md`
+- Known issues: regression check validates JSONL structure only (no model assertions)
+
+- Wired end-to-end tool calls with strict parsing, schema validation, trust gating, and audit logging
+- Added workspace-aware memory paths, routing helper, and audit log JSONL
+- Added trust boundary classifier, debug memory APIs, and stub security contracts
+- Why: harden tool execution and prepare for Moltbot-style routing without unsafe defaults
+- Flags added/changed: FRIDAY_TRUST_MODE, FRIDAY_TRUST_SAFE_TOOLS, FRIDAY_DEBUG_APIS_ENABLED
+- How to test: enable flags, run `python tools/eval/smoke_eval.py`, and call `/api/memory/*` with debug enabled
+- Known issues: tool execution still requires explicit confirmation (default ON)
+
 - Added tool schema/validation engine, built-in memory tools, and evaluation harness
 - Added stub service endpoints + service contracts doc for STT/TTS/Vision/Avatar
 - Why: make tools deterministic and testable while keeping future modalities inert

@@ -30,3 +30,14 @@ Full suite:
 ## Logging
 - Structured logs with request_id + user_id + job_id
 - Keep logs volume reasonable; debug logs behind flag
+
+## Debug APIs
+- Memory debug endpoints are gated by `FRIDAY_DEBUG_APIS_ENABLED=1`
+- Disable in production
+
+## Eval Tripwire (pre-import baseline)
+Run this before importing external references (e.g., Moltbot) to ensure the core loop hasn’t regressed:
+
+```bash
+FRIDAY_TOOLS_ENABLED=1 FRIDAY_TOOLS_REQUIRE_CONFIRM=1 FRIDAY_TRUST_MODE=strict FRIDAY_DEBUG_APIS_ENABLED=1 FRIDAY_MEMORY_FACTS_ENABLED=1 FRIDAY_MEMORY_SUMMARIES_ENABLED=1 FRIDAY_MEMORY_CONSOLIDATION_ENABLED=1 python3 tools/eval/smoke_eval.py && python3 tools/eval/regression_check.py --limit 5
+```

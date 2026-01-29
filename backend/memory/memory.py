@@ -29,16 +29,16 @@ class MemoryStore:
         self._data_dir = os.getenv("FRIDAY_DATA_DIR", "/data")
         self._thread_id = "default"
 
-    def load_thread(self, user_id: str, limit: Optional[int] = None) -> List[dict]:
-        persisted = self._load_persisted(user_id, limit=limit)
+    def load_thread(self, user_id: str, workspace_id: str, limit: Optional[int] = None) -> List[dict]:
+        persisted = self._load_persisted(user_id, workspace_id, limit=limit)
         with self._lock:
-            live = list(self._threads.get(user_id, []))
+            live = list(self._threads.get(self._thread_key(user_id, workspace_id), []))
         combined = persisted + live
         if limit is not None and limit > 0:
             return combined[-limit:]
         return combined
 
-    def append(self, user_id: str, role: str, content: str, meta: Optional[Dict[str, Any]] = None) -> None:
+    def append(self, user_id: str, workspace_id: str, role: str, content: str, meta: Optional[Dict[str, Any]] = None) -> None:
         entry: Dict[str, Any] = {
             "ts": _utc_ts(),
             "role": role,
@@ -48,10 +48,11 @@ class MemoryStore:
             entry["meta"] = meta
 
         with self._lock:
-            self._threads.setdefault(user_id, []).append(entry)
+            key = self._thread_key(user_id, workspace_id)
+            self._threads.setdefault(key, []).append(entry)
 
         if self._persist_enabled:
-            self._append_persisted(user_id, entry)
+            self._append_persisted(user_id, workspace_id, entry)
 
     def vector_enabled(self) -> bool:
         return self._vector_enabled
@@ -59,24 +60,24 @@ class MemoryStore:
     def persist_enabled(self) -> bool:
         return self._persist_enabled
 
-    def thread_path(self, user_id: str) -> Path:
-        return self._thread_path(user_id)
+    def thread_path(self, user_id: str, workspace_id: str) -> Path:
+        return self._thread_path(user_id, workspace_id)
 
     def recall_vector(self, query: str) -> List[dict]:
         if not self._vector_enabled:
             return []
         return []
 
-    def _append_persisted(self, user_id: str, entry: Dict[str, Any]) -> None:
-        path = self._thread_path(user_id)
+    def _append_persisted(self, user_id: str, workspace_id: str, entry: Dict[str, Any]) -> None:
+        path = self._thread_path(user_id, workspace_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-    def _load_persisted(self, user_id: str, limit: Optional[int] = None) -> List[dict]:
+    def _load_persisted(self, user_id: str, workspace_id: str, limit: Optional[int] = None) -> List[dict]:
         if not self._persist_enabled:
             return []
-        path = self._thread_path(user_id)
+        path = self._thread_path(user_id, workspace_id)
         if not path.exists():
             return []
 
@@ -105,6 +106,10 @@ class MemoryStore:
                     continue
         return entries
 
-    def _thread_path(self, user_id: str) -> Path:
+    def _thread_path(self, user_id: str, workspace_id: str) -> Path:
         safe_id = re.sub(r"[^a-zA-Z0-9_.-]", "_", user_id) or "unknown"
-        return Path(self._data_dir) / "users" / safe_id / "threads" / f"{self._thread_id}.jsonl"
+        safe_ws = re.sub(r"[^a-zA-Z0-9_.-]", "_", workspace_id) or "default"
+        return Path(self._data_dir) / "users" / safe_id / "workspaces" / safe_ws / "threads" / f"{self._thread_id}.jsonl"
+
+    def _thread_key(self, user_id: str, workspace_id: str) -> str:
+        return f"{workspace_id}:{user_id}"

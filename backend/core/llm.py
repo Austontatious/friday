@@ -115,6 +115,8 @@ class LLMClient:
                 lines.append(f"System: {content}")
             elif role == "assistant":
                 lines.append(f"Assistant: {content}")
+            elif role == "tool":
+                lines.append(f"Tool: {content}")
             else:
                 lines.append(f"User: {content}")
         lines.append("Assistant:")

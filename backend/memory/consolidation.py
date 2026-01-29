@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Sequence, Tuple
 
+from backend.audit.logger import log_event
 from backend.memory.facts_store import FactsStore
 from backend.memory.memory import MemoryStore
 from backend.memory.summaries_store import SummariesStore
@@ -72,14 +73,15 @@ def extract_open_loops(turns: List[Dict[str, Any]]) -> List[str]:
 
 def consolidate(
     user_id: str,
+    workspace_id: str,
     thread_id: str,
     conversation: MemoryStore,
     facts: FactsStore,
     summaries: SummariesStore,
 ) -> Dict[str, Any]:
-    turns = conversation.load_thread(user_id, limit=40)
+    turns = conversation.load_thread(user_id, workspace_id, limit=40)
     summary_text = summarize_turns(turns)
-    existing = summaries.load(user_id, thread_id)
+    existing = summaries.load(user_id, workspace_id, thread_id)
     open_loops = existing.get("open_loops", [])
 
     new_open = extract_open_loops(turns)
@@ -87,18 +89,20 @@ def consolidate(
     for item in new_open:
         if item in open_items:
             continue
-        summaries.add_open_loop(user_id, item, thread_id)
+        summaries.add_open_loop(user_id, workspace_id, item, thread_id)
         open_items.add(item)
 
     facts_added = 0
     for fact in extract_facts(turns):
-        facts.upsert_fact(user_id, fact["key"], fact["value"], tags=fact.get("tags"), source="consolidation")
+        facts.upsert_fact(user_id, workspace_id, fact["key"], fact["value"], tags=fact.get("tags"), source="consolidation")
         facts_added += 1
 
-    summaries.update_summary(user_id, summary_text, thread_id=thread_id)
+    summaries.update_summary(user_id, workspace_id, summary_text, thread_id=thread_id)
 
-    return {
+    result = {
         "summary": summary_text,
         "facts_added": facts_added,
         "open_loops_added": len(new_open),
     }
+    log_event("memory_consolidation", result, user_id, workspace_id)
+    return result

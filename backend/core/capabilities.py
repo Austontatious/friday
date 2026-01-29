@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from backend.audit.logger import log_event
 from backend.core.health_checks import env_bool, jobs_status, memory_status, service_status
 from backend.core.llm import llm_client
 
 
 def _available_from_status(status: Dict[str, Any]) -> bool:
     return status.get("enabled") is True and status.get("status") == "healthy"
+
+
+_LAST_SNAPSHOT: Dict[str, Any] = {}
 
 
 def get_capabilities() -> Dict[str, Any]:
@@ -47,4 +51,9 @@ def get_capabilities() -> Dict[str, Any]:
         "memory_summaries": enabled.get("memory_summaries", False),
     }
 
-    return {"enabled": enabled, "available": available}
+    snapshot = {"enabled": enabled, "available": available}
+    global _LAST_SNAPSHOT
+    if _LAST_SNAPSHOT != snapshot:
+        log_event("capabilities_snapshot_changed", {"snapshot": snapshot})
+        _LAST_SNAPSHOT = snapshot
+    return snapshot

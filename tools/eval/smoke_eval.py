@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import json
 import os
 import sys
 import tempfile
+from pathlib import Path
+import subprocess
 from typing import Any, Dict
 
 import requests
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 BASE_URL = os.getenv("FRIDAY_BASE_URL", "http://localhost:9001")
 
@@ -54,9 +59,9 @@ def memory_check() -> None:
         from backend.memory.service import MemoryService
 
         service = MemoryService()
-        service.append_turn("user-1", "user", "Remember that I like espresso.")
-        service.remember_fact("user-1", "drink", "espresso", tags=["preference"])
-        bundle = service.retrieve("user-1", "What do I like?", limit_turns=5)
+        service.append_turn("user-1", "default", "user", "Remember that I like espresso.")
+        service.remember_fact("user-1", "default", "drink", "espresso", tags=["preference"])
+        bundle = service.retrieve("user-1", "default", "espresso", limit_turns=5)
 
         facts = bundle.get("relevant_facts", [])
         if not any(fact.get("value") == "espresso" for fact in facts):
@@ -66,13 +71,40 @@ def memory_check() -> None:
 
 
 def tool_check() -> None:
-    from backend.tools.engine import validate_tool_call
+    from backend.tools import builtins as _builtins  # register tools
+    from backend.security.trust import TrustContext
+    from backend.tools.engine import execute_tool_call, validate_tool_call
 
     ok, error = validate_tool_call({"name": "remember_fact"})
     if ok or error.get("code") != "invalid_tool_call":
         raise AssertionError("tool schema validation failed")
 
+    os.environ["FRIDAY_TOOLS_ENABLED"] = "1"
+    os.environ["FRIDAY_TOOLS_REQUIRE_CONFIRM"] = "1"
+    os.environ["FRIDAY_MEMORY_FACTS_ENABLED"] = "1"
+
+    call = {"id": "t1", "name": "remember_fact", "args": {"key": "pref", "value": "short replies"}}
+    trust = TrustContext(level="trusted_user", reasons=["smoke"])
+    blocked = execute_tool_call(call, context_user_id="user-1", workspace_id="default", require_confirm=True, approved=False, trust=trust)
+    if blocked.get("ok") is True or blocked.get("error", {}).get("code") != "requires_confirmation":
+        raise AssertionError("tool should require confirmation")
+
+    allowed = execute_tool_call(call, context_user_id="user-1", workspace_id="default", require_confirm=True, approved=True, trust=trust)
+    if not allowed.get("ok"):
+        raise AssertionError("tool should execute after confirmation")
+
     log("tool checks ok")
+
+
+def guard_vendor_imports() -> None:
+    root = Path(__file__).resolve().parents[2]
+    script = root / "scripts" / "check_no_vendor_imports.sh"
+    if not script.exists():
+        return
+    try:
+        subprocess.run([str(script)], check=True)
+    except Exception as exc:
+        raise AssertionError(f"vendor import guard failed: {exc}")
 
 
 def main() -> None:
@@ -82,6 +114,7 @@ def main() -> None:
         log(f"api checks failed: {exc}")
     memory_check()
     tool_check()
+    guard_vendor_imports()
     log("smoke eval complete")
 
 

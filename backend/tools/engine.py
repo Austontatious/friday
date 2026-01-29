@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import inspect
 import os
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+from backend.audit.logger import log_event
+from backend.security.trust import TrustContext, is_safe_tool, require_confirmation
 
 from backend.tools.registry import get_tool, tool_schema
 
@@ -81,47 +84,82 @@ def tool_schema_list() -> List[Dict[str, Any]]:
     return [{"name": name, **details} for name, details in schema.items()]
 
 
-def execute_tool_call(call: Dict[str, Any], approved: bool = False, context_user_id: Optional[str] = None) -> Dict[str, Any]:
+def execute_tool_call(
+    call: Dict[str, Any],
+    context_user_id: Optional[str],
+    workspace_id: Optional[str],
+    require_confirm: Optional[bool],
+    approved: bool = False,
+    trust: Optional[TrustContext] = None,
+) -> Dict[str, Any]:
     ok, error = validate_tool_call(call)
     if not ok:
+        log_event("tool_call_invalid", {"call": call, "error": error}, context_user_id, workspace_id)
         return {"id": call.get("id") if isinstance(call, dict) else None, "name": None, "ok": False, "error": error}
 
     if not _env_bool("FRIDAY_TOOLS_ENABLED", "0"):
-        return {"id": call["id"], "name": call["name"], "ok": False, "error": _error("tools_disabled", "Tools are disabled")}
+        error = _error("tools_disabled", "Tools are disabled")
+        log_event("tool_call_blocked", {"call": call, "error": error}, context_user_id, workspace_id)
+        return {"id": call["id"], "name": call["name"], "ok": False, "error": error}
 
     spec = get_tool(call["name"])
     if not spec:
-        return {"id": call["id"], "name": call["name"], "ok": False, "error": _error("tool_not_found", "Unknown tool")}
-
-    if not _tool_enabled(spec):
-        return {"id": call["id"], "name": call["name"], "ok": False, "error": _error("tool_disabled", "Tool is disabled")}
-
-    if spec.get("requires_confirmation") or _env_bool("FRIDAY_TOOLS_REQUIRE_CONFIRM", "1"):
-        if not approved:
-            return {
-                "id": call["id"],
-                "name": call["name"],
-                "ok": False,
-                "error": _error("requires_confirmation", "Tool call requires confirmation"),
-            }
-
-    args_schema = spec.get("args_schema", {})
-    ok, error = validate_args(args_schema, call["args"])
-    if not ok:
+        error = _error("tool_not_found", "Unknown tool")
+        log_event("tool_call_blocked", {"call": call, "error": error}, context_user_id, workspace_id)
         return {"id": call["id"], "name": call["name"], "ok": False, "error": error}
 
-    try:
-        args = dict(call["args"])
-        if context_user_id:
-            params = inspect.signature(spec["fn"]).parameters
-            if "user_id" in params and "user_id" not in args:
-                args["user_id"] = context_user_id
-        result = spec["fn"](**args)
-        return {"id": call["id"], "name": call["name"], "ok": True, "result": result}
-    except Exception as exc:
+    if not _tool_enabled(spec):
+        error = _error("tool_disabled", "Tool is disabled")
+        log_event("tool_call_blocked", {"call": call, "error": error}, context_user_id, workspace_id)
+        return {"id": call["id"], "name": call["name"], "ok": False, "error": error}
+
+    needs_confirm = require_confirm if require_confirm is not None else _env_bool("FRIDAY_TOOLS_REQUIRE_CONFIRM", "1")
+    if trust and require_confirmation(trust) and not is_safe_tool(call["name"]):
+        needs_confirm = True
+    if spec.get("requires_confirmation"):
+        needs_confirm = True
+
+    if needs_confirm and not approved:
+        error = _error("requires_confirmation", "Tool call requires confirmation")
+        log_event("tool_call_blocked", {"call": call, "error": error}, context_user_id, workspace_id)
         return {
             "id": call["id"],
             "name": call["name"],
             "ok": False,
-            "error": _error("tool_failed", "Tool execution failed", str(exc)),
+            "error": error,
+        }
+
+    args_schema = spec.get("args_schema", {})
+    ok, error = validate_args(args_schema, call["args"])
+    if not ok:
+        log_event("tool_call_invalid", {"call": call, "error": error}, context_user_id, workspace_id)
+        return {"id": call["id"], "name": call["name"], "ok": False, "error": error}
+
+    try:
+        args = dict(call["args"])
+        params = inspect.signature(spec["fn"]).parameters
+        if "user_id" in params and "user_id" not in args:
+            if not context_user_id:
+                error = _error("missing_context", "user_id is required")
+                log_event("tool_call_blocked", {"call": call, "error": error}, context_user_id, workspace_id)
+                return {"id": call["id"], "name": call["name"], "ok": False, "error": error}
+            args["user_id"] = context_user_id
+        if "workspace_id" in params and "workspace_id" not in args:
+            if not workspace_id:
+                error = _error("missing_context", "workspace_id is required")
+                log_event("tool_call_blocked", {"call": call, "error": error}, context_user_id, workspace_id)
+                return {"id": call["id"], "name": call["name"], "ok": False, "error": error}
+            args["workspace_id"] = workspace_id
+
+        result = spec["fn"](**args)
+        log_event("tool_call_ok", {"call": call, "result": result}, context_user_id, workspace_id)
+        return {"id": call["id"], "name": call["name"], "ok": True, "result": result}
+    except Exception as exc:
+        error = _error("tool_failed", "Tool execution failed", str(exc))
+        log_event("tool_call_failed", {"call": call, "error": error}, context_user_id, workspace_id)
+        return {
+            "id": call["id"],
+            "name": call["name"],
+            "ok": False,
+            "error": error,
         }

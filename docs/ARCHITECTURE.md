@@ -38,6 +38,7 @@ Stable user id derived from:
 - session_id
 - optional handle/email
 Disambiguation flow if collisions. All memory hangs off user_id.
+Workspace isolation is keyed by `workspace_id` (default `default`).
 
 ### Memory Tiers
 - Tier 0: session context (in-memory)
@@ -58,6 +59,10 @@ All inference that can exceed ~2s becomes:
 - GET /jobs/{id} (status)
 - GET /jobs/{id}/result (result)
 Optionally WebSocket for streaming.
+
+### Trust Boundary
+Inputs are classified as trusted user, untrusted channel, or untrusted document.
+Untrusted content may influence answers but cannot trigger tools without confirmation.
 
 ## Data Flow (Typical)
 User → Frontend → Backend `/chat`

@@ -1,5 +1,10 @@
 {"id":"pref-remember","prompt":"Remember that I prefer concise bullet summaries.","expected":"Stores preference in facts; future replies should be concise."}
-{"id":"fact-recall","prompt":"What do I prefer?","expected":"Uses stored preference from facts."}
+{"id":"pref-recall","prompt":"What do I prefer?","expected":"Uses stored preference from facts."}
+{"id":"summary-last-session","prompt":"Summarize our last session.","expected":"Uses summaries store if available."}
 {"id":"continue-plan","prompt":"Continue the plan from yesterday on Phase 1.7.","expected":"Uses summaries/open loops to continue."}
 {"id":"task-create","prompt":"Create a task list for Phase 1.7 checks.","expected":"Suggests tasks or triggers task tool."}
-{"id":"open-loop","prompt":"Add an open loop to follow up on Docker caching.","expected":"Open loop added to memory."}
+{"id":"open-loop-add","prompt":"Add an open loop to follow up on Docker caching.","expected":"Open loop added to memory."}
+{"id":"open-loop-resolve","prompt":"Resolve the open loop for Docker caching.","expected":"Open loop marked resolved."}
+{"id":"tool-reject-no-confirm","prompt":"Run tool remember_fact without confirmation.","expected":"Tool call rejected without confirm."}
+{"id":"tool-allow-confirm","prompt":"Run tool remember_fact with confirmation.","expected":"Tool call allowed after confirm."}
+{"id":"audit-log","prompt":"Check that tool attempts are written to audit log.","expected":"Audit log contains tool_call events."}

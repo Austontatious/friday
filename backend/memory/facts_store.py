@@ -52,8 +52,8 @@ class FactsStore:
         self._data_dir = data_dir
         self._max_facts = _env_int("FRIDAY_MEMORY_MAX_FACTS", 500)
 
-    def list_facts(self, user_id: str, tag: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        facts = self._load(user_id)
+    def list_facts(self, user_id: str, workspace_id: str, tag: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        facts = self._load(user_id, workspace_id)
         if tag:
             tag = tag.lower()
             facts = [fact for fact in facts if tag in (fact.get("tags") or [])]
@@ -62,8 +62,8 @@ class FactsStore:
             return facts[:limit]
         return facts
 
-    def search(self, user_id: str, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        facts = self._load(user_id)
+    def search(self, user_id: str, workspace_id: str, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        facts = self._load(user_id, workspace_id)
         query_tokens = _tokenize(query)
         scored: List[Tuple[float, Dict[str, Any]]] = []
         for fact in facts:
@@ -77,6 +77,7 @@ class FactsStore:
     def upsert_fact(
         self,
         user_id: str,
+        workspace_id: str,
         key: str,
         value: str,
         tags: Optional[Sequence[str]] = None,
@@ -89,7 +90,7 @@ class FactsStore:
         if not key or not value:
             raise ValueError("key and value are required")
 
-        facts = self._load(user_id)
+        facts = self._load(user_id, workspace_id)
         now = _utc_ts()
         tags_list = _normalize_tags(tags)
         confidence_value = self._normalize_confidence(confidence)
@@ -138,20 +139,20 @@ class FactsStore:
             facts.append(updated)
 
         self._prune(facts)
-        self._save(user_id, facts)
+        self._save(user_id, workspace_id, facts)
         return updated
 
-    def delete_fact(self, user_id: str, key: str) -> int:
-        facts = self._load(user_id)
+    def delete_fact(self, user_id: str, workspace_id: str, key: str) -> int:
+        facts = self._load(user_id, workspace_id)
         before = len(facts)
         facts = [fact for fact in facts if fact.get("key") != key]
         removed = before - len(facts)
         if removed:
-            self._save(user_id, facts)
+            self._save(user_id, workspace_id, facts)
         return removed
 
-    def _load(self, user_id: str) -> List[Dict[str, Any]]:
-        path = self._path(user_id)
+    def _load(self, user_id: str, workspace_id: str) -> List[Dict[str, Any]]:
+        path = self._path(user_id, workspace_id)
         if not path.exists():
             return []
         try:
@@ -162,14 +163,15 @@ class FactsStore:
             return data
         return []
 
-    def _save(self, user_id: str, facts: List[Dict[str, Any]]) -> None:
-        path = self._path(user_id)
+    def _save(self, user_id: str, workspace_id: str, facts: List[Dict[str, Any]]) -> None:
+        path = self._path(user_id, workspace_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(facts, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def _path(self, user_id: str) -> Path:
+    def _path(self, user_id: str, workspace_id: str) -> Path:
         safe_id = re.sub(r"[^a-zA-Z0-9_.-]", "_", user_id) or "unknown"
-        return Path(self._data_dir) / "users" / safe_id / "facts.json"
+        safe_ws = re.sub(r"[^a-zA-Z0-9_.-]", "_", workspace_id) or "default"
+        return Path(self._data_dir) / "users" / safe_id / "workspaces" / safe_ws / "facts.json"
 
     def _prune(self, facts: List[Dict[str, Any]]) -> None:
         if self._max_facts <= 0:
