@@ -42,6 +42,12 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added emotion-lite metadata capture (record-only) on user messages when enabled
+- Why: capture coarse sentiment/arousal/confusion/urgency without changing behavior
+- Flags added/changed: none (uses existing FRIDAY_EMOTION_LITE_ENABLED)
+- How to test: set `FRIDAY_EMOTION_LITE_ENABLED=1` and post to `/api/chat`, then inspect JSONL when memory persistence is enabled
+- Known issues: heuristic-only (no model)
+
 - Added `/api/capabilities` endpoint and shared health-check helpers
 - Expanded backend compose env to pass capability flags + service URLs into the container
 - Why: allow frontend gating and make enabled/available reporting consistent with env config

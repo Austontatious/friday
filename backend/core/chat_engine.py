@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import os
 from typing import Any, Dict
 
+from backend.core.emotion_lite import analyze as analyze_emotion, enabled as emotion_enabled
 from backend.core.llm import llm_client, LLMDisabledError, LLMConfigError, LLMRequestError
 from backend.memory.memory import MemoryStore
 
@@ -53,7 +54,11 @@ async def run_chat(payload: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as exc:
         raise ChatError("chat_failed", "Chat failed", str(exc), True, 500)
 
-    _memory.append(user_id, "user", prompt)
+    user_meta = None
+    if emotion_enabled():
+        user_meta = {"affect": analyze_emotion(prompt)}
+
+    _memory.append(user_id, "user", prompt, meta=user_meta)
     _memory.append(user_id, "assistant", reply)
 
     return {
