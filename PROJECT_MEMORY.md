@@ -42,6 +42,13 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added consolidation loop scaffold (heuristic summary + fact extraction) with job tracking
+- Added summary cadence flag for deterministic consolidation triggers
+- Why: enable rolling summaries and fact extraction without blocking chat
+- Flags added/changed: FRIDAY_MEMORY_SUMMARY_EVERY_N_TURNS
+- How to test: enable facts/summaries/consolidation flags, send N turns, inspect summaries and facts files
+- Known issues: consolidation is heuristic until LLM summarizer is wired
+
 - Added Memory v2 data model: facts store, summaries store, retrieval bundle, and memory service
 - Added env flags for facts/summaries/consolidation and retrieval limits
 - Why: enable structured, queryable memory beyond raw conversation logs

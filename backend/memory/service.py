@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from backend.jobs.store import JobStoreError, get_store
+from backend.memory.consolidation import consolidate
 from backend.memory.facts_store import FactsStore
 from backend.memory.memory import MemoryStore
 from backend.memory.retrieval import retrieve_bundle
@@ -35,6 +38,8 @@ class MemoryService:
         self._summaries_store = SummariesStore(self._data_dir)
         self._facts_limit = _env_int("FRIDAY_MEMORY_FACTS_RETRIEVAL_LIMIT", 10)
         self._summaries_limit = _env_int("FRIDAY_MEMORY_SUMMARIES_RETRIEVAL_LIMIT", 5)
+        self._consolidation_enabled = _env_bool("FRIDAY_MEMORY_CONSOLIDATION_ENABLED", "0")
+        self._summary_every_n = _env_int("FRIDAY_MEMORY_SUMMARY_EVERY_N_TURNS", 20)
 
     def append_turn(self, user_id: str, role: str, content: str, meta: Optional[Dict[str, Any]] = None) -> None:
         self._conversation.append(user_id, role, content, meta=meta)
@@ -141,6 +146,34 @@ class MemoryService:
                     break
 
         return results
+
+    def maybe_consolidate(self, user_id: str, thread_id: str = "default") -> Optional[str]:
+        if not (self._summaries_enabled and self._facts_enabled and self._consolidation_enabled):
+            return None
+        summary_state = self._summaries_store.load(user_id, thread_id)
+        turns_since = int(summary_state.get("turns_since_summary", 0))
+        if turns_since < max(self._summary_every_n, 1):
+            return None
+
+        try:
+            store = get_store()
+        except JobStoreError:
+            consolidate(user_id, thread_id, self._conversation, self._facts_store, self._summaries_store)
+            return None
+
+        job = store.create({"type": "memory_consolidation", "user_id": user_id, "thread_id": thread_id})
+        job_id = job["job_id"]
+
+        def _run() -> None:
+            store.set_status(job_id, "running")
+            try:
+                result = consolidate(user_id, thread_id, self._conversation, self._facts_store, self._summaries_store)
+                store.set_result(job_id, result)
+            except Exception as exc:
+                store.set_error(job_id, str(exc))
+
+        threading.Thread(target=_run, daemon=True).start()
+        return job_id
 
 
 memory_service = MemoryService()
