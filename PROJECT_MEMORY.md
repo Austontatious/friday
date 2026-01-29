@@ -42,6 +42,12 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added `tools/pull_models.sh` model fetcher (HF + GitHub) with manifest output
+- Why: standardize model pulls and repos for Phase 1 multimodal stack
+- Flags added/changed: none
+- How to test: `HF_TOKEN=... ./tools/pull_models.sh`
+- Known issues: script exits if HF_TOKEN is not set
+
 - Phase 0 stabilization: added canonical backend spine under `backend/` (entrypoint, chat, health, memory, tools)
 - Deprecated legacy routes/entrypoints and removed duplicate `/process` handlers in active paths
 - Fixed `start.sh`, `process_manager.py`, `Dockerfile`, `docker-compose.yaml` for a single runnable backend
