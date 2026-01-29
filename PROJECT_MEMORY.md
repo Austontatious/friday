@@ -42,6 +42,14 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added prompt assembly pipeline with capabilities + memory bundle + FRIDAY exec profile
+- Updated chat loop to use memory bundle retrieval and LLM message generation
+- Added prompt profile/model class envs for control loop tuning
+- Why: make the core loop structured and model-aware
+- Flags added/changed: FRIDAY_PROMPT_PROFILE, FRIDAY_MODEL_CLASS
+- How to test: `curl -X POST http://localhost:9001/api/chat -H 'Content-Type: application/json' -d '{"prompt":"Hello"}'`
+- Known issues: tool schema injection is stubbed until tools are wired
+
 - Added consolidation loop scaffold (heuristic summary + fact extraction) with job tracking
 - Added summary cadence flag for deterministic consolidation triggers
 - Why: enable rolling summaries and fact extraction without blocking chat

@@ -6,7 +6,8 @@ from typing import Any, Dict
 
 from backend.core.emotion_lite import analyze as analyze_emotion, enabled as emotion_enabled
 from backend.core.llm import llm_client, LLMDisabledError, LLMConfigError, LLMRequestError
-from backend.memory.memory import MemoryStore
+from backend.core.prompt_builder import build_messages
+from backend.memory.service import memory_service
 
 
 @dataclass
@@ -18,7 +19,6 @@ class ChatError(Exception):
     status_code: int = 500
 
 
-_memory = MemoryStore()
 LLM_DISABLED_MESSAGE = "[LLM disabled] Set FRIDAY_LLM_ENABLED=1 and LLM_BASE_URL to enable chat."
 
 
@@ -41,10 +41,11 @@ def _history_limit() -> int:
 async def run_chat(payload: Dict[str, Any]) -> Dict[str, Any]:
     prompt = payload.get("prompt") or payload.get("message") or payload.get("text")
     user_id = _resolve_user_id(payload)
-    history = _memory.load_thread(user_id, limit=_history_limit())
+    memory_bundle = memory_service.retrieve(user_id, prompt, limit_turns=_history_limit())
+    messages = build_messages(prompt, memory_bundle, tool_schema=None)
 
     try:
-        reply = await llm_client.generate(prompt, history)
+        reply = await llm_client.generate_messages(messages)
     except LLMDisabledError:
         reply = LLM_DISABLED_MESSAGE
     except LLMConfigError as exc:
@@ -58,11 +59,12 @@ async def run_chat(payload: Dict[str, Any]) -> Dict[str, Any]:
     if emotion_enabled():
         user_meta = {"affect": analyze_emotion(prompt)}
 
-    _memory.append(user_id, "user", prompt, meta=user_meta)
-    _memory.append(user_id, "assistant", reply)
+    memory_service.append_turn(user_id, "user", prompt, meta=user_meta)
+    memory_service.append_turn(user_id, "assistant", reply)
+    consolidation_job = memory_service.maybe_consolidate(user_id)
 
     return {
         "text": reply,
         "tools": [],
-        "meta": {"user_id": user_id},
+        "meta": {"user_id": user_id, "consolidation_job_id": consolidation_job},
     }

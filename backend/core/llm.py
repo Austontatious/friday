@@ -72,12 +72,19 @@ class LLMClient:
         return {"enabled": True, "status": "not_configured", "detail": "no_model_or_url"}
 
     async def generate(self, prompt: str, history: Optional[List[Dict[str, str]]] = None) -> str:
+        messages = [{"role": "system", "content": _default_system_prompt()}]
+        for msg in history or []:
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+        messages.append({"role": "user", "content": prompt})
+        return await self.generate_messages(messages)
+
+    async def generate_messages(self, messages: List[Dict[str, str]]) -> str:
         if not self.enabled:
             raise LLMDisabledError("LLM is disabled")
         if self.model_path:
-            return await asyncio.to_thread(self._generate_local, prompt, history or [])
+            return await asyncio.to_thread(self._generate_local_messages, messages)
         if self.base_url:
-            return await self._generate_remote(prompt, history or [])
+            return await self._generate_remote_messages(messages)
         raise LLMConfigError("No LLM configured")
 
     def _load_llama(self):
@@ -99,20 +106,21 @@ class LLMClient:
             verbose=False,
         )
 
-    def _build_prompt(self, prompt: str, history: List[Dict[str, str]]) -> str:
-        lines = [f"System: {_default_system_prompt()}"]
-        for msg in history[-10:]:
+    def _build_prompt_from_messages(self, messages: List[Dict[str, str]]) -> str:
+        lines = []
+        for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
-            if role == "assistant":
+            if role == "system":
+                lines.append(f"System: {content}")
+            elif role == "assistant":
                 lines.append(f"Assistant: {content}")
             else:
                 lines.append(f"User: {content}")
-        lines.append(f"User: {prompt}")
         lines.append("Assistant:")
         return "\n".join(lines)
 
-    def _generate_local(self, prompt: str, history: List[Dict[str, str]]) -> str:
+    def _generate_local_messages(self, messages: List[Dict[str, str]]) -> str:
         self._load_llama()
         max_tokens = int(os.getenv("FRIDAY_MAX_TOKENS", "512"))
         temperature = float(os.getenv("FRIDAY_TEMPERATURE", "0.7"))
@@ -120,7 +128,7 @@ class LLMClient:
         repeat_penalty = float(os.getenv("FRIDAY_REPEAT_PENALTY", "1.1"))
         stop = ["<|EOT|>", "<|im_end|>"]
 
-        prompt_text = self._build_prompt(prompt, history)
+        prompt_text = self._build_prompt_from_messages(messages)
         output = self._llama(
             prompt=prompt_text,
             max_tokens=max_tokens,
@@ -132,12 +140,8 @@ class LLMClient:
         text = output["choices"][0]["text"]
         return text.strip()
 
-    async def _generate_remote(self, prompt: str, history: List[Dict[str, str]]) -> str:
+    async def _generate_remote_messages(self, messages: List[Dict[str, str]]) -> str:
         url = _chat_url(self.base_url)
-        messages = [{"role": "system", "content": _default_system_prompt()}]
-        for msg in history[-10:]:
-            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
-        messages.append({"role": "user", "content": prompt})
 
         payload = {
             "model": self.model_name,
