@@ -41,7 +41,7 @@ Disambiguation flow if collisions. All memory hangs off user_id.
 
 ### Memory Tiers
 - Tier 0: session context (in-memory)
-- Tier 1: persisted JSONL thread + facts
+- Tier 1: persisted JSONL threads + facts/preferences + episodic summaries
 - Tier 2 (optional): vector store / embeddings
 All tiers feature-flagged and safe to disable.
 

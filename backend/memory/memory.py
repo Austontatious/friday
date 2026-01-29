@@ -56,6 +56,12 @@ class MemoryStore:
     def vector_enabled(self) -> bool:
         return self._vector_enabled
 
+    def persist_enabled(self) -> bool:
+        return self._persist_enabled
+
+    def thread_path(self, user_id: str) -> Path:
+        return self._thread_path(user_id)
+
     def recall_vector(self, query: str) -> List[dict]:
         if not self._vector_enabled:
             return []

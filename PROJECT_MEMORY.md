@@ -42,6 +42,13 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added Memory v2 data model: facts store, summaries store, retrieval bundle, and memory service
+- Added env flags for facts/summaries/consolidation and retrieval limits
+- Why: enable structured, queryable memory beyond raw conversation logs
+- Flags added/changed: FRIDAY_MEMORY_FACTS_ENABLED, FRIDAY_MEMORY_SUMMARIES_ENABLED, FRIDAY_MEMORY_CONSOLIDATION_ENABLED, FRIDAY_MEMORY_MAX_FACTS, FRIDAY_MEMORY_FACTS_RETRIEVAL_LIMIT, FRIDAY_MEMORY_SUMMARY_RETRIEVAL_LIMIT
+- How to test: import `backend.memory.service.memory_service` and call `remember_fact`/`retrieve` in a REPL
+- Known issues: facts/summaries retrieval is heuristic until consolidation is wired
+
 - Added emotion-lite metadata capture (record-only) on user messages when enabled
 - Why: capture coarse sentiment/arousal/confusion/urgency without changing behavior
 - Flags added/changed: none (uses existing FRIDAY_EMOTION_LITE_ENABLED)
