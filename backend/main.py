@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from backend.api.chat import router as chat_router
 from backend.api.health import router as health_router
+from backend.middleware.identity import IdentityMiddleware
 
 logging.basicConfig(level=os.getenv("FRIDAY_LOG_LEVEL", "INFO"))
 logger = logging.getLogger("friday.backend")
@@ -15,6 +16,7 @@ logger = logging.getLogger("friday.backend")
 
 def create_app() -> FastAPI:
     app = FastAPI(title="FRIDAY Core")
+    app.add_middleware(IdentityMiddleware)
     app.include_router(chat_router, prefix="/api")
     app.include_router(health_router)
 

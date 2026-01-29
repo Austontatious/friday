@@ -17,6 +17,7 @@ class ChatError(Exception):
 
 
 _memory = MemoryStore()
+LLM_DISABLED_MESSAGE = "[LLM disabled] Set FRIDAY_LLM_ENABLED=1 and LLM_BASE_URL to enable chat."
 
 
 def _resolve_user_id(payload: Dict[str, Any]) -> str:
@@ -34,8 +35,8 @@ async def run_chat(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         reply = await llm_client.generate(prompt, history)
-    except LLMDisabledError as exc:
-        raise ChatError("llm_disabled", "LLM is disabled", str(exc), False, 503)
+    except LLMDisabledError:
+        reply = LLM_DISABLED_MESSAGE
     except LLMConfigError as exc:
         raise ChatError("llm_not_configured", "LLM not configured", str(exc), False, 503)
     except LLMRequestError as exc:

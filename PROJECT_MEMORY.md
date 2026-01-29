@@ -42,6 +42,13 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 
 ## Change Log
 ### 2026-01-29
+- Added identity middleware to assign stable `user_id` via header/cookie and attach `X-Friday-User` response header
+- Updated `/api/chat` to carry request `user_id` and return a friendly LLM-disabled response (HTTP 200)
+- Why: establish stable identity buckets and keep text-only chat usable while LLM is disabled
+- Flags added/changed: none
+- How to test: start backend, then `curl -i -X POST http://localhost:9001/api/chat -H 'Content-Type: application/json' -d '{"prompt":"Hello"}'`
+- Known issues: none
+
 - Replaced `.env` with Phase 0 defaults (LLM disabled) and archived `.env` -> `.env.legacy`
 - Rewired model profiles to service names `llm`, `stt`, `tts`, `vision`, `avatar` in `docker-compose.models.yml`
 - Updated `.env.models.example` to minimal opt-in toggles
