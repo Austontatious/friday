@@ -1,0 +1,25 @@
+services:
+  backend:
+    build: .
+    ports:
+      - "${FRIDAY_API_PORT:-9001}:9001"
+    environment:
+      FRIDAY_API_PORT: "${FRIDAY_API_PORT:-9001}"
+      FRIDAY_LLM_ENABLED: "${FRIDAY_LLM_ENABLED:-1}"
+      FRIDAY_MODEL_PATH: "${FRIDAY_MODEL_PATH:-}"
+      FRIDAY_MODEL_NAME: "${FRIDAY_MODEL_NAME:-friday}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+    volumes:
+      - .:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/healthz"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+    networks:
+      - friday_net
+
+networks:
+  friday_net:
+    driver: bridge

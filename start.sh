@@ -3,10 +3,7 @@
 # Exit on error
 set -e
 
-# Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-# Change to the script directory
 cd "$SCRIPT_DIR"
 
 # Load environment variables
@@ -37,18 +34,18 @@ kill_port() {
     fi
 }
 
-# Check and kill processes on required ports
-for port in ${FRIDAY_PORT:-8001} ${REACT_APP_BACKEND_PORT:-8002}; do
-    if ! check_port $port; then
-        kill_port $port
-        sleep 2
-        if ! check_port $port; then
-            echo "Failed to free port $port"
-            exit 1
-        fi
+BACKEND_PORT=${FRIDAY_API_PORT:-9001}
+
+# Check and kill process on backend port if needed
+if ! check_port $BACKEND_PORT; then
+    kill_port $BACKEND_PORT
+    sleep 2
+    if ! check_port $BACKEND_PORT; then
+        echo "Failed to free port $BACKEND_PORT"
+        exit 1
     fi
-done
+fi
 
 # Start the application
-echo "Starting FRIDAY AI Assistant..."
-python friday.py 
+echo "Starting FRIDAY backend on port $BACKEND_PORT..."
+python -m backend.main

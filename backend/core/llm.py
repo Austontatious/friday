@@ -1,0 +1,148 @@
+from __future__ import annotations
+
+import os
+import asyncio
+from typing import Any, Dict, List, Optional
+
+import httpx
+
+
+class LLMDisabledError(Exception):
+    pass
+
+
+class LLMConfigError(Exception):
+    pass
+
+
+class LLMRequestError(Exception):
+    pass
+
+
+def _env_bool(key: str, default: str = "0") -> bool:
+    return os.getenv(key, default).lower() in {"1", "true", "yes", "on"}
+
+
+def _default_system_prompt() -> str:
+    return os.getenv("FRIDAY_SYSTEM_PROMPT", "You are FRIDAY, a helpful assistant.")
+
+
+def _chat_url(base_url: str) -> str:
+    base = base_url.rstrip("/")
+    if "/v1/" in base:
+        return base
+    if base.endswith("/v1"):
+        return f"{base}/chat/completions"
+    return f"{base}/v1/chat/completions"
+
+
+class LLMClient:
+    def __init__(self) -> None:
+        self.enabled = _env_bool("FRIDAY_LLM_ENABLED", "1")
+        self.model_path = os.getenv("FRIDAY_MODEL_PATH", "").strip()
+        self.model_name = os.getenv("FRIDAY_MODEL_NAME", "friday")
+        self.base_url = os.getenv("LLM_BASE_URL", "").strip()
+        self.api_key = os.getenv("LLM_API_KEY", "").strip()
+        self._llama = None
+
+    def ready(self) -> bool:
+        if not self.enabled:
+            return False
+        if self.model_path:
+            return os.path.exists(self.model_path)
+        if self.base_url:
+            return True
+        return False
+
+    async def generate(self, prompt: str, history: Optional[List[Dict[str, str]]] = None) -> str:
+        if not self.enabled:
+            raise LLMDisabledError("LLM is disabled")
+        if self.model_path:
+            return await asyncio.to_thread(self._generate_local, prompt, history or [])
+        if self.base_url:
+            return await self._generate_remote(prompt, history or [])
+        raise LLMConfigError("No LLM configured")
+
+    def _load_llama(self):
+        if self._llama is not None:
+            return
+        if not self.model_path:
+            raise LLMConfigError("FRIDAY_MODEL_PATH is not set")
+        if not os.path.exists(self.model_path):
+            raise LLMConfigError(f"Model file not found: {self.model_path}")
+
+        from llama_cpp import Llama
+
+        context_length = int(os.getenv("FRIDAY_CONTEXT_LENGTH", "4096"))
+        n_gpu_layers = int(os.getenv("FRIDAY_N_GPU_LAYERS", "0"))
+        self._llama = Llama(
+            model_path=self.model_path,
+            n_ctx=context_length,
+            n_gpu_layers=n_gpu_layers,
+            verbose=False,
+        )
+
+    def _build_prompt(self, prompt: str, history: List[Dict[str, str]]) -> str:
+        lines = [f"System: {_default_system_prompt()}"]
+        for msg in history[-10:]:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "assistant":
+                lines.append(f"Assistant: {content}")
+            else:
+                lines.append(f"User: {content}")
+        lines.append(f"User: {prompt}")
+        lines.append("Assistant:")
+        return "\n".join(lines)
+
+    def _generate_local(self, prompt: str, history: List[Dict[str, str]]) -> str:
+        self._load_llama()
+        max_tokens = int(os.getenv("FRIDAY_MAX_TOKENS", "512"))
+        temperature = float(os.getenv("FRIDAY_TEMPERATURE", "0.7"))
+        top_p = float(os.getenv("FRIDAY_TOP_P", "0.9"))
+        repeat_penalty = float(os.getenv("FRIDAY_REPEAT_PENALTY", "1.1"))
+        stop = ["<|EOT|>", "<|im_end|>"]
+
+        prompt_text = self._build_prompt(prompt, history)
+        output = self._llama(
+            prompt=prompt_text,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            repeat_penalty=repeat_penalty,
+            stop=stop,
+        )
+        text = output["choices"][0]["text"]
+        return text.strip()
+
+    async def _generate_remote(self, prompt: str, history: List[Dict[str, str]]) -> str:
+        url = _chat_url(self.base_url)
+        messages = [{"role": "system", "content": _default_system_prompt()}]
+        for msg in history[-10:]:
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+        messages.append({"role": "user", "content": prompt})
+
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "temperature": float(os.getenv("FRIDAY_TEMPERATURE", "0.7")),
+            "max_tokens": int(os.getenv("FRIDAY_MAX_TOKENS", "512")),
+        }
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        timeout = float(os.getenv("FRIDAY_LLM_TIMEOUT", "30"))
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code >= 400:
+                raise LLMRequestError(f"LLM error {resp.status_code}: {resp.text}")
+            data = resp.json()
+
+        try:
+            return data["choices"][0]["message"]["content"].strip()
+        except Exception as exc:
+            raise LLMRequestError(f"Invalid LLM response: {exc}")
+
+
+llm_client = LLMClient()

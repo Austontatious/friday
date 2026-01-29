@@ -36,32 +36,17 @@ const handleSend = async () => {
 
   try {
     const response = await sendPrompt({ prompt: currentInput });
-console.log("🧠 Full model output:", response);
+    console.log("🧠 Full model output:", response);
 
-    // 🛠️ Access nested result fields
-    const cleaned = response.result?.cleaned || response.result?.raw || "[FRIDAY gave no valid reply]";
-    const affectValue = response.affect ?? "";
-    const showAffect = affectValue.toLowerCase() !== "unknown" && affectValue !== "";
-    const affectEmojiMap: Record<string, string> = {
-      happy: "😊",
-      content: "🙂",
-      curious: "🤔",
-      anxious: "😬",
-      sad: "😢",
-      surprised: "😮",
-    };
-
-    const affectEmoji = showAffect ? affectEmojiMap[affectValue.toLowerCase()] || "🧠" : "";
-    const affect = showAffect ? `\n\n${affectEmoji} (${affectValue.toUpperCase()})` : "";
+    const cleaned = response.text || "[FRIDAY gave no valid reply]";
 
     const aiMessage: Message = {
       sender: "ai",
-      content: cleaned + affect,
+      content: cleaned,
     };
 
     setMessages((prev) => [...prev, aiMessage]);
-
-    } catch (err) {
+  } catch (err) {
     setMessages((prev) => [
       ...prev,
       { sender: "ai", content: "[Error fetching response]" },
@@ -207,4 +192,3 @@ console.log("🧠 Full model output:", response);
 };
 
 export default App;
-

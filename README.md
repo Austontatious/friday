@@ -1,166 +1,49 @@
-# FRIDAY AI Assistant
+# FRIDAY (Phase 0 — Make It Run)
 
-FRIDAY is an advanced AI assistant designed to help developers with coding tasks, debugging, and software development. It combines multiple language models to provide intelligent code assistance and natural language interactions.
+FRIDAY is a modular assistant. Phase 0 is **text-only** and focuses on a stable, runnable spine.
 
-## Features
+## What works (Phase 0)
+- Text chat (single `/api/chat` route)
+- Health endpoints (`/healthz`, `/readyz`)
+- Single backend entrypoint (`backend/main.py`)
+- One memory system (ephemeral)
+- One tool system (minimal registry, not wired to LLM yet)
 
-- Multi-model support (DeepSeek, Llama)
-- Intelligent code completion and generation
-- Natural language code explanations
-- Debugging assistance
-- Context-aware responses
-- Configurable model settings
-- Robust error handling and logging
+## What is disabled (Phase 0)
+- Multimodal (STT/TTS/Vision/Gesture/Avatar)
+- Emotion features
+- Persistent/vector memory
 
-## Prerequisites
-
-- Python 3.8 or higher
-- Node.js 14 or higher
-- Git
-- CUDA-capable GPU (recommended for better performance)
-
-## Installation
-
-1. Clone the repository:
+## Quick Start (backend only)
 ```bash
-git clone https://github.com/yourusername/friday.git
-cd friday
+cp .env.example .env
+docker compose up --build
 ```
 
-2. Create and activate a virtual environment:
+Backend runs on `http://localhost:9001` by default.
+
+## API
+- `POST /api/chat` — body: `{ "prompt": "..." }`
+- `GET /healthz`
+- `GET /readyz`
+
+Example:
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+curl -s http://localhost:9001/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Hello FRIDAY"}'
 ```
 
-3. Install Python dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Install Node.js dependencies:
+## Frontend (optional for Phase 0)
 ```bash
 cd frontend
 npm install
-cd ..
+npm start
 ```
+Set `REACT_APP_API_URL=http://localhost:9001/api` if you want a custom API target.
 
-5. Copy the example environment file and configure it:
-```bash
-cp .env.example .env
-```
-
-Edit the `.env` file with your configuration:
-```env
-# API Keys
-ANTHROPIC_API_KEY=your_api_key_here
-
-# Model Paths
-DEEPSEEK_MODEL_PATH=models/deepseek-coder-6.7b-instruct.Q4_K_M.gguf
-LLAMA_MODEL_PATH=models/llama-2-7b-chat
-
-# Server Configuration
-HOST=0.0.0.0
-PORT=8000
-LOG_LEVEL=INFO
-
-# Backend and Frontend Ports
-FRIDAY_PORT=8001
-REACT_APP_BACKEND_PORT=8002
-REACT_APP_BACKEND_URL=http://localhost:8001
-```
-
-## Usage
-
-1. Start the application:
-```bash
-./start.sh
-```
-
-This will start both the backend and frontend servers. The application will be available at:
-- Frontend: http://localhost:8000
-- Backend API: http://localhost:8001
-
-2. Access the web interface and start interacting with FRIDAY.
-
-## Project Structure
-
-```
-friday/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   ├── core/
-│   │   ├── models/
-│   │   └── services/
-│   ├── tests/
-│   └── main.py
-├── frontend/
-│   ├── src/
-│   ├── public/
-│   └── package.json
-├── models/
-├── scripts/
-├── .env.example
-├── requirements.txt
-└── start.sh
-```
-
-## Model Configuration
-
-FRIDAY supports multiple language models with different capabilities:
-
-### DeepSeek Model
-- Context length: 16384 tokens
-- Specialized for code generation and explanation
-- Uses GGUF format for efficient inference
-
-### Llama Model
-- Context length: 4096 tokens
-- General-purpose language model
-- Supports various coding tasks
-
-## Development
-
-### Running Tests
-```bash
-pytest backend/tests/
-```
-
-### Code Style
-The project uses:
-- Black for Python code formatting
-- isort for import sorting
-- flake8 for linting
-- mypy for type checking
-
-Run the formatters:
-```bash
-black backend/
-isort backend/
-```
-
-### Adding New Models
-
-1. Add model configuration in `model_config.py`
-2. Implement model loading in `model_loader.py`
-3. Update `persona.py` to support the new model
-4. Add model-specific prompts and handling
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- DeepSeek AI for the code-specialized model
-- Meta AI for the Llama model
-- The open-source community for various tools and libraries 
+## Notes
+- LLM configuration is via env:
+  - `FRIDAY_LLM_ENABLED=1`
+  - `FRIDAY_MODEL_PATH=/path/to/model.gguf` **or** `LLM_BASE_URL=http://host:port`
+  - `FRIDAY_MODEL_NAME=friday` (for remote OpenAI-compatible servers)

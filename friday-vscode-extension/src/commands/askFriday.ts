@@ -13,14 +13,14 @@ export async function askFriday() {
   if (!input) return;
 
   try {
-    const response = await fetch('http://localhost:8001/process', {
+    const response = await fetch('http://localhost:9001/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ input, file: text }),
+      body: JSON.stringify({ prompt: input, context: text }),
     });
 
     const data = await response.json();
-    vscode.window.showInformationMessage(data.response || "FRIDAY returned no answer.");
+    vscode.window.showInformationMessage(data.text || "FRIDAY returned no answer.");
   } catch (err) {
     vscode.window.showErrorMessage("Failed to contact FRIDAY backend.");
   }

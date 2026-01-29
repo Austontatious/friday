@@ -1,13 +1,18 @@
 export type TaskType = 'explain' | 'fix_bugs' | 'generate_tests' | 'document' | 'optimize';
 
-export type ModelResponse = {
-  result?: {
-        raw?: string;
-        cleaned?: string;
-    };
-    affect?: string;
-}
+export type ErrorPayload = {
+  code: string;
+  message: string;
+  detail?: string;
+  retryable: boolean;
+};
 
+export type ModelResponse = {
+  text?: string;
+  tools?: any[];
+  meta?: Record<string, any>;
+  error?: ErrorPayload;
+};
 
 export interface TaskResponse {
   response: string;
@@ -37,4 +42,4 @@ export interface TaskHistory {
   timestamp: string;
   status: 'completed' | 'failed';
   metadata?: Record<string, any>;
-} 
+}

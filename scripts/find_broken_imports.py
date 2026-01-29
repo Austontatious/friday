@@ -1,7 +1,7 @@
 import os
 import re
 
-BASE_DIR = "/workspace/ai-lab/friday"
+BASE_DIR = os.getenv("FRIDAY_REPO_ROOT", os.path.dirname(os.path.dirname(__file__)))
 KNOWN_LOCAL_MODULES = {
     "model_config", "task_manager", "context", "memory", "persona",
     "model_loader_core", "model_types", "config", "backend_core"
@@ -40,7 +40,6 @@ for file in os.listdir(BASE_DIR):
                 seen.add(key)
 
 # Output
-print("\n🔍 Top-Level Import Issues in /friday/:\n")
+print(f"\n🔍 Top-Level Import Issues in {BASE_DIR}:\n")
 for issue in issues:
     print(issue)
-
