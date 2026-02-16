@@ -41,6 +41,41 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 - FRIDAY_JOBS_ENABLED
 
 ## Change Log
+### 2026-02-16
+- Cut over chat memory integration to provider abstraction with env selection: `FRIDAY_MEMORY_PROVIDER=muninn|legacy|none` (default `muninn`)
+- Added `backend/memory/provider.py`, `backend/memory/muninn_provider.py`, and `backend/memory/factory.py`
+- Added Muninn HTTP wiring for:
+  - `POST /v0/memory/rehydrate`
+  - `POST /v0/memory/stage_candidates`
+  - `POST /v0/memory/confirm_candidates`
+  - `POST /v0/memory/list_pending`
+- Updated chat pipeline to:
+  - inject rendered `<SYSTEM_MEMORY>` cards pre-prompt
+  - stage conservative post-response memory candidates
+  - return memory metadata (`accepted_ids`, `pending_ids`, reasons) in `/api/chat`
+- Added memory relay endpoints:
+  - `POST /api/memory/confirm`
+  - `POST /api/memory/pending`
+- Added minimal frontend confirmation flow (Accept all / Reject all) when pending IDs are present
+- Added smoke script scaffold: `scripts/smoke_memory.sh`
+- Added repo coordination artifacts:
+  - `.agents/skills/integration-cutover/SKILL.md`
+  - `.agents/skills/web-ui-minimal-confirm/SKILL.md`
+  - `.agents/skills/env-config-hygiene/SKILL.md`
+  - `.agents/skills/smoke-testing/SKILL.md`
+- Why: replace legacy in-process memory coupling with an external Muninn service while preserving rollback safety and non-blocking chat behavior
+- New/changed env flags:
+  - `FRIDAY_MEMORY_PROVIDER`
+  - `MUNINN_BASE_URL`
+  - `MUNINN_NAMESPACE`
+  - `MUNINN_PROFILE`
+  - `MUNINN_HTTP_TIMEOUT_SECONDS`
+  - `FRIDAY_DEBUG_MEMORY`
+- How to test:
+  - `python -m backend.main` then `curl -s http://localhost:9001/healthz`
+  - `curl -s http://localhost:9001/api/chat -H 'Content-Type: application/json' -H 'X-Friday-Device: test' -d '{\"prompt\":\"I prefer tea\"}'`
+  - `bash scripts/smoke_memory.sh`
+
 ### 2026-01-29
 - Added debug gating for tool error turns (default drop), vendor import guard script, and regression check helper
 - Why: avoid tool-error feedback loops and add a lightweight pre-import tripwire

@@ -50,6 +50,7 @@ def build_messages(
     user_prompt: str,
     memory_bundle: Dict[str, Any],
     tool_schema: Optional[List[Dict[str, Any]]] = None,
+    system_memory_block: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     profile = _env("FRIDAY_PROMPT_PROFILE", "friday_exec")
     model_class = _env("FRIDAY_MODEL_CLASS", "30b")
@@ -61,24 +62,28 @@ def build_messages(
     if tool_schema is None:
         tool_schema = tool_schema_list()
 
-    system_sections = [
-        system_policy,
-        f"Model class: {model_class}",
-        f"Capabilities enabled: {capabilities.get('enabled')}",
-        f"Capabilities available: {capabilities.get('available')}",
-        "Identity snapshot:",
-        "Preferences:\n" + _format_kv(identity.get("preferences", [])),
-        "Profile facts:\n" + _format_kv(identity.get("profile", [])),
-        "Constraints:\n" + _format_kv(identity.get("constraints", [])),
-        "Projects:\n" + _format_kv(identity.get("projects", [])),
-        "Goals:\n" + _format_kv(identity.get("goals", [])),
-        "Active loops:",
-        "Open loops:\n" + _format_items(memory_bundle.get("open_loops", []), "item"),
-        "Commitments:\n" + _format_items(memory_bundle.get("commitments", []), "item"),
-        "Tasks:\n" + _format_items(memory_bundle.get("tasks", []), "title"),
-        "Relevant facts:\n" + _format_kv(memory_bundle.get("relevant_facts", [])),
-        "Relevant summaries:\n" + _format_items(memory_bundle.get("relevant_summaries", []), "summary"),
-    ]
+    system_sections = [system_policy]
+    if system_memory_block:
+        system_sections.append(system_memory_block)
+    system_sections.extend(
+        [
+            f"Model class: {model_class}",
+            f"Capabilities enabled: {capabilities.get('enabled')}",
+            f"Capabilities available: {capabilities.get('available')}",
+            "Identity snapshot:",
+            "Preferences:\n" + _format_kv(identity.get("preferences", [])),
+            "Profile facts:\n" + _format_kv(identity.get("profile", [])),
+            "Constraints:\n" + _format_kv(identity.get("constraints", [])),
+            "Projects:\n" + _format_kv(identity.get("projects", [])),
+            "Goals:\n" + _format_kv(identity.get("goals", [])),
+            "Active loops:",
+            "Open loops:\n" + _format_items(memory_bundle.get("open_loops", []), "item"),
+            "Commitments:\n" + _format_items(memory_bundle.get("commitments", []), "item"),
+            "Tasks:\n" + _format_items(memory_bundle.get("tasks", []), "title"),
+            "Relevant facts:\n" + _format_kv(memory_bundle.get("relevant_facts", [])),
+            "Relevant summaries:\n" + _format_items(memory_bundle.get("relevant_summaries", []), "summary"),
+        ]
+    )
 
     if tool_schema:
         system_sections.append("Tools available (call only when necessary):")

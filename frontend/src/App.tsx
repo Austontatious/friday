@@ -8,10 +8,10 @@ import {
   HStack,
   Text,
   Button,
+  useToast,
 } from "@chakra-ui/react";
 import { MoonIcon, SunIcon } from "@chakra-ui/icons";
-import { sendPrompt } from "./services/api";
-import type { ModelResponse } from "./types";
+import { confirmMemory, sendPrompt } from "./services/api";
 
 
 type Message = {
@@ -21,43 +21,72 @@ type Message = {
 
 const App = () => {
   const { colorMode, toggleColorMode } = useColorMode();
+  const toast = useToast();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
+  const [confirming, setConfirming] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-const handleSend = async () => {
-  if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim()) return;
 
-  const currentInput = input; // capture now
-  setInput("");               // clear immediately for UI
+    const currentInput = input;
+    setInput("");
 
-  const userMessage: Message = { sender: "user", content: currentInput };
-  setMessages((prev) => [...prev, userMessage]);
+    const userMessage: Message = { sender: "user", content: currentInput };
+    setMessages((prev) => [...prev, userMessage]);
 
-  try {
-    const response = await sendPrompt({ prompt: currentInput });
-    console.log("🧠 Full model output:", response);
+    try {
+      const response = await sendPrompt({ prompt: currentInput });
+      const cleaned = response.text || "[FRIDAY gave no valid reply]";
 
-    const cleaned = response.text || "[FRIDAY gave no valid reply]";
+      const aiMessage: Message = {
+        sender: "ai",
+        content: cleaned,
+      };
 
-    const aiMessage: Message = {
-      sender: "ai",
-      content: cleaned,
-    };
+      const responsePending = Array.isArray(response.memory?.pending_ids)
+        ? response.memory?.pending_ids ?? []
+        : [];
+      setPendingIds(responsePending);
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { sender: "ai", content: "[Error fetching response]" },
+      ]);
+    }
 
-    setMessages((prev) => [...prev, aiMessage]);
-  } catch (err) {
-    setMessages((prev) => [
-      ...prev,
-      { sender: "ai", content: "[Error fetching response]" },
-    ]);
-  }
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
 
-  // Optional: this blur might not be needed anymore
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur();
-  }
-};
+  const handleConfirm = async (decision: "accept" | "reject") => {
+    if (!pendingIds.length || confirming) return;
+
+    setConfirming(true);
+    try {
+      await confirmMemory({ pending_ids: pendingIds, decision });
+      setPendingIds([]);
+      toast({
+        title: decision === "accept" ? "Saved" : "Discarded",
+        status: "success",
+        duration: 2400,
+        isClosable: true,
+      });
+    } catch (err) {
+      toast({
+        title: "Memory confirmation failed",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setConfirming(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -134,11 +163,45 @@ const handleSend = async () => {
         </VStack>
       </Box>
 
+      {pendingIds.length > 0 && (
+        <Box
+          border="2px solid"
+          borderColor={colorMode === "light" ? "#000000" : "#00FFFF"}
+          borderRadius="md"
+          p={3}
+          mb={4}
+          boxShadow="0 0 10px #00FFFF66"
+        >
+          <HStack justify="space-between" flexWrap="wrap" gap={3}>
+            <Text>
+              {pendingIds.length} memories need confirmation
+            </Text>
+            <HStack>
+              <Button
+                size="sm"
+                onClick={() => handleConfirm("accept")}
+                isLoading={confirming}
+              >
+                Accept all
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleConfirm("reject")}
+                isLoading={confirming}
+              >
+                Reject all
+              </Button>
+            </HStack>
+          </HStack>
+        </Box>
+      )}
+
       {/* INPUT + SUBMIT */}
       <Box>
         <Textarea
-	  value={input}
-	  onChange={(e) => setInput(e.target.value)}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
           placeholder="Ask FRIDAY something..."
           resize="vertical"
           minH="60px"

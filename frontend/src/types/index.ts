@@ -7,10 +7,22 @@ export type ErrorPayload = {
   retryable: boolean;
 };
 
+export type MemoryMetadata = {
+  provider?: string;
+  accepted_ids?: string[];
+  pending_ids?: string[];
+  pending_reasons?: string[];
+  rejected?: {
+    count?: number;
+    reasons?: string[];
+  };
+};
+
 export type ModelResponse = {
   text?: string;
   tools?: any[];
   meta?: Record<string, any>;
+  memory?: MemoryMetadata;
   error?: ErrorPayload;
 };
 

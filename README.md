@@ -6,7 +6,7 @@ FRIDAY is a modular assistant. Phase 0 is **text-only** and focuses on a stable,
 - Text chat (single `/api/chat` route)
 - Health endpoints (`/healthz`, `/readyz`)
 - Single backend entrypoint (`backend/main.py`)
-- One memory system (ephemeral)
+- Memory provider abstraction (`muninn|legacy|none`)
 - One tool system (minimal registry, not wired to LLM yet)
 
 ## What is disabled (Phase 0)
@@ -47,3 +47,14 @@ Set `REACT_APP_API_URL=http://localhost:9001/api` if you want a custom API targe
   - `FRIDAY_LLM_ENABLED=1`
   - `FRIDAY_MODEL_PATH=/path/to/model.gguf` **or** `LLM_BASE_URL=http://host:port`
   - `FRIDAY_MODEL_NAME=friday` (for remote OpenAI-compatible servers)
+
+## Memory Provider
+- Provider selection: `FRIDAY_MEMORY_PROVIDER=muninn|legacy|none` (default `muninn`)
+- Muninn settings:
+  - `MUNINN_BASE_URL=http://127.0.0.1:8000`
+  - `MUNINN_NAMESPACE=friday`
+  - `MUNINN_PROFILE=friday`
+  - `FRIDAY_DEBUG_MEMORY=1` to log injected `<SYSTEM_MEMORY>` blocks
+- Backend relay endpoints:
+  - `POST /api/memory/confirm`
+  - `POST /api/memory/pending`
