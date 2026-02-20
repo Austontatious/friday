@@ -73,3 +73,7 @@ services:
       bash -lc "echo 'Avatar service scaffold (disabled until implemented)' && sleep infinity"
     networks:
       - friday_net
+
+networks:
+  friday_net:
+    external: true

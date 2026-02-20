@@ -28,6 +28,36 @@ By default this brings up:
 
 If Muninn is unavailable, FRIDAY falls back to `legacy` (or `none`) and still returns chat responses.
 
+## Docker (Dev / Prod)
+
+Dev (backend + muninn):
+```bash
+docker compose -f docker-compose.dev.yml up --build
+# run frontend on host for speed:
+cd frontend && npm start
+```
+
+Prod-like app stack:
+```bash
+docker compose -f docker-compose.app.yml up --build -d
+```
+
+With models:
+```bash
+docker compose -f docker-compose.app.yml up --build -d
+docker compose -f docker-compose.models.yml up -d
+```
+
+Or single command:
+```bash
+docker compose -f docker-compose.app.yml -f docker-compose.models.yml up --build -d
+```
+
+Default endpoints:
+- Frontend: `http://localhost:8080`
+- Backend API: `http://localhost:9001`
+- Muninn: `http://localhost:8000`
+
 ## Identity / `entity_id` Priority
 FRIDAY resolves stable identity in this order:
 1. `X-Friday-Account-User` (or `X-Authenticated-User`)

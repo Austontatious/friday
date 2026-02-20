@@ -1,0 +1,51 @@
+services:
+  muninn:
+    image: friday-muninn:local
+    build:
+      context: .
+      dockerfile: docker/muninn.Dockerfile
+    ports:
+      - "${MUNINN_PORT:-8000}:8000"
+    volumes:
+      - muninn_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [friday_net]
+
+  friday-backend:
+    build:
+      context: .
+      target: dev
+    environment:
+      - FRIDAY_API_PORT=9001
+      - FRIDAY_DATA_DIR=/data
+      - FRIDAY_LOG_DIR=/logs
+      - MUNINN_BASE_URL=http://muninn:8000
+      - LLM_BASE_URL=http://llm:8000
+    env_file:
+      - .env.example
+    ports:
+      - "${FRIDAY_API_PORT:-9001}:9001"
+    depends_on:
+      muninn:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+      - friday_data:/data
+      - friday_logs:/logs
+    networks: [friday_net]
+
+networks:
+  friday_net:
+    name: friday_net
+    driver: bridge
+
+volumes:
+  friday_data:
+  friday_logs:
+  muninn_data:

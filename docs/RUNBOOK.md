@@ -1,5 +1,22 @@
 # FRIDAY Runbook
 
+## Docker (Dev / Prod)
+1. Dev stack (backend + muninn):
+   - `docker compose -f docker-compose.dev.yml up --build`
+   - run frontend on host for speed: `cd frontend && npm start`
+2. Prod-like app stack:
+   - `docker compose -f docker-compose.app.yml up --build -d`
+3. With models:
+   - `docker compose -f docker-compose.app.yml up --build -d`
+   - `docker compose -f docker-compose.models.yml up -d`
+4. Single command variant:
+   - `docker compose -f docker-compose.app.yml -f docker-compose.models.yml up --build -d`
+
+Default endpoints:
+- Frontend: `http://localhost:8080`
+- Backend API: `http://localhost:9001`
+- Muninn: `http://localhost:8000`
+
 ## Quick Start
 1. `cp .env.example .env`
 2. If enabling LLM outside compose, set:
