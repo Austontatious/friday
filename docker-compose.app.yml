@@ -8,7 +8,7 @@ services:
       - MUNINN_HOST=0.0.0.0
       - MUNINN_PORT=8000
     ports:
-      - "${MUNINN_PORT:-8000}:8000"
+      - "${FRIDAY_HOST_MUNINN_PORT:-8000}:8000"
     volumes:
       - muninn_data:/data
     healthcheck:
@@ -32,7 +32,7 @@ services:
     env_file:
       - .env.example
     ports:
-      - "${FRIDAY_API_PORT:-9001}:9001"
+      - "${FRIDAY_HOST_API_PORT:-9001}:9001"
     depends_on:
       muninn:
         condition: service_healthy
@@ -52,7 +52,7 @@ services:
       dockerfile: frontend/Dockerfile
       target: prod
     ports:
-      - "${FRIDAY_FRONTEND_PORT:-8080}:8080"
+      - "${FRIDAY_HOST_WEB_PORT:-8080}:8080"
     depends_on:
       friday-backend:
         condition: service_healthy

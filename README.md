@@ -42,6 +42,12 @@ Prod-like app stack:
 docker compose -f docker-compose.app.yml up --build -d
 ```
 
+Example: avoid port conflicts on a busy host:
+```bash
+FRIDAY_HOST_API_PORT=19001 FRIDAY_HOST_WEB_PORT=18080 FRIDAY_HOST_MUNINN_PORT=18000 \
+docker compose -f docker-compose.app.yml up --build -d
+```
+
 With models:
 ```bash
 docker compose -f docker-compose.app.yml up --build -d

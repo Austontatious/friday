@@ -8,9 +8,9 @@ FRONTEND_PORT=${FRONTEND_PORT:-8080}
 
 echo "==> Building and starting stack: $APP_COMPOSE"
 env \
-  FRIDAY_API_PORT="${BACKEND_PORT}" \
-  FRIDAY_FRONTEND_PORT="${FRONTEND_PORT}" \
-  MUNINN_PORT="${MUNINN_PORT}" \
+  FRIDAY_HOST_API_PORT="${BACKEND_PORT}" \
+  FRIDAY_HOST_WEB_PORT="${FRONTEND_PORT}" \
+  FRIDAY_HOST_MUNINN_PORT="${MUNINN_PORT}" \
   docker compose -f "$APP_COMPOSE" up -d --build
 
 echo "==> Waiting for backend health..."
