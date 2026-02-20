@@ -30,7 +30,7 @@ log "Sending chat turn through ${API_URL}/chat"
 chat_response="$(curl -sS "${API_URL}/chat" \
   -H 'Content-Type: application/json' \
   -H "X-Friday-Device: ${DEVICE_ID}" \
-  -d '{"prompt":"I prefer tea over coffee."}')"
+  -d '{"prompt":"Call me Nova. My email is nova-smoke@example.com and I prefer tea over coffee."}')"
 
 python3 - "${chat_response}" <<'PY'
 import json
@@ -41,18 +41,21 @@ text = str(data.get("text") or "")
 if not text:
     raise SystemExit("chat response missing text")
 memory = data.get("memory") if isinstance(data.get("memory"), dict) else {}
+provider = str(memory.get("provider") or "")
+if not provider:
+    raise SystemExit("chat response missing memory.provider")
 pending = memory.get("pending_ids") if isinstance(memory.get("pending_ids"), list) else []
-print(f"chat_ok text_len={len(text)} pending_count={len(pending)}")
+print(f"chat_ok text_len={len(text)} provider={provider} pending_count={len(pending)}")
 PY
 
-log "Staging sensitive candidate directly in Muninn to attempt pending confirmation"
+log "Staging sensitive candidate directly in Muninn to force pending confirmation path"
 now_ts="$(python3 - <<'PY'
 import time
 print(time.time())
 PY
 )"
 stage_payload="$(cat <<JSON
-{"namespace":"friday","candidates":[{"kind":"preference","entity":{"id":"${DEVICE_ID}"},"payload":{"key":"account_password","value":"temporary-secret","tags":["preference"]},"confidence":0.96,"provenance":{"source_type":"user","source_id":"smoke_memory","note":"smoke","ts":${now_ts}}}],"ttl_seconds":86400}
+{"namespace":"friday","candidates":[{"kind":"email","entity":{"id":"${DEVICE_ID}"},"payload":{"key":"email","value":"nova-smoke@example.com","tags":["contact","sensitive"]},"confidence":0.99,"policy":{"requires_confirmation":true,"reason":"sensitive_pattern:email"},"provenance":{"source_type":"user","source_id":"smoke_memory","note":"smoke_confirm_required","ts":${now_ts}}}],"ttl_seconds":86400}
 JSON
 )"
 stage_response="$(curl -sS "${MUNINN_BASE%/}/v0/memory/stage_candidates" \
@@ -94,6 +97,24 @@ processed = int(memory.get("processed") or 0)
 if processed < 1:
     raise SystemExit("memory confirm processed=0")
 print(f"confirm_ok processed={processed}")
+PY
+
+  log "Sending follow-up chat to ensure rehydrate path still returns memory metadata"
+  post_confirm_chat="$(curl -sS "${API_URL}/chat" \
+    -H 'Content-Type: application/json' \
+    -H "X-Friday-Device: ${DEVICE_ID}" \
+    -d '{"prompt":"What do you remember about me?"}')"
+
+  python3 - "${post_confirm_chat}" <<'PY'
+import json
+import sys
+
+data = json.loads(sys.argv[1])
+memory = data.get("memory") if isinstance(data.get("memory"), dict) else {}
+provider = str(memory.get("provider") or "")
+if not provider:
+    raise SystemExit("post-confirm chat missing memory.provider")
+print(f"post_confirm_chat_ok provider={provider}")
 PY
 else
   log "Muninn returned no pending IDs in this environment; validating confirm endpoint with synthetic ID"

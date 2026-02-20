@@ -24,7 +24,7 @@ def _env_bool(key: str, default: str = "0") -> bool:
 
 
 def _default_system_prompt() -> str:
-    return os.getenv("FRIDAY_SYSTEM_PROMPT", "You are FRIDAY, a helpful assistant.")
+    return os.getenv("FRIDAY_SYSTEM_PROMPT", "You are FRIDAY, an executive assistant and systems operator.")
 
 
 def _chat_url(base_url: str) -> str:
@@ -50,7 +50,7 @@ class LLMClient:
     def __init__(self) -> None:
         self.enabled = _env_bool("FRIDAY_LLM_ENABLED", "1")
         self.model_path = os.getenv("FRIDAY_MODEL_PATH", "").strip()
-        self.model_name = os.getenv("FRIDAY_MODEL_NAME", "friday")
+        self.model_name = os.getenv("FRIDAY_MODEL_NAME", "Lexi").strip() or "Lexi"
         self.base_url = os.getenv("LLM_BASE_URL", "").strip()
         self.api_key = os.getenv("LLM_API_KEY", "").strip()
         self._llama = None
@@ -78,13 +78,32 @@ class LLMClient:
         messages.append({"role": "user", "content": prompt})
         return await self.generate_messages(messages)
 
-    async def generate_messages(self, messages: List[Dict[str, str]]) -> str:
-        if not self.enabled:
+    async def generate_messages(
+        self,
+        messages: List[Dict[str, str]],
+        *,
+        base_url_override: Optional[str] = None,
+        model_override: Optional[str] = None,
+        api_key_override: Optional[str] = None,
+    ) -> str:
+        override_base = (base_url_override or "").strip()
+        override_model = (model_override or "").strip()
+        use_remote_override = bool(override_base)
+
+        if not self.enabled and not use_remote_override:
             raise LLMDisabledError("LLM is disabled")
-        if self.model_path:
+        if self.model_path and not use_remote_override:
             return await asyncio.to_thread(self._generate_local_messages, messages)
-        if self.base_url:
-            return await self._generate_remote_messages(messages)
+        effective_base_url = override_base or self.base_url
+        if effective_base_url:
+            effective_model = override_model or self.model_name
+            effective_api_key = api_key_override if api_key_override is not None else self.api_key
+            return await self._generate_remote_messages(
+                messages,
+                base_url=effective_base_url,
+                model_name=effective_model,
+                api_key=effective_api_key,
+            )
         raise LLMConfigError("No LLM configured")
 
     def _load_llama(self):
@@ -142,18 +161,25 @@ class LLMClient:
         text = output["choices"][0]["text"]
         return text.strip()
 
-    async def _generate_remote_messages(self, messages: List[Dict[str, str]]) -> str:
-        url = _chat_url(self.base_url)
+    async def _generate_remote_messages(
+        self,
+        messages: List[Dict[str, str]],
+        *,
+        base_url: str,
+        model_name: str,
+        api_key: str,
+    ) -> str:
+        url = _chat_url(base_url)
 
         payload = {
-            "model": self.model_name,
+            "model": model_name,
             "messages": messages,
             "temperature": float(os.getenv("FRIDAY_TEMPERATURE", "0.7")),
             "max_tokens": int(os.getenv("FRIDAY_MAX_TOKENS", "512")),
         }
         headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
 
         timeout = float(os.getenv("FRIDAY_LLM_TIMEOUT", "30"))
         async with httpx.AsyncClient(timeout=timeout) as client:

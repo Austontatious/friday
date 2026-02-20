@@ -12,13 +12,11 @@ export type MemoryMetadata = {
   accepted_ids?: string[];
   pending_ids?: string[];
   pending_reasons?: string[];
-  rejected?: {
-    count?: number;
-    reasons?: string[];
-  };
+  rejected?: number;
 };
 
 export type ModelResponse = {
+  assistant_text?: string;
   text?: string;
   tools?: any[];
   meta?: Record<string, any>;

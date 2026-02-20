@@ -46,12 +46,15 @@ Workspace isolation is keyed by `workspace_id` (default `default`).
 - Tier 2 (optional): vector store / embeddings
 All tiers feature-flagged and safe to disable.
 
-### Emotional Awareness (Lite)
-Track *non-manipulative* signals:
-- sentiment / arousal / frustration (coarse)
-- conversation “temperature”
-- user preferences / intent drift
-Used only to improve tone, prioritization, and clarity.
+### Interaction Policy (Rule-Based v1)
+- Deterministic mode inference: `focused | neutral | warm`.
+- Signals: urgency terms, profanity/caps, short imperative commands, repeated corrections, recent tool-failure loops.
+- Explicit user overrides: `be brief`, `be human`, `no banter`.
+- `playful` exists but is hard-gated (`FRIDAY_INTERACTION_PLAYFUL_ENABLED=1` + explicit user request).
+- Prompt receives an `<INTERACTION_POLICY>` block, then a deterministic response shaper enforces:
+  - banter budget
+  - one-question cap
+  - one-screen default with optional details expansion
 
 ### Async Jobs
 All inference that can exceed ~2s becomes:
@@ -73,3 +76,8 @@ Backend:
 - executes tools (if any)
 - returns streaming tokens or final response
 If vision/audio/avatar requested: create job, return job_id, frontend polls.
+
+## Agentic Run API (Async)
+- `POST /api/agent` accepts a run and returns `{run_id, status:"accepted"}` immediately.
+- `POST /api/agent/wait` waits on lifecycle completion and returns `ok|error|timeout`.
+- Runs are serialized per session key with global lane concurrency caps.

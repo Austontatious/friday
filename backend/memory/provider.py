@@ -12,7 +12,7 @@ from backend.memory.service import memory_service
 
 logger = logging.getLogger("friday.memory.provider")
 
-_SENSITIVE_HINTS = (
+_SECRET_HINTS = (
     "password",
     "passcode",
     "ssn",
@@ -26,11 +26,16 @@ _SENSITIVE_HINTS = (
     "dob",
 )
 
+_CONFIRM_REQUIRED_KINDS = {"email", "phone", "address", "ssn_like", "medical"}
+
 _CANDIDATE_PATTERNS = (
     (r"\bcall me (?P<value>[^.?!\n]+)", "fact", "preferred_name", ["profile"], 0.95),
     (r"\bi (?:really )?prefer (?P<value>[^.?!\n]+)", "preference", "preference", ["preference"], 0.90),
     (r"\bi (?:really )?like (?P<value>[^.?!\n]+)", "preference", "likes", ["preference"], 0.88),
 )
+
+_EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+_PHONE_PATTERN = re.compile(r"(?:\+?1[\s.-]*)?(?:\(?\d{3}\)?[\s.-]*)\d{3}[\s.-]*\d{4}")
 
 
 def _env_int(key: str, default: int) -> int:
@@ -43,6 +48,13 @@ def _env_int(key: str, default: int) -> int:
         return default
 
 
+def _inject_budget_chars(default_chars: int = 1800, default_tokens: int = 450) -> int:
+    max_chars = max(_env_int("FRIDAY_MEMORY_MAX_INJECT_CHARS", default_chars), 256)
+    max_tokens = max(_env_int("FRIDAY_MEMORY_MAX_INJECT_TOKENS", default_tokens), 64)
+    token_budget_chars = max_tokens * 4
+    return min(max_chars, token_budget_chars)
+
+
 def _clean_text(value: Any, limit: int = 180) -> str:
     text = str(value or "").strip()
     text = re.sub(r"\s+", " ", text).strip(" \"'.,;:()[]{}")
@@ -53,7 +65,7 @@ def _clean_text(value: Any, limit: int = 180) -> str:
 
 def _is_sensitive(value: str) -> bool:
     lowered = value.lower()
-    return any(token in lowered for token in _SENSITIVE_HINTS)
+    return any(token in lowered for token in _SECRET_HINTS)
 
 
 def _as_tag_list(value: Any) -> List[str]:
@@ -134,7 +146,7 @@ class NullMemoryProvider:
         profile: str,
         k: int = 8,
     ) -> Dict[str, Any]:
-        return {"cards": [], "items": []}
+        return {"provider": self.name, "cards": [], "items": []}
 
     def stage(
         self,
@@ -144,6 +156,7 @@ class NullMemoryProvider:
         ttl_seconds: Optional[int] = None,
     ) -> Dict[str, Any]:
         return {
+            "provider": self.name,
             "accepted": 0,
             "pending": 0,
             "rejected": len(candidates or []),
@@ -163,6 +176,7 @@ class NullMemoryProvider:
         namespace: str,
     ) -> Dict[str, Any]:
         return {
+            "provider": self.name,
             "namespace": namespace,
             "decision": decision,
             "processed": 0,
@@ -175,7 +189,7 @@ class NullMemoryProvider:
         }
 
     def list_pending(self, *, namespace: str, entity_id: Optional[str] = None) -> Dict[str, Any]:
-        return {"items": []}
+        return {"provider": self.name, "items": []}
 
 
 class LegacyMemoryProvider:
@@ -199,7 +213,7 @@ class LegacyMemoryProvider:
             prompt=user_text,
             limit_turns=self._history_limit,
         )
-        return {"cards": _legacy_cards(bundle, max(1, k)), "items": []}
+        return {"provider": self.name, "cards": _legacy_cards(bundle, max(1, k)), "items": []}
 
     def stage(
         self,
@@ -247,6 +261,7 @@ class LegacyMemoryProvider:
                 reject_reasons.append(f"legacy_store_failed:{exc}")
 
         return {
+            "provider": self.name,
             "accepted": len(accepted_ids),
             "pending": 0,
             "rejected": len(reject_reasons),
@@ -268,6 +283,7 @@ class LegacyMemoryProvider:
         if decision == "accept":
             reasons = ["legacy_provider_has_no_pending_queue"]
             return {
+                "provider": self.name,
                 "namespace": namespace,
                 "decision": decision,
                 "processed": len(pending_ids),
@@ -279,6 +295,7 @@ class LegacyMemoryProvider:
                 "reasons": reasons if pending_ids else [],
             }
         return {
+            "provider": self.name,
             "namespace": namespace,
             "decision": decision,
             "processed": len(pending_ids),
@@ -291,7 +308,7 @@ class LegacyMemoryProvider:
         }
 
     def list_pending(self, *, namespace: str, entity_id: Optional[str] = None) -> Dict[str, Any]:
-        return {"items": []}
+        return {"provider": self.name, "items": []}
 
 
 def _entity_from_candidate(candidate: Any) -> str:
@@ -362,7 +379,12 @@ def render_system_memory_block(cards: List[Dict[str, Any]], max_cards: int = 8, 
     if not cards:
         return ""
 
+    max_cards = max(_env_int("FRIDAY_MEMORY_MAX_INJECT_CARDS", max_cards), 1)
+    max_bullets = max(_env_int("FRIDAY_MEMORY_MAX_INJECT_BULLETS", max_bullets), 1)
+    budget_chars = _inject_budget_chars()
+
     lines = ["<SYSTEM_MEMORY>"]
+    used_chars = len(lines[0]) + 1
     card_count = 0
     for card in cards:
         if card_count >= max_cards:
@@ -378,15 +400,74 @@ def render_system_memory_block(cards: List[Dict[str, Any]], max_cards: int = 8, 
         if not clean_bullets:
             continue
 
-        lines.append(f"- {title} [{card_type}]")
+        header_line = f"- {title} [{card_type}]"
+        projected = used_chars + len(header_line) + 1
+        if projected > budget_chars:
+            break
+        lines.append(header_line)
+        used_chars = projected
         for bullet in clean_bullets[:max_bullets]:
-            lines.append(f"  - {bullet}")
+            bullet_line = f"  - {bullet}"
+            projected = used_chars + len(bullet_line) + 1
+            if projected > budget_chars:
+                break
+            lines.append(bullet_line)
+            used_chars = projected
         card_count += 1
 
-    lines.append("</SYSTEM_MEMORY>")
     if card_count == 0:
         return ""
+    closing_line = "</SYSTEM_MEMORY>"
+    if used_chars + len(closing_line) + 1 <= budget_chars:
+        lines.append(closing_line)
+    else:
+        lines.append("</SYSTEM_MEMORY>")
     return "\n".join(lines)
+
+
+def _requires_confirmation(kind: str, value: str) -> tuple[bool, Optional[str]]:
+    if kind in _CONFIRM_REQUIRED_KINDS:
+        return True, f"sensitive_kind:{kind}"
+    if _EMAIL_PATTERN.search(value):
+        return True, "sensitive_pattern:email"
+    if _PHONE_PATTERN.search(value):
+        return True, "sensitive_pattern:phone"
+    return False, None
+
+
+def _build_candidate(
+    *,
+    kind: str,
+    key: str,
+    value: str,
+    tags: List[str],
+    confidence: float,
+    entity_id: str,
+    source_id: str,
+    note: str = "friday_heuristic_v1",
+) -> Dict[str, Any]:
+    candidate: Dict[str, Any] = {
+        "kind": kind,
+        "entity": {"id": entity_id or "ent_local_user", "type": "user"},
+        "payload": {
+            "key": key,
+            "value": value,
+            "tags": tags,
+        },
+        "confidence": confidence,
+        "provenance": {
+            "source_type": "user",
+            "source_id": source_id,
+            "note": note,
+            "ts": time.time(),
+        },
+    }
+    needs_confirm, reason = _requires_confirmation(kind, value)
+    if needs_confirm:
+        candidate["policy"] = {"requires_confirmation": True}
+        if reason:
+            candidate["policy"]["reason"] = reason
+    return candidate
 
 
 def extract_memory_candidates(user_text: str, entity_id: str, *, source_id: str) -> List[Dict[str, Any]]:
@@ -410,24 +491,58 @@ def extract_memory_candidates(user_text: str, entity_id: str, *, source_id: str)
             continue
         seen.add(marker)
         candidates.append(
-            {
-                "kind": kind,
-                "entity": {"id": entity_id or "ent_user", "type": "user"},
-                "payload": {
-                    "key": key,
-                    "value": value,
-                    "tags": tags,
-                },
-                "confidence": confidence,
-                "provenance": {
-                    "source_type": "user",
-                    "source_id": source_id,
-                    "note": "friday_heuristic_v1",
-                    "ts": time.time(),
-                },
-            }
+            _build_candidate(
+                kind=kind,
+                key=key,
+                value=value,
+                tags=tags,
+                confidence=confidence,
+                entity_id=entity_id,
+                source_id=source_id,
+            )
         )
 
-    if len(candidates) > 3:
-        return candidates[:3]
+    email_match = _EMAIL_PATTERN.search(text)
+    if email_match:
+        email = _clean_text(email_match.group(0), limit=180)
+        if email and not _is_sensitive(email):
+            marker = f"email:email:{email.lower()}"
+            if marker not in seen:
+                seen.add(marker)
+                candidates.append(
+                    _build_candidate(
+                        kind="email",
+                        key="email",
+                        value=email,
+                        tags=["contact", "sensitive"],
+                        confidence=0.99,
+                        entity_id=entity_id,
+                        source_id=source_id,
+                        note="friday_sensitive_regex_v1",
+                    )
+                )
+
+    phone_match = _PHONE_PATTERN.search(text)
+    if phone_match:
+        phone = _clean_text(phone_match.group(0), limit=64)
+        if phone and not _is_sensitive(phone):
+            marker = f"phone:phone:{phone.lower()}"
+            if marker not in seen:
+                seen.add(marker)
+                candidates.append(
+                    _build_candidate(
+                        kind="phone",
+                        key="phone",
+                        value=phone,
+                        tags=["contact", "sensitive"],
+                        confidence=0.99,
+                        entity_id=entity_id,
+                        source_id=source_id,
+                        note="friday_sensitive_regex_v1",
+                    )
+                )
+
+    max_candidates = max(_env_int("FRIDAY_MEMORY_MAX_CANDIDATES_PER_TURN", 6), 1)
+    if len(candidates) > max_candidates:
+        return candidates[:max_candidates]
     return candidates

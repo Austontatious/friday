@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
@@ -33,26 +34,39 @@ class _FallbackMemoryProvider:
 
     def _call(self, method: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         fn = getattr(self._primary, method)
+        started = time.perf_counter()
         try:
-            return fn(*args, **kwargs)
+            result = fn(*args, **kwargs)
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            return _with_provider_name(result, provider=getattr(self._primary, "name", "muninn"), latency_ms=latency_ms)
         except MemoryProviderError as exc:
-            if self.fallback_name == "none":
-                fallback_label = "no memory"
-            else:
-                fallback_label = self.fallback_name
             logger.warning(
-                "Muninn unavailable; falling back to %s (%s: %s)",
-                fallback_label,
+                "memory_provider_fallback method=%s primary=%s fallback=%s error_code=%s retryable=%s",
+                method,
+                getattr(self._primary, "name", "muninn"),
+                self.fallback_name,
                 exc.code,
-                exc.message,
+                exc.retryable,
             )
+            fallback_reason = exc.code
         except Exception as exc:
-            if self.fallback_name == "none":
-                fallback_label = "no memory"
-            else:
-                fallback_label = self.fallback_name
-            logger.warning("Muninn unavailable; falling back to %s (%s)", fallback_label, exc)
-        return getattr(self._fallback, method)(*args, **kwargs)
+            logger.warning(
+                "memory_provider_fallback method=%s primary=%s fallback=%s error_type=%s",
+                method,
+                getattr(self._primary, "name", "muninn"),
+                self.fallback_name,
+                type(exc).__name__,
+            )
+            fallback_reason = type(exc).__name__
+        fallback_started = time.perf_counter()
+        fallback_result = getattr(self._fallback, method)(*args, **kwargs)
+        latency_ms = int((time.perf_counter() - fallback_started) * 1000)
+        return _with_provider_name(
+            fallback_result,
+            provider=self.fallback_name,
+            fallback_reason=fallback_reason,
+            latency_ms=latency_ms,
+        )
 
     def rehydrate(
         self,
@@ -96,7 +110,13 @@ class _FallbackMemoryProvider:
         return self._call("list_pending", namespace=namespace, entity_id=entity_id)
 
 
-def _legacy_fallback_or_none() -> MemoryProvider:
+def _fallback_provider() -> MemoryProvider:
+    configured = (os.getenv("FRIDAY_MEMORY_FALLBACK_PROVIDER", "legacy").strip().lower() or "legacy")
+    if configured not in {"legacy", "none"}:
+        logger.warning("Unknown FRIDAY_MEMORY_FALLBACK_PROVIDER=%s; defaulting to legacy", configured)
+        configured = "legacy"
+    if configured == "none":
+        return NullMemoryProvider()
     try:
         return LegacyMemoryProvider()
     except Exception as exc:
@@ -120,12 +140,28 @@ def get_memory_provider() -> MemoryProvider:
     base_url = (os.getenv("MUNINN_BASE_URL", "http://127.0.0.1:8000").strip() or "http://127.0.0.1:8000").rstrip("/")
     namespace = memory_namespace()
     profile = memory_profile()
-    logger.info("Memory provider: muninn base_url=%s namespace=%s profile=%s", base_url, namespace, profile)
+    logger.info("Memory provider selected=muninn base_url=%s namespace=%s profile=%s", base_url, namespace, profile)
     primary = MuninnMemoryProvider(base_url=base_url, namespace=namespace, profile=profile)
-    fallback = _legacy_fallback_or_none()
+    fallback = _fallback_provider()
     return _FallbackMemoryProvider(primary, fallback)
 
 
 def reset_memory_provider_cache() -> None:
     get_memory_provider.cache_clear()
 
+
+def _with_provider_name(
+    value: Any,
+    *,
+    provider: str,
+    fallback_reason: Optional[str] = None,
+    latency_ms: Optional[int] = None,
+) -> Dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+    out = dict(data)
+    out["provider"] = provider
+    if fallback_reason:
+        out.setdefault("fallback_reason", fallback_reason)
+    if isinstance(latency_ms, int):
+        out.setdefault("latency_ms", latency_ms)
+    return out

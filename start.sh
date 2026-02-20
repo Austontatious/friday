@@ -8,7 +8,10 @@ cd "$SCRIPT_DIR"
 
 # Load environment variables
 if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+    set -a
+    # shellcheck disable=SC1091
+    . ./.env
+    set +a
 fi
 
 # Function to check if a port is in use
@@ -48,4 +51,13 @@ fi
 
 # Start the application
 echo "Starting FRIDAY backend on port $BACKEND_PORT..."
-python -m backend.main
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+    if command -v python >/dev/null 2>&1; then
+        PYTHON_BIN="python"
+    else
+        echo "No python interpreter found (expected python3 or python)"
+        exit 1
+    fi
+fi
+"$PYTHON_BIN" -m backend.main

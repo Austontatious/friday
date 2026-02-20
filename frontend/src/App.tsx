@@ -39,7 +39,7 @@ const App = () => {
 
     try {
       const response = await sendPrompt({ prompt: currentInput });
-      const cleaned = response.text || "[FRIDAY gave no valid reply]";
+      const cleaned = response.assistant_text || response.text || "[FRIDAY gave no valid reply]";
 
       const aiMessage: Message = {
         sender: "ai",

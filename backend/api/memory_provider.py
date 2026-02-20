@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -39,8 +40,22 @@ def _optional_text(value: Any) -> Optional[str]:
     return text or None
 
 
+def _env_int(key: str, default: int) -> int:
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
 @router.post("/memory/confirm")
 def confirm_memory(request: Request, payload: Dict[str, Any]):
+    max_pending = _env_int("FRIDAY_MEMORY_CONFIRM_MAX_IDS", 100)
+    max_pending_id_len = _env_int("FRIDAY_MEMORY_CONFIRM_MAX_ID_LEN", 128)
+    max_note_len = _env_int("FRIDAY_MEMORY_CONFIRM_MAX_NOTE_CHARS", 500)
     pending_ids = _str_list(payload.get("pending_ids"))
     decision = str(payload.get("decision") or "").strip().lower()
     note = _optional_text(payload.get("note"))
@@ -55,6 +70,27 @@ def confirm_memory(request: Request, payload: Dict[str, Any]):
                 False,
             ),
         )
+    if len(pending_ids) > max_pending:
+        raise HTTPException(
+            status_code=400,
+            detail=_error_payload(
+                "bad_request",
+                "Too many pending_ids",
+                f"Maximum pending_ids per request is {max_pending}",
+                False,
+            ),
+        )
+    invalid_ids = [item for item in pending_ids if len(item) > max_pending_id_len]
+    if invalid_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=_error_payload(
+                "bad_request",
+                "Invalid pending_id length",
+                f"Each pending_id must be <= {max_pending_id_len} characters",
+                False,
+            ),
+        )
     if decision not in {"accept", "reject"}:
         raise HTTPException(
             status_code=400,
@@ -65,10 +101,20 @@ def confirm_memory(request: Request, payload: Dict[str, Any]):
                 False,
             ),
         )
+    if note and len(note) > max_note_len:
+        raise HTTPException(
+            status_code=400,
+            detail=_error_payload(
+                "bad_request",
+                "Note too long",
+                f"note must be <= {max_note_len} characters",
+                False,
+            ),
+        )
 
     namespace = memory_namespace()
     provider = get_memory_provider()
-    user_id = str(getattr(request.state, "user_id", "") or "").strip() or "localweb"
+    user_id = str(getattr(request.state, "user_id", "") or "").strip() or "ent_local_user"
     decided_by = f"user:{user_id}"
     configured_provider = selected_memory_provider_name()
 
@@ -93,18 +139,21 @@ def confirm_memory(request: Request, payload: Dict[str, Any]):
 
     if configured_provider not in {"muninn", "legacy", "none"}:
         configured_provider = getattr(provider, "name", "none")
+    provider_used = configured_provider
+    if isinstance(result, dict) and isinstance(result.get("provider"), str):
+        provider_used = str(result.get("provider"))
     return {
         "memory": {
-            "provider": configured_provider,
+            "provider": provider_used,
             **(result if isinstance(result, dict) else {}),
         }
     }
 
 
 @router.post("/memory/pending")
-def pending_memory(payload: Dict[str, Any]):
+def pending_memory(request: Request, payload: Dict[str, Any]):
     namespace = memory_namespace()
-    entity_id = _optional_text(payload.get("entity_id"))
+    entity_id = _optional_text(payload.get("entity_id")) or str(getattr(request.state, "user_id", "") or "").strip() or None
     provider = get_memory_provider()
     configured_provider = selected_memory_provider_name()
 
@@ -126,10 +175,12 @@ def pending_memory(payload: Dict[str, Any]):
         items = []
     if configured_provider not in {"muninn", "legacy", "none"}:
         configured_provider = getattr(provider, "name", "none")
+    provider_used = configured_provider
+    if isinstance(data, dict) and isinstance(data.get("provider"), str):
+        provider_used = str(data.get("provider"))
     return {
         "memory": {
-            "provider": configured_provider,
+            "provider": provider_used,
             "items": items,
         }
     }
-

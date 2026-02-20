@@ -1,6 +1,6 @@
 import type { ModelResponse } from "../types";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:9001/api";
+const API_URL = process.env.REACT_APP_API_URL || "/api";
 const DEVICE_KEY = "friday_device_id";
 const DEVICE_HEADER = "X-Friday-Device";
 
@@ -20,6 +20,8 @@ export interface MemoryConfirmResponse {
     provider?: string;
     processed?: number;
     accepted_ids?: string[];
+    rejected?: number;
+    reasons?: string[];
   };
 }
 

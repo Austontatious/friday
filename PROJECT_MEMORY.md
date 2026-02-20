@@ -41,7 +41,89 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 - FRIDAY_JOBS_ENABLED
 
 ## Change Log
+### 2026-02-20
+- Added deterministic interaction policy + shaping stack for chat UX hardening:
+  - new policy kernel: `backend/core/interaction_policy.py`
+  - new deterministic shaper: `backend/core/response_shaper.py`
+  - chat wiring + certainty/recovery metadata/events: `backend/core/chat_engine.py`
+  - prompt policy injection (`<INTERACTION_POLICY>`): `backend/core/prompt_builder.py`
+  - runtime event forwarding on async agent runs: `backend/agentic/service.py`
+- Behavior updates:
+  - v1 modes are `focused | neutral | warm` (rule-based inference)
+  - `playful` remains hard-gated behind `FRIDAY_INTERACTION_PLAYFUL_ENABLED=1` and explicit request
+  - deterministic response constraints: banter budget, one-question cap, one-screen default
+  - confidence calibration now prefers high certainty on tool outputs and command/test-like success signals
+  - blame-free fallback language for tool-failure loops
+- Added tests:
+  - `tests/test_interaction_policy.py`
+  - `tests/test_response_shaper.py`
+  - `tests/test_chat_recovery.py`
+  - updates: `tests/test_prompt_builder.py`, `tests/test_coder_fallback.py`, `tests/test_agent_api.py`
+- New env flags:
+  - `FRIDAY_INTERACTION_DEFAULT_MODE`
+  - `FRIDAY_INTERACTION_ONE_SCREEN_CHARS`
+  - `FRIDAY_INTERACTION_PLAYFUL_ENABLED`
+- Why: enforce UX discipline deterministically rather than relying on model compliance, while preserving existing coder-route fallback and async agent API contracts.
+- How to test:
+  - `PYTHONDONTWRITEBYTECODE=1 pytest tests/test_interaction_policy.py tests/test_response_shaper.py tests/test_prompt_builder.py tests/test_coder_fallback.py tests/test_chat_recovery.py tests/test_agent_api.py -q`
+  - `PYTHONDONTWRITEBYTECODE=1 pytest tests/test_model_switching.py -q`
+
+### 2026-02-18
+- Aligned vLLM model naming defaults to Lexi across runtime/config:
+  - `backend/core/llm.py` now defaults `FRIDAY_MODEL_NAME` to `Lexi` (with blank-env fallback)
+  - `docker-compose.yaml` backend env default now `FRIDAY_MODEL_NAME=Lexi`
+  - `docker-compose.models.yml` now serves `${FRIDAY_MODEL_NAME:-Lexi}` instead of a hardcoded legacy name
+- Added explicit Lexi model env examples:
+  - `.env` includes `FRIDAY_MODEL_NAME=Lexi`
+  - `.env.example` and `.env.models.example` include `FRIDAY_MODEL_NAME=Lexi`
+- Updated operator docs (`README.md`, `RUNBOOK.md`, `docs/RUNBOOK.md`) to clarify:
+  - compose LLM URL (`http://llm:8000`)
+  - host-run backend to host vLLM URL (`http://127.0.0.1:8008`)
+- Why: ensure FRIDAY requests the active vLLM model id (`Lexi`) by default and avoid model-name drift between backend and served vLLM name.
+- How to test:
+  - `curl -fsS http://127.0.0.1:8008/v1/models`
+  - `FRIDAY_LLM_ENABLED=1 FRIDAY_MODEL_NAME=Lexi LLM_BASE_URL=http://127.0.0.1:8008 python -m backend.main`
+  - `curl -sS http://127.0.0.1:9001/api/chat -H 'Content-Type: application/json' -H 'X-Friday-Device: lexi-check' -d '{"prompt":"status check"}'`
+- Added OpenClaw-style agentic spine scaffolding:
+  - new async run API: `POST /api/agent`, `POST /api/agent/wait`, `GET /api/agent/{run_id}`
+  - run lifecycle events (`lifecycle`, `assistant`, `tool`, `error`) in `backend/agentic/events.py`
+  - per-session + global lane queue control in `backend/agentic/queue.py`
+  - run snapshot + wait semantics in `backend/agentic/wait.py`
+  - run orchestration service in `backend/agentic/service.py`
+- Wired backend entrypoint to include the new agent router in `backend/main.py`
+- Added optional coding-specialist model route with fallback in chat runtime:
+  - request-level trigger: `agent_profile:"coding"` or `use_coder_model:true`
+  - env route: `FRIDAY_CODER_ENABLED`, `FRIDAY_CODER_MODEL_NAME`, `FRIDAY_CODER_BASE_URL`, `FRIDAY_CODER_API_KEY`
+  - fallback behavior: if coder route fails, automatically use primary LLM route
+- Updated docs:
+  - `README.md`, `RUNBOOK.md`, `docs/RUNBOOK.md`
+- Why: establish a durable asynchronous agent run contract now, while keeping `POST /api/chat` stable; preserve optional coder specialization without making it a hard dependency.
+- How to test:
+  - `pytest tests/test_agent_api.py tests/test_coder_fallback.py tests/test_model_switching.py tests/test_prompt_builder.py`
+  - `curl -sS http://127.0.0.1:9001/api/agent -H 'Content-Type: application/json' -H 'X-Friday-Device: smoke-agent' -d '{"prompt":"hello","idempotency_key":"smoke-agent-1"}'`
+  - `curl -sS http://127.0.0.1:9001/api/agent/wait -H 'Content-Type: application/json' -d '{"run_id":"<run_id>","timeout_ms":30000,"include_result":true}'`
+
 ### 2026-02-16
+- Hardened Muninn integration with explicit connect/read/overall timeout controls and retry/backoff in `backend/memory/muninn_client.py`
+- Added provider fallback metadata so runtime responses reflect actual provider used (`muninn|legacy|none`) instead of configured provider only
+- Added guardrails:
+  - memory injection caps (`FRIDAY_MEMORY_MAX_INJECT_*`)
+  - confirmation endpoint caps (`FRIDAY_MEMORY_CONFIRM_MAX_*`)
+  - first-pass sensitive candidate marking (`email`/`phone` regex + confirm-required policy)
+- Upgraded identity resolution priority to:
+  - account header → session header/cookie → device header/cookie → `ent_local_user`
+- Added compose service topology for `friday-backend` + `muninn` with non-blocking dependency and health checks
+- Replaced outdated tests with provider/runtime-focused pytest coverage and added `pytest.ini` collection rules
+- Updated docs for source-of-truth alignment:
+  - `README.md`
+  - `docs/RUNBOOK.md`
+  - `docs/DECISIONS.md`
+  - `ROADMAP.md`
+- Why: remove docs/runtime drift, raise reliability/security baseline, and complete Muninn-first operational path without making memory a hard dependency
+- How to test:
+  - `pytest`
+  - `bash scripts/smoke_memory.sh`
+
 - Cut over chat memory integration to provider abstraction with env selection: `FRIDAY_MEMORY_PROVIDER=muninn|legacy|none` (default `muninn`)
 - Added `backend/memory/provider.py`, `backend/memory/muninn_provider.py`, and `backend/memory/factory.py`
 - Added Muninn HTTP wiring for:

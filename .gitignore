@@ -65,3 +65,6 @@ friday.log
 /workspace/ai-lab/friday/frontend/node_modules/
 
 .env.legacy
+
+# Local env (never commit)
+.env

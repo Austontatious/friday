@@ -4,21 +4,10 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-import httpx
-
+from backend.memory.muninn_client import MuninnClient
 from backend.memory.provider import MemoryProviderError
 
 logger = logging.getLogger("friday.memory.muninn")
-
-
-def _env_float(key: str, default: float) -> float:
-    raw = os.getenv(key)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        return default
 
 
 class MuninnMemoryProvider:
@@ -30,46 +19,16 @@ class MuninnMemoryProvider:
         base_url: Optional[str] = None,
         namespace: Optional[str] = None,
         profile: Optional[str] = None,
+        client: Optional[MuninnClient] = None,
     ) -> None:
         self.base_url = (base_url or os.getenv("MUNINN_BASE_URL", "http://127.0.0.1:8000")).rstrip("/")
         self.default_namespace = namespace or os.getenv("MUNINN_NAMESPACE", "friday")
         self.default_profile = profile or os.getenv("MUNINN_PROFILE", "friday")
-        self.timeout_seconds = _env_float("MUNINN_HTTP_TIMEOUT_SECONDS", 2.5)
+        self.readonly = str(os.getenv("MUNINN_READONLY", "0")).strip().lower() in {"1", "true", "yes", "on"}
+        self._client = client or MuninnClient(base_url=self.base_url)
 
     def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        url = f"{self.base_url}{path}"
-        try:
-            response = httpx.post(url, json=payload, timeout=self.timeout_seconds)
-        except Exception as exc:
-            raise MemoryProviderError(
-                code="muninn_unavailable",
-                message="Muninn request failed",
-                detail=str(exc),
-                retryable=True,
-            ) from exc
-
-        if response.status_code >= 400:
-            detail = {
-                "status_code": response.status_code,
-                "body": response.text[:600],
-                "url": url,
-            }
-            raise MemoryProviderError(
-                code="muninn_http_error",
-                message=f"Muninn returned HTTP {response.status_code}",
-                detail=detail,
-                retryable=response.status_code >= 500,
-            )
-
-        try:
-            data = response.json()
-        except Exception as exc:
-            raise MemoryProviderError(
-                code="muninn_invalid_response",
-                message="Muninn returned non-JSON response",
-                detail=str(exc),
-                retryable=True,
-            ) from exc
+        data = self._client.post(path, payload)
         if not isinstance(data, dict):
             raise MemoryProviderError(
                 code="muninn_invalid_response",
@@ -77,7 +36,7 @@ class MuninnMemoryProvider:
                 detail={"type": type(data).__name__},
                 retryable=True,
             )
-        return data
+        return {"provider": self.name, **data}
 
     def rehydrate(
         self,
@@ -104,6 +63,17 @@ class MuninnMemoryProvider:
         namespace: str,
         ttl_seconds: Optional[int] = None,
     ) -> Dict[str, Any]:
+        if self.readonly:
+            return {
+                "provider": self.name,
+                "accepted": 0,
+                "pending": 0,
+                "rejected": len(candidates or []),
+                "accepted_ids": [],
+                "pending_ids": [],
+                "pending_reasons": [],
+                "reject_reasons": ["muninn_readonly"] if candidates else [],
+            }
         body: Dict[str, Any] = {
             "namespace": namespace or self.default_namespace,
             "candidates": candidates,
@@ -121,6 +91,19 @@ class MuninnMemoryProvider:
         *,
         namespace: str,
     ) -> Dict[str, Any]:
+        if self.readonly:
+            return {
+                "provider": self.name,
+                "namespace": namespace or self.default_namespace,
+                "decision": decision,
+                "processed": len(pending_ids or []),
+                "accepted_writes": 0,
+                "rejected": len(pending_ids or []) if decision == "reject" else 0,
+                "missing": len(pending_ids or []) if decision == "accept" else 0,
+                "expired": 0,
+                "accepted_ids": [],
+                "reasons": ["muninn_readonly"] if pending_ids else [],
+            }
         body: Dict[str, Any] = {
             "namespace": namespace or self.default_namespace,
             "pending_ids": [str(item) for item in pending_ids],
@@ -135,9 +118,8 @@ class MuninnMemoryProvider:
         body: Dict[str, Any] = {
             "namespace": namespace or self.default_namespace,
             "status": "pending",
-            "limit": 50,
+            "limit": max(int(os.getenv("MUNINN_LIST_PENDING_LIMIT", "50")), 1),
         }
         if entity_id:
             body["entity_id"] = entity_id
         return self._post("/v0/memory/list_pending", body)
-

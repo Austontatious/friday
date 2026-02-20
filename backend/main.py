@@ -6,6 +6,7 @@ import logging
 import uvicorn
 from fastapi import FastAPI
 
+from backend.api.agent import router as agent_router
 from backend.api.chat import router as chat_router
 from backend.api.capabilities import router as capabilities_router
 from backend.api.health import router as health_router
@@ -23,6 +24,7 @@ logger = logging.getLogger("friday.backend")
 def create_app() -> FastAPI:
     app = FastAPI(title="FRIDAY Core")
     app.add_middleware(IdentityMiddleware)
+    app.include_router(agent_router, prefix="/api")
     app.include_router(chat_router, prefix="/api")
     app.include_router(capabilities_router, prefix="/api")
     app.include_router(jobs_router, prefix="/api")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict
 
 from backend.audit.logger import log_event
@@ -9,6 +10,11 @@ from backend.core.llm import llm_client
 
 def _available_from_status(status: Dict[str, Any]) -> bool:
     return status.get("enabled") is True and status.get("status") == "healthy"
+
+
+def _memory_provider_enabled() -> bool:
+    provider = (os.getenv("FRIDAY_MEMORY_PROVIDER", "muninn").strip().lower() or "muninn")
+    return provider in {"muninn", "legacy"}
 
 
 _LAST_SNAPSHOT: Dict[str, Any] = {}
@@ -23,7 +29,7 @@ def get_capabilities() -> Dict[str, Any]:
         "gesture": env_bool("FRIDAY_GESTURE_ENABLED", "0"),
         "avatar": env_bool("FRIDAY_AVATAR_ENABLED", "0"),
         "jobs": env_bool("FRIDAY_JOBS_ENABLED", "0"),
-        "memory_persist": env_bool("FRIDAY_MEMORY_PERSIST_ENABLED", "0"),
+        "memory_persist": env_bool("FRIDAY_MEMORY_PERSIST_ENABLED", "0") or _memory_provider_enabled(),
         "memory_vector": env_bool("FRIDAY_MEMORY_VECTOR_ENABLED", "0"),
         "memory_facts": env_bool("FRIDAY_MEMORY_FACTS_ENABLED", "0"),
         "memory_summaries": env_bool("FRIDAY_MEMORY_SUMMARIES_ENABLED", "0"),
