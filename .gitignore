@@ -68,3 +68,6 @@ friday.log
 
 # Local env (never commit)
 .env
+
+# Runtime-resolved env (auto-generated)
+.env.runtime

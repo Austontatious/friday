@@ -42,6 +42,17 @@ Prod-like app stack:
 docker compose -f docker-compose.app.yml up --build -d
 ```
 
+One command (autodiscover host Muninn/LLM, else start containers):
+```bash
+./scripts/friday_up.sh
+```
+
+Override examples:
+```bash
+HOST_LLM_URL_DEFAULT=http://127.0.0.1:8008 ./scripts/friday_up.sh
+AUTO_START_MODELS=0 ./scripts/friday_up.sh
+```
+
 Example: avoid port conflicts on a busy host:
 ```bash
 FRIDAY_HOST_API_PORT=19001 FRIDAY_HOST_WEB_PORT=18080 FRIDAY_HOST_MUNINN_PORT=18000 \
