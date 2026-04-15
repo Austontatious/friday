@@ -109,8 +109,8 @@ Most important remaining issue:
 
 ### `/mnt/data/friday`
 - Branch: `phase0-stabilize`
-- Commit hash: `TBD_AFTER_COMMIT`
-- Push status: `TBD_AFTER_PUSH`
+- Commit hash: `1b2246e`
+- Push status: `succeeded` (`origin/phase0-stabilize`)
 - Commit scope policy: only scratchpad/mimir decision/eval report related files (no broad unrelated tree sweep).
 
 ## Blockers/caveats
