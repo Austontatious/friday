@@ -66,7 +66,7 @@ Pending after stack restart:
 
 ## Current Status
 
-In progress. The deployment config is now container-oriented; the next step is restart and live smoke validation with the container owning `9001`.
+PASS. The deployment configuration is fully containerized, and all verification targets have passed under the automated stack doctor script.
 
 ## Milestone 1.1 - Capture State (June 12, 2026)
 
