@@ -84,3 +84,18 @@ In progress. The deployment config is now container-oriented; the next step is r
 - **Container health check results (Initial)**:
   - `healthz`: `{"ok":true}`
   - `readyz`: `{"ok":false}`. The `llm` and `coder` services report unhealthy/unreachable because the host firewall drops docker-bridge traffic to the host gateway at port `8130`.
+
+## Milestone 2 - Container Runtime Doctor Validation
+
+- **Doctor Script**: `scripts/doctor_friday_container_online.sh` (Created and executed)
+- **Checks and Outcomes**:
+  - Backend container exists: **PASS**
+  - Host gateway health check: **PASS**
+  - Host gateway models check: **PASS**
+  - Backend container to gateway connectivity: **PASS** (through `host.docker.internal` after firewall exception rules were applied by the helper service)
+  - Backend `/healthz` check: **PASS**
+  - Backend `/readyz` check: **PASS** (reachable `llm` and `coder` services)
+  - Direct chat smoke test: **PASS** (returns `container-direct-ok`)
+  - Coder chat smoke test: **PASS** (returns `container-coder-ok` using model `friday-coder`)
+  - Althing bridge fallback check: **PASS** (returns fallback header `X-Friday-Bridge-Fallback: direct_friday_runtime_fallback`)
+  - Frontend proxy reachable on port 18080: **PASS**
