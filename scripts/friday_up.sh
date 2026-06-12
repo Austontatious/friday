@@ -8,18 +8,42 @@ MODELS_COMPOSE=${MODELS_COMPOSE:-docker-compose.models.yml}
 
 # Preferences / defaults
 HOST_MUNINN_URL_DEFAULT=${HOST_MUNINN_URL_DEFAULT:-http://127.0.0.1:8000}
+HOST_GATEWAY_URL_DEFAULT=${HOST_GATEWAY_URL_DEFAULT:-http://127.0.0.1:8130}
 HOST_LLM_URL_DEFAULT=${HOST_LLM_URL_DEFAULT:-http://127.0.0.1:8000}
 HOST_LLM_URL_FALLBACK=${HOST_LLM_URL_FALLBACK:-http://127.0.0.1:8008}
+HOST_CODER_URL_DEFAULT=${HOST_CODER_URL_DEFAULT:-http://127.0.0.1:8010}
+COMPOSE_GATEWAY_URL=${COMPOSE_GATEWAY_URL:-http://host.docker.internal:8130/v1}
 COMPOSE_MUNINN_URL=${COMPOSE_MUNINN_URL:-http://muninn:8000}
 COMPOSE_LLM_URL=${COMPOSE_LLM_URL:-http://llm:8000}
+COMPOSE_CODER_URL=${COMPOSE_CODER_URL:-http://friday-coder:8010}
 DOCKER_HOST_ALIAS=${DOCKER_HOST_ALIAS:-host.docker.internal}
 
 AUTO_START_MODELS=${AUTO_START_MODELS:-1}
 AUTO_START_MUNINN=${AUTO_START_MUNINN:-1}
+CODER_ENABLED="${FRIDAY_CODER_ENABLED:-}"
+LLM_ENABLED="${FRIDAY_LLM_ENABLED:-}"
+LLM_MODEL_NAME="friday"
+FRIDAY_CODER_MODEL_NAME="${FRIDAY_CODER_MODEL_NAME:-}"
 
 probe_json() {
   local url="$1"
   curl -fsS --max-time 1 "$url" >/dev/null 2>&1
+}
+
+probe_llm_models() {
+  local base="$1"
+  local expected="${2:-}"
+  local out
+  out="$(curl -fsS --max-time 1 "${base%/}/v1/models" 2>/dev/null || true)"
+  if [[ -z "$out" ]]; then
+    return 1
+  fi
+  if ! echo "$out" | grep -q '"data"'; then
+    return 1
+  fi
+  if [[ -n "$expected" ]]; then
+    echo "$out" | grep -q "\"id\"[[:space:]]*:[[:space:]]*\"${expected}\""
+  fi
 }
 
 port_in_use() {
@@ -80,26 +104,80 @@ else
   fi
 fi
 
-LLM_BASE_URL=""
-if probe_json "${HOST_LLM_URL_DEFAULT}/v1/models" || probe_json "${HOST_LLM_URL_DEFAULT}/health"; then
-  LLM_BASE_URL="$(to_container_url "${HOST_LLM_URL_DEFAULT}")"
-  echo "LLM: using host at ${LLM_BASE_URL}"
-elif probe_json "${HOST_LLM_URL_FALLBACK}/v1/models" || probe_json "${HOST_LLM_URL_FALLBACK}/health"; then
-  LLM_BASE_URL="$(to_container_url "${HOST_LLM_URL_FALLBACK}")"
-  echo "LLM: using host at ${LLM_BASE_URL}"
+LLM_BASE_URL="${LLM_BASE_URL:-}"
+if probe_llm_models "${HOST_GATEWAY_URL_DEFAULT}" "friday" && probe_llm_models "${HOST_GATEWAY_URL_DEFAULT}" "friday-coder"; then
+  LLM_BASE_URL="$(to_container_url "${HOST_GATEWAY_URL_DEFAULT}")"
+  LLM_MODEL_NAME="friday"
+  LLM_ENABLED="1"
+  CODER_BASE_URL="$(to_container_url "${HOST_GATEWAY_URL_DEFAULT}")"
+  CODER_ENABLED="1"
+  FRIDAY_CODER_MODEL_NAME="friday-coder"
+  echo "LLM: using host local gateway at ${LLM_BASE_URL}"
+elif [[ -n "${LLM_BASE_URL:-}" ]]; then
+  LLM_BASE_URL="$(to_container_url "${LLM_BASE_URL}")"
+  echo "LLM: manual override set to ${LLM_BASE_URL}"
 else
-  if [[ "${AUTO_START_MODELS}" == "1" ]]; then
-    echo "LLM: host not reachable; will use compose model service (${COMPOSE_LLM_URL})"
-    LLM_BASE_URL="${COMPOSE_LLM_URL}"
+  EXPECTED_LLM_MODEL="${LLM_MODEL_NAME:-friday}"
+  if probe_llm_models "${HOST_LLM_URL_DEFAULT}" "${EXPECTED_LLM_MODEL}"; then
+    LLM_BASE_URL="$(to_container_url "${HOST_LLM_URL_DEFAULT}")"
+    LLM_ENABLED="1"
+    echo "LLM: using host at ${LLM_BASE_URL}"
+  elif probe_llm_models "${HOST_LLM_URL_FALLBACK}" "${EXPECTED_LLM_MODEL}"; then
+    LLM_BASE_URL="$(to_container_url "${HOST_LLM_URL_FALLBACK}")"
+    LLM_ENABLED="1"
+    echo "LLM: using host at ${LLM_BASE_URL}"
+  elif probe_llm_models "${HOST_LLM_URL_DEFAULT}"; then
+    LLM_BASE_URL="$(to_container_url "${HOST_LLM_URL_DEFAULT}")"
+    LLM_ENABLED="1"
+    echo "LLM: host reachable at ${LLM_BASE_URL} but expected model '${EXPECTED_LLM_MODEL}' not listed."
+  elif probe_llm_models "${HOST_LLM_URL_FALLBACK}"; then
+    LLM_BASE_URL="$(to_container_url "${HOST_LLM_URL_FALLBACK}")"
+    LLM_ENABLED="1"
+    echo "LLM: host reachable at ${LLM_BASE_URL} but expected model '${EXPECTED_LLM_MODEL}' not listed."
   else
-    echo "LLM: host not reachable and AUTO_START_MODELS=0; leaving unset"
+    if [[ "${AUTO_START_MODELS}" == "1" ]]; then
+      echo "LLM: host not reachable; will use compose gateway service (${COMPOSE_GATEWAY_URL})"
+      LLM_BASE_URL="${COMPOSE_GATEWAY_URL}"
+      LLM_ENABLED="1"
+    else
+      echo "LLM: host not reachable and AUTO_START_MODELS=0; leaving unset"
+    fi
   fi
+fi
+
+CODER_BASE_URL="${CODER_BASE_URL:-}"
+if [[ -z "${CODER_BASE_URL}" && ( -z "${CODER_ENABLED}" || "${CODER_ENABLED}" == "1" ) ]]; then
+  EXPECTED_CODER_MODEL="${FRIDAY_CODER_MODEL_NAME:-qwen3-coder-30b-a3b-instruct}"
+  if probe_llm_models "${HOST_CODER_URL_DEFAULT}" "${EXPECTED_CODER_MODEL}"; then
+    CODER_BASE_URL="$(to_container_url "${HOST_CODER_URL_DEFAULT}")"
+    CODER_ENABLED="1"
+    echo "Coder LLM: using host at ${CODER_BASE_URL}"
+  elif probe_llm_models "${HOST_CODER_URL_DEFAULT}"; then
+    CODER_BASE_URL="$(to_container_url "${HOST_CODER_URL_DEFAULT}")"
+    CODER_ENABLED="1"
+    echo "Coder LLM: host reachable at ${CODER_BASE_URL} but expected model '${EXPECTED_CODER_MODEL}' not listed."
+  else
+    if [[ "${AUTO_START_MODELS}" == "1" ]]; then
+      echo "Coder LLM: host not reachable; will use compose model service (${COMPOSE_CODER_URL})"
+      CODER_BASE_URL="${COMPOSE_CODER_URL}"
+      CODER_ENABLED="1"
+    else
+      echo "Coder LLM: host not reachable and AUTO_START_MODELS=0; leaving unset"
+    fi
+  fi
+else
+  echo "Coder LLM disabled by FRIDAY_CODER_ENABLED=${CODER_ENABLED}; skipping coder discovery"
 fi
 
 cat > .env.runtime <<EOF
 # Auto-generated by scripts/friday_up.sh
 MUNINN_BASE_URL=${MUNINN_BASE_URL}
 LLM_BASE_URL=${LLM_BASE_URL}
+FRIDAY_LLM_ENABLED=${LLM_ENABLED:-0}
+FRIDAY_MODEL_NAME=${LLM_MODEL_NAME}
+FRIDAY_CODER_ENABLED=${CODER_ENABLED:-0}
+FRIDAY_CODER_BASE_URL=${CODER_BASE_URL}
+FRIDAY_CODER_MODEL_NAME=${FRIDAY_CODER_MODEL_NAME}
 EOF
 
 echo "==> Wrote .env.runtime"
@@ -128,15 +206,17 @@ if [[ "${USE_COMPOSE_MUNINN}" == "1" ]]; then
     docker compose -f "${APP_COMPOSE}" up -d --build
 else
   echo "==> Starting backend/frontend only (external Muninn or disabled Muninn)"
+  echo "==> Ensuring writable backend volumes (/data, /logs)"
+  docker compose -f "${APP_COMPOSE}" up -d friday-volume-init
   FRIDAY_HOST_API_PORT="${RESOLVED_API_HOST_PORT}" \
   FRIDAY_HOST_WEB_PORT="${RESOLVED_WEB_HOST_PORT}" \
   FRIDAY_HOST_MUNINN_PORT="${RESOLVED_MUNINN_HOST_PORT}" \
     docker compose -f "${APP_COMPOSE}" up -d --build --no-deps friday-backend friday-frontend
 fi
 
-if [[ "${AUTO_START_MODELS}" == "1" ]] && [[ "${LLM_BASE_URL}" == "${COMPOSE_LLM_URL}" ]]; then
+if [[ "${AUTO_START_MODELS}" == "1" ]] && [[ "${LLM_BASE_URL}" == "${COMPOSE_GATEWAY_URL}" || "${CODER_BASE_URL}" == "${COMPOSE_CODER_URL}" ]]; then
   echo "==> Starting models stack: ${MODELS_COMPOSE}"
   docker compose -f "${MODELS_COMPOSE}" --profile models up -d || true
 fi
 
-echo "==> Done. Frontend: http://127.0.0.1:${RESOLVED_WEB_HOST_PORT}  Backend: http://127.0.0.1:${RESOLVED_API_HOST_PORT}  Muninn: ${MUNINN_BASE_URL}  LLM: ${LLM_BASE_URL}"
+echo "==> Done. Frontend: http://127.0.0.1:${RESOLVED_WEB_HOST_PORT}  Backend: http://127.0.0.1:${RESOLVED_API_HOST_PORT}  Muninn: ${MUNINN_BASE_URL}  LLM: ${LLM_BASE_URL}  Coder LLM: ${CODER_BASE_URL}"

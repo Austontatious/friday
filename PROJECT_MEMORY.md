@@ -41,6 +41,127 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 - FRIDAY_JOBS_ENABLED
 
 ## Change Log
+### 2026-06-11 (Candidate B local gateway startup and alias cutover)
+- What changed:
+  - Updated `local_llm_gateway/config/models.yaml` so `friday-heavy-lite` points at the Candidate B q4 llama-server backend on `8174`, `friday-coder` points at the Candidate B q36 llama-server backend on `8176`, and `friday-heavy` remains the quality-mode q6 alias.
+  - Added llama.cpp streaming support in `local_llm_gateway/gateway/adapters/llama_cpp.py` so gateway streaming works for the Candidate B llama-server aliases.
+  - Moved `comfy-sd` in `Lex/docker-compose.yml` from GPU 0 to GPU 6 and restarted it healthy.
+  - Added Candidate B orchestration and smoke helpers under `scripts/gateway/` plus runtime reports under `docs/gateway/runtime/`.
+- Why:
+  - Bring up the reserve-friendly Candidate B gateway stack, preserve GPU 7 as reserve, and validate the public gateway alias contract without wiring app clients yet.
+- New env flags:
+  - None.
+- How to test:
+  - `bash /mnt/data/models/scripts/gateway/start_local_gateway_candidate_b.sh`
+  - `python3 /mnt/data/models/scripts/gateway/healthcheck_candidate_b.py`
+  - `python3 /mnt/data/models/scripts/gateway/smoke_candidate_b_gateway.py`
+  - `curl -sf http://127.0.0.1:8188/system_stats`
+
+### 2026-06-11 (Local-first harness session contract)
+- What changed:
+  - Added `docs/local_first_harness_contract.md` to define the app-to-gateway session payload contract, supported mode values, and the thin adapter boundary.
+  - Extended `local_llm_gateway/gateway/schemas.py` and `local_llm_gateway/gateway/router.py` so gateway responses echo bounded `app_session` metadata when callers provide it.
+  - Added `tests/test_local_first_harness_contract.py` to verify alias identity and mode layering remain composable while app session metadata is preserved.
+  - Added `docs/decisions/2026-06-11_local_first_harness_session_contract_adr.md` to record the contract decision.
+- Why:
+  - Make the local-first harness explicit for app callers without duplicating persona or backend-specific logic in each app.
+- New env flags:
+  - None.
+- How to test:
+  - `python3 -m pytest -q tests/test_local_first_harness_contract.py tests/test_alias_routing.py tests/test_json_mode.py`
+
+### 2026-06-10 (Local LLM gateway for alias-to-backend contract routing)
+- What changed:
+  - Added a standalone `local_llm_gateway/` FastAPI service that exposes `/health`, `/profiles`, `/v1/models`, `/v1/chat/completions`, and `/admin/reload`.
+  - Added YAML-driven backend/alias profiles under `local_llm_gateway/config/models.yaml` with shared-backend aliasing for `lexi`, `friday`, `chef`, `friday-coder`, and `friday-fast`.
+  - Implemented alias-specific input policies, output cleanup, approximate context budgeting, strict-JSON repair, and stream normalization.
+  - Added smoke tooling (`scripts/run_gateway.sh`, `scripts/smoke_gateway.py`) plus focused tests for routing, prompt shaping, streaming whitespace, JSON repair, and budget overflow.
+  - Documented the boundary in `docs/decisions/2026-06-10_local_llm_gateway_adr.md`, plus implementation plan, migration notes, and a final report under `docs/`.
+- Why:
+  - Provide one stable local endpoint that can serve multiple public persona/application aliases without baking backend-specific prompts or transport quirks into the caller apps.
+- New env flags:
+  - None for the gateway core. The smoke script accepts `GATEWAY_URL` for convenience.
+- How to test:
+  - `python3 -m pytest -q tests/test_alias_routing.py tests/test_lexi_scaffold_filter.py tests/test_friday_structured_context.py tests/test_stream_normalization.py tests/test_json_mode.py tests/test_context_budget.py tests/test_template_rendering.py`
+  - `python3 -m pytest -q tests/test_codex_standards.py --noconftest`
+  - `python3 evals/runner.py --check`
+  - `python3 scripts/smoke_gateway.py --gateway-url http://127.0.0.1:8130/v1`
+
+### 2026-06-08 (Friday model modernization to Llama 3.3 Abliterated 70B)
+- What changed:
+  - Set Friday model defaults to the new primary path: `FRIDAY_MODEL_NAME=friday`.
+  - `docker-compose.models.yml` primary `llm` service now serves `FRIDAY_MODEL_NAME` from `/mnt/data/models/llama-3.3-70b-abliterated-gptq-int8` with `--tensor-parallel-size 4` and `--max-model-len 32768`.
+  - Turned default coder auto-routing off (`FRIDAY_CODER_ENABLED=0`, `FRIDAY_CODER_AUTO_ROUTE=0`), while preserving explicit coder route behavior for coding profiles/flags.
+  - Increased default context target to 32k across `backend/core/llm.py` and model startup docs/scripts.
+  - Updated compose/runtime scripts to skip coder discovery unless `FRIDAY_CODER_ENABLED=1`:
+    - `scripts/friday_up.sh`
+    - `scripts/check_friday_stack.sh`
+  - Updated defaults in `.env.example` / `.env.models.example`, smoke script, and capability test expectations.
+- Why:
+  - Route all Friday traffic through the new local primary model by default while keeping the dedicated coding specialist as an explicit/fallback mode.
+- New env flags:
+  - `FRIDAY_CODER_ENABLED` (default `0`)
+  - `FRIDAY_CODER_AUTO_ROUTE` (default `0`)
+  - `FRIDAY_LLM_CONTEXT_WINDOW` (default `32768`)
+  - `FRIDAY_MODEL_NAME` (default `friday`)
+- How to test:
+  - `python3 -m pytest -q tests/test_operational_hardening.py tests/test_chat_repo_context.py`
+  - `LLM_BASE_URL=http://127.0.0.1:8008 FRIDAY_MODEL_NAME=friday bash scripts/smoke_llm.sh`
+  - `bash scripts/check_friday_stack.sh`
+
+### 2026-06-08 (Friday modernization routing cleanup)
+- What changed:
+  - Finished cleanup of routing/tests so `agent_profile: "coding"` is no longer treated as an implicit coder trigger.
+  - `chat_engine` now emits a dedicated `selected_model` in `/api/chat` metadata and preserves explicit `use_coder_model: true` as the only request-level coder activation signal.
+  - Prompt-builder context accounting now exposes route/lane/task metadata through `build_messages_with_accounting`.
+  - Auto file search path from retrieval prompts now records an explicit `auto_file_search` runtime event.
+  - `build_althing_bridge_system_prompt` now matches updated layered prompt-return signature.
+- Why:
+  - Keep Friday traffic on the primary local 70B model by default and make specialist routing explicit and auditable.
+- New env flags:
+  - No new flags introduced in this cleanup pass.
+- How to test:
+  - `PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q tests/test_prompt_builder.py tests/test_coder_fallback.py tests/test_chat_budgeting.py tests/test_chat_repo_context.py`
+
+### 2026-04-19 (Read-only whole-workspace access for Friday/Althing path prompts)
+- What changed:
+  - `backend/tools/builtins.py`: expanded read-only path resolution to support configured extra roots, case-insensitive absolute path resolution under those roots, directory inspection via new `inspect_repo_path`, and directory-aware `file_search`.
+  - `backend/core/chat_engine.py`: absolute path hints now trigger deterministic repo/workspace context injection, and auto repo context uses `inspect_repo_path` so directory prompts can succeed without write access.
+  - `backend/api/althing_chat.py`: Althing-mode UI requests that reference local paths or repo files now fall back to direct Friday read-only inspection instead of proxying unchanged into Althing lanes that lack file tools.
+  - Runtime mounts: `docker-compose.app.yml`, `docker-compose.dev.yml`, and `/mnt/data/althing/docker-compose.yml` now mount `/mnt/data` read-only into the relevant backend/router containers.
+  - Tests: expanded `tests/test_tool_engine_file_search.py`, `tests/test_chat_repo_context.py`, and `tests/test_althing_bridge_api.py`.
+- Why:
+  - The remaining live failure was not just routing. Friday backend had no host workspace mount, so prompts like `/mnt/data/Friday` or `/mnt/data/Althing` were invisible at runtime even after direct Friday repo-file fixes. This patch makes the routed system read-only over the wider workspace while keeping writes disabled.
+- New env flags:
+  - `FRIDAY_FILE_SEARCH_EXTRA_ROOTS`
+- How to test:
+  - `python3 -m pytest -q tests/test_tool_engine_file_search.py tests/test_chat_repo_context.py tests/test_althing_bridge_api.py`
+  - Rebuild/restart:
+    - `docker compose up -d --build friday-backend`
+    - `docker compose -f /mnt/data/althing/docker-compose.yml up -d router`
+  - Live smoke:
+    - `curl -sS -X POST http://127.0.0.1:9001/api/althing/chat -H 'Content-Type: application/json' -H 'X-Friday-Device: smoke-bridge-path' --data '{\"prompt\":\"see if you can access /mnt/data/Friday and /mnt/data/Althing\"}'`
+
+### 2026-04-19 (Coder auto-route + repo file context for direct Friday)
+- What changed:
+  - `backend/core/chat_engine.py`: direct Friday now auto-routes `code_execution` prompts to the coder transport when `FRIDAY_CODER_AUTO_ROUTE=1`, extracts explicit repo-path hints from prompts, and injects deterministic repo context via `read_repo_file`/`file_search` when file-dependent prompts would otherwise fail without local access.
+  - `backend/tools/builtins.py`: added read-only `read_repo_file` for bounded repo-local file reads.
+  - `backend/tools/engine.py`: treats `read_repo_file` as a read-only file tool allowed under the existing `FRIDAY_FILE_SEARCH_ALLOW_WHEN_TOOLS_DISABLED` gate.
+  - `Dockerfile`: backend image now copies the repo working tree into `/app` so live repo-local file reads see the actual Friday tree instead of a Python-only subset.
+  - Tests: added `tests/test_chat_repo_context.py` and expanded `tests/test_tool_engine_file_search.py`.
+- Why:
+  - Friday’s coder transport was healthy, but direct Friday still depended on explicit request flags for coder routing and had no reliable repo-local file access path for coding prompts. This patch makes code prompts reach the coder automatically and gives explicit file-path prompts a deterministic repo context path.
+- New env flags:
+  - `FRIDAY_CODER_AUTO_ROUTE`
+  - `FRIDAY_AUTO_REPO_FILE_LIMIT`
+  - `FRIDAY_AUTO_REPO_FILE_MAX_LINES`
+  - `FRIDAY_READ_REPO_FILE_MAX_LINES`
+- How to test:
+  - `python3 -m pytest -q tests/test_chat_repo_context.py tests/test_tool_engine_file_search.py`
+  - Live smoke:
+    - `curl -sS -X POST http://127.0.0.1:9001/api/chat -H 'Content-Type: application/json' -H 'X-Friday-Device: smoke-coder' --data '{\"prompt\":\"Implement a Python helper that validates a config dict.\",\"user_id\":\"smoke\",\"workspace_id\":\"default\"}'`
+    - `curl -sS -X POST http://127.0.0.1:9001/api/chat -H 'Content-Type: application/json' -H 'X-Friday-Device: smoke-repo-file' --data '{\"prompt\":\"Inspect README.md and tell me the first section title.\",\"user_id\":\"smoke\",\"workspace_id\":\"default\"}'`
+
 ### 2026-04-14 (Remediation pass v1: runtime, routing, file/tool, prompt contract)
 - Runtime/token budgeting hardening:
   - `backend/core/llm.py`: added `max_tokens_override`, context-window introspection, and `LLMContextLimitError` detection for upstream context-limit failures.
@@ -178,6 +299,7 @@ Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilit
 - Added docs:
   - `docs/FRIDAY_UI_ALTHING_BRIDGE.md`
   - `README.md` and `RUNBOOK.md` bridge mode notes
+- Bridge fallback behavior now degrades to direct Friday when the upstream router reports `no_routable_lane_available` / `state_unavailable`, while preserving the existing repo/file direct-fallback path.
 - New env flags:
   - `FRIDAY_ALTHING_BRIDGE_ENABLED`
   - `FRIDAY_ALTHING_BASE_URL`
@@ -913,6 +1035,58 @@ How to test:
   - runtime failures `110 -> 0`
   - tool-selection failures `35 -> 4`
   - prompt-following failures increased (`37 -> 48`), now a primary remaining quality cluster.
+
+## 2026-06-12 - Backend 8174 Restored for Local Model Bridge
+
+### What Changed
+- Restored the Candidate B qwen35 Q4 `llama-server` backend on port `8174`.
+- Added `docs/local_gateway/BACKEND_8174_LIFECYCLE.md`.
+- Added `docs/local_gateway/BACKEND_8174_RESTORE_REPORT.md`.
+- Updated `docs/local_gateway/LOCAL_MODEL_BRIDGE_DOCTOR.md` with an `8174` troubleshooting section.
+
+### Why
+- The local model bridge doctor showed the gateway and Lexi container-to-gateway path were healthy, but backend `8174` was refusing connections.
+- Critical aliases `lexi` and `friday-heavy-lite` depend on `8174`, so they failed while `friday-coder` on `8176` continued passing.
+
+### New Env Flags
+- None.
+
+### How To Test
+- `curl -fsS http://127.0.0.1:8174/v1/models`
+- direct tiny completion against `http://127.0.0.1:8174/v1/chat/completions`
+- `python3 /mnt/data/friday/scripts/local_model_bridge_doctor.py`
+
+### Current Runtime Finding
+- `8174` is restored as detached PID `1184035` using qwen35 Q4 on GPUs `0,1,2,3`.
+- Full doctor result after restore: `passed: 19`, `failed: 0`, `skipped: 2`, `critical_failed: 0`.
+- Remaining risk: `8174` is detached but not reboot-safe; recommended hardening is a dedicated systemd service.
+
+## 2026-06-12 - Local Model Bridge Doctor
+
+### What Changed
+- Added `scripts/local_model_bridge_doctor.py`, a read-only diagnostic script for the local model bridge stack.
+- Added `docs/local_gateway/LOCAL_MODEL_BRIDGE_DOCTOR.md` with usage, failure interpretation, and expected startup order.
+- Added `docs/local_gateway/LOCAL_MODEL_BRIDGE_DOCTOR_IMPLEMENTATION_REPORT.md` with validation output and current runtime findings.
+- The doctor writes its latest JSON result to `docs/local_gateway/local_model_bridge_doctor_latest.json`.
+
+### Why
+- Make local bridge failures attributable by boundary: host to gateway, gateway alias to backend, Lexi container to gateway, Lexi runtime contract, and ChefAI config contract.
+- Prevent future repairs from treating Lexi or ChefAI as generically broken when the failing layer is a backend, alias, Docker path, or app contract.
+
+### New Env Flags
+- None.
+
+### How To Test
+- `python3 /mnt/data/friday/scripts/local_model_bridge_doctor.py --skip-completions`
+- `python3 /mnt/data/friday/scripts/local_model_bridge_doctor.py`
+- `python3 /mnt/data/friday/scripts/local_model_bridge_doctor.py --json-only --skip-completions`
+- `cd /mnt/data/friday && python3 -m pytest tests/test_alias_routing.py -q`
+- `cd /mnt/data/Lex && python3 -m pytest tests/test_runtime_preflight.py -q`
+
+### Current Runtime Finding
+- The gateway and Lexi container-to-gateway path are healthy.
+- Backend `8174` is currently not accepting direct `/v1/models`, causing full doctor critical failures for `lexi` and `friday-heavy-lite`.
+- Backend `8176` and gateway alias `friday-coder` are healthy.
 
 ## 2026-04-15 - Synthetic Optimizer Harness V1 (Bounded Policy Search)
 
