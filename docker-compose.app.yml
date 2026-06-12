@@ -8,7 +8,7 @@ services:
       - MUNINN_HOST=0.0.0.0
       - MUNINN_PORT=8000
     ports:
-      - "${FRIDAY_HOST_MUNINN_PORT:-8000}:8000"
+      - "${FRIDAY_HOST_MUNINN_PORT:-18000}:8000"
     volumes:
       - muninn_data:/data
     healthcheck:
@@ -18,33 +18,70 @@ services:
       retries: 20
     networks: [friday_net]
 
+  friday-volume-init:
+    image: busybox:1.36
+    user: "0:0"
+    command: >
+      sh -lc "mkdir -p /data /logs &&
+      chown -R ${FRIDAY_APP_UID:-10001}:${FRIDAY_APP_GID:-10001} /data /logs &&
+      chmod -R u+rwX,g+rwX /data /logs"
+    restart: "no"
+    volumes:
+      - friday_data:/data
+      - friday_logs:/logs
+    networks: [friday_net]
+
+  friday-gateway-firewall:
+    image: alpine:3.20
+    network_mode: host
+    privileged: true
+    restart: "no"
+    command: >
+      sh -lc "apk add --no-cache iptables >/dev/null && \
+        iptables -C INPUT -p tcp -s 172.29.0.0/16 --dport 8130 -j ACCEPT 2>/dev/null || \
+          iptables -I INPUT 1 -p tcp -s 172.29.0.0/16 --dport 8130 -j ACCEPT; \
+        iptables -C INPUT -p tcp -s 192.168.16.0/20 --dport 8130 -j ACCEPT 2>/dev/null || \
+          iptables -I INPUT 1 -p tcp -s 192.168.16.0/20 --dport 8130 -j ACCEPT"
+
   friday-backend:
     build:
       context: .
       target: prod
     env_file:
-      - .env.example
-      - .env.runtime
+      - path: .env.example
+      - path: .env.runtime
+        required: false
     environment:
       - FRIDAY_API_PORT=9001
       - FRIDAY_DATA_DIR=/data
       - FRIDAY_LOG_DIR=/logs
+      - FRIDAY_CODER_AUTO_ROUTE=${FRIDAY_CODER_AUTO_ROUTE:-0}
+      - FRIDAY_CODER_API_KEY=${FRIDAY_CODER_API_KEY:-}
+      - FRIDAY_ALTHING_BASE_URL=${FRIDAY_ALTHING_BASE_URL:-http://althing_router:8000}
+      - FRIDAY_ALTHING_MODEL_HINT=${FRIDAY_ALTHING_MODEL_HINT:-auto_no_reason}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "${FRIDAY_HOST_API_PORT:-9001}:9001"
     depends_on:
+      friday-volume-init:
+        condition: service_completed_successfully
       muninn:
         condition: service_healthy
+      friday-gateway-firewall:
+        condition: service_completed_successfully
     volumes:
       - friday_data:/data
       - friday_logs:/logs
+      - /mnt/data:/mnt/data:ro
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9001/healthz"]
       interval: 5s
       timeout: 3s
       retries: 30
-    networks: [friday_net]
+    networks:
+      - friday_net
+      - althing_default
 
   friday-frontend:
     build:
@@ -52,7 +89,7 @@ services:
       dockerfile: frontend/Dockerfile
       target: prod
     ports:
-      - "${FRIDAY_HOST_WEB_PORT:-8080}:8080"
+      - "${FRIDAY_HOST_WEB_PORT:-18080}:8080"
     depends_on:
       friday-backend:
         condition: service_healthy
@@ -62,6 +99,8 @@ networks:
   friday_net:
     name: friday_net
     driver: bridge
+  althing_default:
+    external: true
 
 volumes:
   friday_data:
