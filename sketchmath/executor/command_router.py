@@ -680,6 +680,11 @@ def _handle_extrude_profile(command: GeometryCommand, state: SelectionContext) -
             detail={"command_type": command.command_type, **validation.to_dict()},
         )
     depth = float(_parameter(command, "depth"))
+    if depth <= 0:
+        raise SelectionResolutionError(
+            "Extrusion depth must be a positive number",
+            detail={"command_type": command.command_type, "error_code": "invalid_extrusion_depth", "depth": depth},
+        )
     depth_unit = str(_parameter(command, "depth_unit", default="mm"))
     direction = str(_parameter(command, "direction", default="positive_normal"))
     output_format = str(_parameter(command, "output_format", default="step"))

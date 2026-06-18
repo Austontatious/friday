@@ -1,6 +1,7 @@
 import {
   buildAddProfileHoleCommand,
   buildDeleteEntityCommand,
+  buildExtrudeProfileCommand,
   buildSetLengthCommand,
   buildSetRectangleDimensionCommand,
   buildTranslateCommand,
@@ -49,6 +50,19 @@ describe("SketchMath command builders", () => {
     expect(command.command_type).toBe("add_profile_hole");
     expect(command.selection).toEqual(["profile_rect_A"]);
     expect(command.parameters).toEqual({ diameter: 12, unit: "mm", center: [280, 170] });
+  });
+
+  it("generates a typed extrude profile command for STEP preview", () => {
+    const command = buildExtrudeProfileCommand("profile_rect_A", 10, "mm");
+
+    expect(command.command_type).toBe("extrude_profile");
+    expect(command.selection).toEqual(["profile_rect_A"]);
+    expect(command.parameters).toEqual({
+      depth: 10,
+      depth_unit: "mm",
+      direction: "positive_normal",
+      output_format: "step",
+    });
   });
 
   it("marks delete commands as cascade only when requested", () => {

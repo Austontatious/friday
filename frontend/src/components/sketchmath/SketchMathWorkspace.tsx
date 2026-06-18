@@ -246,6 +246,7 @@ const SketchMathWorkspace = () => {
   const [holeDiameterValue, setHoleDiameterValue] = useState("8");
   const [holePlacement, setHolePlacement] = useState<HolePlacementState>(null);
   const [cadFeatureSummary, setCadFeatureSummary] = useState<string | null>(null);
+  const [cadExportPath, setCadExportPath] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canvasDragRef = useRef<{ start: Point; moved: boolean; forceSquare: boolean } | null>(null);
@@ -332,6 +333,7 @@ const SketchMathWorkspace = () => {
   );
   const activeProfileForHole = selectedRectangleProfile || selectedClosedProfile;
   const activeProfileHoleCount = activeProfileForHole ? activeProfileForHole.holes?.length || 0 : null;
+  const activeProfileForCad = selectedRectangleProfile || selectedClosedProfile;
   const rectangleAnchorPoint = useMemo(() => {
     if (!selectedRectangleBaseId) {
       return null;
@@ -788,6 +790,7 @@ const SketchMathWorkspace = () => {
     setTranslationOutcome(null);
     setPendingCommandText("");
     setCadFeatureSummary(null);
+    setCadExportPath(null);
     setError(null);
   };
 
@@ -1268,6 +1271,15 @@ const SketchMathWorkspace = () => {
       const profileBaseId = profileId ? rectangleBaseIdFromEntityId(profileId) : null;
       setRectangleSelectionDetail(profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
       setHolePlacement(null);
+      return;
+    }
+    if (previewCommandPayload.command_type === "extrude_profile") {
+      const profileId = previewCommandPayload.selection[0];
+      setSelectedEntityIds(profileId ? [profileId] : []);
+      const profileBaseId = profileId ? rectangleBaseIdFromEntityId(profileId) : null;
+      setRectangleSelectionDetail(profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
+      setCadFeatureSummary(summarizeExtrudeResult(result, true));
+      setCadExportPath(cadExportMetadata(result).stepPath);
     }
   };
 
@@ -1314,9 +1326,28 @@ const SketchMathWorkspace = () => {
     }
   };
 
-  const handleCreateCadFeature = () => {
-    const profile = selectedRectangleProfile || closedProfileEntity;
+  const cadExportMetadata = (result: SketchMathOperationResult | null): { holeCount: number; stepPath: string | null } => {
+    const cadExport = result?.metadata?.cad_export as Record<string, unknown> | undefined;
+    const exportMetadata = cadExport?.metadata as Record<string, unknown> | undefined;
+    const artifacts = cadExport?.artifacts as Record<string, unknown> | undefined;
+    const holeCount = typeof exportMetadata?.hole_count === "number" ? exportMetadata.hole_count : activeProfileForCad?.holes?.length || 0;
+    const stepPath = typeof artifacts?.step_path === "string" ? artifacts.step_path : null;
+    return { holeCount, stepPath };
+  };
+
+  const summarizeExtrudeResult = (result: SketchMathOperationResult, committed = false): string => {
+    const { holeCount, stepPath } = cadExportMetadata(result);
+    const holeText = holeCount === 1 ? "1 hole" : `${holeCount} holes`;
+    if (committed && stepPath) {
+      return `STEP export ready: profile accepted with ${holeText}`;
+    }
+    return `Extrude preview ready: profile accepted with ${holeText}`;
+  };
+
+  const handleCreateCadFeature = async () => {
+    const profile = activeProfileForCad;
     if (!profile) {
+      setError("Select a closed profile before extrusion");
       return;
     }
     const depth = Number(extrudeDepthValue);
@@ -1326,12 +1357,14 @@ const SketchMathWorkspace = () => {
     }
     const normalizedDepth = Number(depth.toFixed(2));
     const command = buildExtrudeProfileCommand(profile.id, normalizedDepth, "mm");
-    setPendingCommandText(asCommandText(command));
-    setCadFeatureSummary(`Extrude Profile 1 by ${Number(normalizedDepth.toFixed(2)).toString()} mm`);
     setSelectedEntityIds([profile.id]);
     const baseId = rectangleBaseIdFromEntityId(profile.id);
     setRectangleSelectionDetail(baseId ? { kind: "profile", baseId } : null);
-    setError(null);
+    setCadExportPath(null);
+    const result = await previewCommand(command);
+    if (result) {
+      setCadFeatureSummary(summarizeExtrudeResult(result));
+    }
   };
 
   const handleAddProfileHole = async () => {
@@ -1618,6 +1651,7 @@ const SketchMathWorkspace = () => {
   }
 
   const hasUsableGeometry = Boolean(closedProfileEntity);
+  const canExtrudeSelection = Boolean(activeProfileForCad);
   const holePlacementDiameter = Number(holeDiameterValue);
   const holePlacementPreview =
     holePlacement && Number.isFinite(holePlacementDiameter) && holePlacementDiameter > 0
@@ -1820,8 +1854,8 @@ const SketchMathWorkspace = () => {
                     onChange={(event) => setExtrudeDepthValue(event.target.value)}
                     width="110px"
                   />
-                  <Button size="sm" onClick={handleCreateCadFeature} isDisabled={!hasUsableGeometry}>
-                    Create CAD Feature
+                  <Button size="sm" onClick={() => void handleCreateCadFeature()} isDisabled={!canExtrudeSelection}>
+                    Extrude
                   </Button>
                 </HStack>
                 {cadFeatureSummary ? (
@@ -1829,8 +1863,17 @@ const SketchMathWorkspace = () => {
                     {cadFeatureSummary}
                   </Text>
                 ) : null}
+                {cadExportPath ? (
+                  <Button as="a" href={cadExportPath} size="sm" variant="outline" mt={2}>
+                    Export STEP
+                  </Button>
+                ) : null}
                 <Text fontSize="sm" opacity={0.75} mt={2}>
-                  {hasUsableGeometry ? "Closed profile is ready for extrusion." : "Draw or select a closed profile before extrusion."}
+                  {canExtrudeSelection
+                    ? "Selected profile is ready for extrusion."
+                    : hasUsableGeometry
+                      ? "Select a closed profile before extrusion."
+                      : "Draw or select a closed profile before extrusion."}
                 </Text>
               </Box>
               <Button size="sm" variant="ghost" onClick={() => setAdvancedOpen((value) => !value)}>

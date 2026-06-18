@@ -74,6 +74,7 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
   - Creates a deterministic point projected onto a line-like entity.
 - `extrude_profile`
   - Consumes one closed outer `profile_2d` plus optional closed hole profiles and exports a STEP solid through the headless FreeCAD adapter.
+  - If `parameters.holes` is omitted, stored `profile.holes` are used.
   - The adapter first tries face-with-holes construction, then falls back to boolean subtraction if construction, extrusion, export, validation, bbox, or volume sanity checks fail.
   - The export metadata records the strategy used plus profile winding information so hole orientation is not dependent on user-created polygon order.
 
@@ -166,6 +167,28 @@ The browser workspace exposes Add Hole only when a semantic rectangle/profile is
   }
 }
 ```
+
+Extrude payload:
+
+The browser workspace exposes Extrude only for a selected closed profile. It sends a typed `extrude_profile` preview command, shows a textual success state for the accepted profile/hole count, and exposes Export STEP after Commit Preview returns a STEP artifact path.
+
+```json
+{
+  "version": "0.1",
+  "command_id": "extrude_profile_<generated>",
+  "mode": "preview",
+  "command_type": "extrude_profile",
+  "selection": ["profile_rect_<id>"],
+  "parameters": {
+    "depth": 10,
+    "depth_unit": "mm",
+    "direction": "positive_normal",
+    "output_format": "step"
+  }
+}
+```
+
+Stored profile holes are included by the backend when `parameters.holes` is absent, so rectangle/profile hole UX does not need a second frontend hole list.
 
 ## Validation Errors
 

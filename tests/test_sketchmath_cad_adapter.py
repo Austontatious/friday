@@ -259,6 +259,25 @@ def test_extrude_profile_rejects_invalid_depth_units() -> None:
     assert exc_info.value.to_dict()["code"] == "invalid_units"
 
 
+def test_extrude_profile_rejects_non_positive_depth() -> None:
+    session = _session([_profile()])
+
+    with pytest.raises(Exception) as exc_info:
+        session.execute(
+            _command(
+                "extrude_profile",
+                "cmd_extrude_bad_depth",
+                mode="commit",
+                selection=["profile_box"],
+                parameters={"depth": 0.0, "depth_unit": "mm", "direction": "positive_normal", "output_format": "step"},
+            )
+        )
+
+    error = exc_info.value.to_dict()
+    assert error["code"] == "selection_resolution_error"
+    assert error["detail"]["error_code"] == "invalid_extrusion_depth"
+
+
 def test_extrude_profile_reports_unavailable_freecad(monkeypatch) -> None:
     monkeypatch.setenv("FRIDAY_SKETCHMATH_FREECAD_CMD", "/definitely/missing/freecadcmd")
     monkeypatch.setattr("sketchmath.cad.adapter.shutil.which", lambda _name: None)

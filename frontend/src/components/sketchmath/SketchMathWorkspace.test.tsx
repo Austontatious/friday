@@ -465,6 +465,43 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
     return setSnapshot(nextItems, [profileId, holeId], command, mutate);
   };
 
+  const extrudeProfile = (command: any, mutate: boolean) => {
+    const profileId = command.selection[0];
+    const profileEntity = snapshot.selection_context.items.find(
+      (item): item is Extract<Entity, { type: "profile_2d" }> => item.type === "profile_2d" && item.id === profileId,
+    );
+    if (!profileEntity) {
+      throw new Error("extrude_profile requires profile selection");
+    }
+    const holeIds = profileEntity.holes || [];
+    const response = setSnapshot(snapshot.selection_context.items, [], command, mutate) as any;
+    response.result.value = 1200;
+    response.result.unit = "mm^3";
+    response.result.metadata = {
+      cad_export: {
+        status: "export_ready",
+        artifacts: {
+          step_path: `/tmp/sketchmath/${command.command_id}/export.step`,
+        },
+        metadata: {
+          adapter_strategy: holeIds.length ? "face_with_holes" : "plain_extrude",
+          hole_count: holeIds.length,
+        },
+        measurements: {
+          is_valid_solid: true,
+          volume_mm3: 1200,
+        },
+      },
+      profile_hole_validation: {
+        ok: true,
+        details: {
+          hole_profile_ids: holeIds,
+        },
+      },
+    };
+    return response;
+  };
+
   async function fetchMockImpl(input: RequestInfo | URL, init?: RequestInit): Promise<any> {
     const url = String(input);
     const method = (init?.method || "GET").toUpperCase();
@@ -540,6 +577,9 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
       if (command.command_type === "add_profile_hole") {
         return makeResponse(addProfileHole(command, mutate));
       }
+      if (command.command_type === "extrude_profile") {
+        return makeResponse(extrudeProfile(command, mutate));
+      }
       if (command.command_type === "set_angle") {
         return makeResponse(constraintHandler(command, mutate, "angle_constraint", command.selection.slice(0, 3)));
       }
@@ -609,7 +649,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByRole("button", { name: "Line" })).toBeVisible();
     expect(screen.getAllByRole("button", { name: "Dimension" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "Parallel" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Extrude" })).toBeDisabled();
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
     expect(screen.queryByTestId("sketchmath-command-box")).toBeNull();
   });
@@ -649,7 +689,7 @@ describe("SketchMath workspace", () => {
 
     const secondLineId = `line_${stamp.value.toString(36)}`;
     await waitFor(() => expect(screen.getByTestId(`entity-${secondLineId}`)).toBeVisible());
-    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeDisabled());
+    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeDisabled());
     await userEvent.click(within(workbench).getByRole("button", { name: "Make Parallel" }));
 
     await waitFor(() =>
@@ -677,7 +717,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected object");
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Rectangle");
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Closed profile: valid");
-    expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled();
+    expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeEnabled();
   });
 
   it("exposes rectangle dimensions that drive grouped rectangle geometry", async () => {
@@ -998,7 +1038,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("locked");
   });
 
-  it("creates a visible extrude feature summary while debug JSON stays collapsed", async () => {
+  it("previews extrusion for a selected profile with holes and exposes commit/export affordances", async () => {
     const { fetchMock } = createSketchmathMock();
     global.fetch = fetchMock as unknown as typeof fetch;
     renderWorkspace();
@@ -1011,14 +1051,42 @@ describe("SketchMath workspace", () => {
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
-    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled());
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeEnabled());
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
     expect(screen.getByLabelText("Extrusion depth")).toHaveValue(10);
 
-    await userEvent.click(within(workbench).getByRole("button", { name: "Create CAD Feature" }));
+    fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "12" } });
+    await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+    await screen.findByTestId("sketchmath-hole-placement");
+    await userEvent.click(screen.getByRole("button", { name: "Preview Centered Hole" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Profile holes: 1"));
 
-    await waitFor(() => expect(workbench).toHaveTextContent("Extrude Profile 1 by 10 mm"));
+    await userEvent.click(within(workbench).getByRole("button", { name: "Extrude" }));
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    const previewCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("extrude_profile"));
+    expect(previewCall).toBeTruthy();
+    const previewBody = JSON.parse(String(previewCall?.[1]?.body || "{}"));
+    expect(previewBody.command).toMatchObject({
+      mode: "preview",
+      command_type: "extrude_profile",
+      selection: [`profile_${baseId}`],
+      parameters: {
+        depth: 10,
+        depth_unit: "mm",
+        direction: "positive_normal",
+        output_format: "step",
+      },
+    });
+    await waitFor(() => expect(workbench).toHaveTextContent("Extrude preview ready: profile accepted with 1 hole"));
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
+    await waitFor(() => expect(workbench).toHaveTextContent("STEP export ready"));
+    expect(screen.getByRole("link", { name: "Export STEP" })).toBeVisible();
 
     await userEvent.click(screen.getByRole("button", { name: /Show Advanced \/ Debug/ }));
     expect(screen.getByTestId("sketchmath-command-panel")).toBeVisible();
@@ -1169,12 +1237,12 @@ describe("SketchMath workspace", () => {
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
-    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled());
+    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeEnabled());
     await userEvent.click(within(screen.getByTestId("sketchmath-selection-inspector")).getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(screen.queryByTestId(/^entity-rect_/)).toBeNull());
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Nothing selected.");
-    expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeDisabled();
     expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Underdefined");
   });
 
@@ -1200,7 +1268,7 @@ describe("SketchMath workspace", () => {
 
     await waitFor(() => expect(screen.queryByTestId(/^entity-rect_/)).toBeNull());
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Nothing selected.");
-    expect(screen.getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Extrude" })).toBeDisabled();
   });
 
   it("rolls back line endpoint points when line creation fails", async () => {
@@ -1235,7 +1303,7 @@ describe("SketchMath workspace", () => {
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
-    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled());
+    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeEnabled());
     expect(workbench).toHaveTextContent("Closed profile: valid");
     expect(workbench).toHaveTextContent("Ready for CAD feature");
     expect(workbench).not.toHaveTextContent("Requires a closed sketch profile before extrusion.");
@@ -1260,7 +1328,7 @@ describe("SketchMath workspace", () => {
     renderWorkspace();
 
     await screen.findByText("SketchMath");
-    const convertButton = within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Create CAD Feature" });
+    const convertButton = within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Extrude" });
 
     expect(convertButton).toBeDisabled();
 
@@ -1270,7 +1338,7 @@ describe("SketchMath workspace", () => {
     clickCanvasAt(canvas, 320, 240);
 
     await waitFor(() =>
-      expect(within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled(),
+      expect(within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Extrude" })).toBeEnabled(),
     );
   });
 });

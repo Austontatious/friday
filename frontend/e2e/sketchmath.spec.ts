@@ -75,7 +75,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByRole("button", { name: "Parallel" }).first()).toBeVisible();
     await expect(page.getByTestId("sketchmath-command-panel")).toHaveCount(0);
     await expect(page.getByTestId("sketchmath-command-box")).toHaveCount(0);
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" })).toBeDisabled();
   });
 
   test("draws geometry, applies dimensions and constraints, and reveals advanced JSON on demand", async ({ page }) => {
@@ -97,7 +97,7 @@ test.describe("SketchMath workspace", () => {
     await page.getByTestId("sketchmath-canvas").click({ position: { x: 420, y: 260 } });
 
     await expect(page.locator('[data-testid^="entity-line_"]').nth(1)).toBeVisible();
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" })).toBeDisabled();
 
     await clickWorkbenchButton(page, "Make Parallel");
     await expect(page.getByTestId("sketchmath-selection-inspector")).toContainText("parallel_constraint");
@@ -111,7 +111,7 @@ test.describe("SketchMath workspace", () => {
   test("completes the rectangle interaction loop through CAD feature generation", async ({ page }) => {
     await openSketchMath(page);
 
-    const createFeatureButton = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Create CAD Feature" });
+    const createFeatureButton = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" });
     await expect(createFeatureButton).toBeDisabled();
     await expect(page.getByTestId("sketchmath-command-panel")).toHaveCount(0);
     await page.screenshot({ path: screenshotPath("sketchmath-debug-hidden-default.png"), fullPage: true });
@@ -176,7 +176,11 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-command-panel")).toHaveCount(0);
     await expect(page.getByLabel("Extrusion depth")).toHaveValue("10");
     await createFeatureButton.click();
-    await expect(page.getByTestId("sketchmath-cad-feature-summary")).toContainText("Extrude Profile 1 by 10 mm");
+    await expect(page.getByTestId("sketchmath-cad-feature-summary")).toContainText("Extrude preview ready: profile accepted with 1 hole");
+    await expect(page.getByTestId("sketchmath-preview-controls")).toBeVisible();
+    await page.getByRole("button", { name: "Commit Preview" }).click();
+    await expect(page.getByTestId("sketchmath-cad-feature-summary")).toContainText("STEP export ready");
+    await expect(page.getByRole("link", { name: "Export STEP" })).toBeVisible();
     await expect(page.getByTestId("sketchmath-command-panel")).toHaveCount(0);
     await page.screenshot({ path: screenshotPath("sketchmath-extrude-normal-ui.png"), fullPage: true });
 
@@ -204,7 +208,7 @@ test.describe("SketchMath workspace", () => {
     await page.getByRole("button", { name: "Delete whole rectangle" }).click();
     await expect(page.locator('[data-testid^="entity-rect_"]')).toHaveCount(0, { timeout: 20000 });
     await expect(page.getByTestId("sketchmath-selection-inspector")).toContainText("Nothing selected");
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" })).toBeDisabled();
 
     await page.getByRole("button", { name: "Rectangle" }).first().click();
     await clickSvgViewBoxPoint(page, 190, 160);
@@ -214,7 +218,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.locator('[data-testid^="entity-rect_"]')).toHaveCount(0, { timeout: 20000 });
     await expect(page.getByTestId("sketchmath-selection-inspector")).toContainText("Nothing selected");
     await expect(page.getByTestId("sketchmath-workbench-panel")).toContainText("0 points");
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" })).toBeDisabled();
     await page.screenshot({ path: screenshotPath("sketchmath-clear-sketch-reset.png"), fullPage: true });
   });
 
@@ -277,6 +281,6 @@ test.describe("SketchMath workspace", () => {
     await page.getByRole("button", { name: "Clear sketch" }).click();
     await expect(page.locator('[data-testid^="entity-rect_"]')).toHaveCount(0, { timeout: 20000 });
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Nothing");
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" })).toBeDisabled();
   });
 });

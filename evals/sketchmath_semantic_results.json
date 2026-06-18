@@ -1771,7 +1771,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_equal_angle.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_99c5df6df353",
+          "command_id": "cmd_translate_49322eea43b9",
           "command_type": "make_equal_angle",
           "mode": "preview",
           "parameters": {},
@@ -1797,7 +1797,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_equal_length.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_edffd426b476",
+          "command_id": "cmd_translate_4846239f9f73",
           "command_type": "make_equal_length",
           "mode": "preview",
           "parameters": {},
@@ -1821,7 +1821,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_make_line_polar.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_e2f167f9d5bb",
+          "command_id": "cmd_translate_1fe3c497181d",
           "command_type": "set_line_polar",
           "mode": "preview",
           "parameters": {
@@ -1850,7 +1850,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_mirror.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_c2e6df4ecf19",
+          "command_id": "cmd_translate_81456772be3f",
           "command_type": "mirror",
           "mode": "preview",
           "parameters": {
@@ -1873,11 +1873,11 @@
       "path": "evals/cases/sketchmath_translator_slice5_profile.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_4c162e9bd0b4",
+          "command_id": "cmd_translate_bfee739825f3",
           "command_type": "make_profile",
           "mode": "preview",
           "parameters": {
-            "name": "profile_fb96e465"
+            "name": "profile_0acd0e41"
           },
           "selection": [
             "point_A",
@@ -1899,7 +1899,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_rotate.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_02337f80d24f",
+          "command_id": "cmd_translate_c5d89cd12332",
           "command_type": "rotate",
           "mode": "preview",
           "parameters": {
@@ -1927,7 +1927,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_set_angle.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_bb7bcc0c5fab",
+          "command_id": "cmd_translate_8ffaff3362c2",
           "command_type": "set_angle",
           "mode": "preview",
           "parameters": {
@@ -1953,7 +1953,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_translate.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_067de3c6b4b4",
+          "command_id": "cmd_translate_69d3c5364a66",
           "command_type": "translate",
           "mode": "preview",
           "parameters": {

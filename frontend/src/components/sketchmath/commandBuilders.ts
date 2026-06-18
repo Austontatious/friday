@@ -66,8 +66,9 @@ export const buildMakeProfileCommand = (selection: string[], name?: string): Ske
 export const buildExtrudeProfileCommand = (profileId: string, depth: number, unit: string = "mm"): SketchMathCommand =>
   baseCommand("extrude_profile", [profileId], {
     depth,
-    unit,
-    direction: "positive_z",
+    depth_unit: unit,
+    direction: "positive_normal",
+    output_format: "step",
   });
 
 export const buildAddProfileHoleCommand = (profileId: string, diameter: number, center: Point, unit: string = "mm"): SketchMathCommand =>
