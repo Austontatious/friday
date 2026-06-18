@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_geometry_translate",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_geom_translate",
+      "mode": "commit",
+      "command_type": "translate",
+      "selection": ["point_A", "line_A"],
+      "parameters": {"vector": [3, -1]}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_geom_05",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [1, 2], "locked": false},
+        {"id": "line_A", "type": "line_2d", "start": [0, 0], "end": [2, 0], "locked": false}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {"status": "committed"}
+}

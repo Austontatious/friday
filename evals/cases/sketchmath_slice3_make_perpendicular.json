@@ -1,0 +1,30 @@
+{
+  "name": "sketchmath_slice3_make_perpendicular",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_slice3_make_perpendicular",
+      "mode": "commit",
+      "command_type": "make_perpendicular",
+      "selection": ["point_A", "point_B", "point_C", "point_D"],
+      "parameters": {}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_slice3_03",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": true},
+        {"id": "point_B", "type": "point_2d", "coords": [4, 0], "locked": true},
+        {"id": "point_C", "type": "point_2d", "coords": [0, 2], "locked": true},
+        {"id": "point_D", "type": "point_2d", "coords": [1, 3], "locked": false}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "after": {"point_D": [0.0, 3.414213562373095]}
+  }
+}

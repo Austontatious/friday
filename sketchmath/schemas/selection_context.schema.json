@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SelectionContext",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["selection_set_id", "units", "frame", "items", "constraints", "named_references"],
+  "properties": {
+    "selection_set_id": {"type": "string"},
+    "units": {"type": "string"},
+    "frame": {"type": "string", "enum": ["canvas_2d"], "default": "canvas_2d"},
+    "items": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "coords"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "point_2d"},
+              "coords": {
+                "type": "array",
+                "prefixItems": [{"type": "number"}, {"type": "number"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "start", "end"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "line_2d"},
+              "start": {
+                "type": "array",
+                "prefixItems": [{"type": "number"}, {"type": "number"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "end": {
+                "type": "array",
+                "prefixItems": [{"type": "number"}, {"type": "number"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "origin", "direction"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "axis_2d"},
+              "origin": {
+                "type": "array",
+                "prefixItems": [{"type": "number"}, {"type": "number"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "direction": {
+                "type": "array",
+                "prefixItems": [{"type": "number"}, {"type": "number"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "start", "end"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "construction_line_2d"},
+              "start": {
+                "type": "array",
+                "prefixItems": [{"type": "number"}, {"type": "number"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "end": {
+                "type": "array",
+                "prefixItems": [{"type": "number"}, {"type": "number"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "vertices", "area", "winding", "closed"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "profile_2d"},
+              "vertices": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [{"type": "number"}, {"type": "number"}],
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              },
+              "area": {"type": "number"},
+              "winding": {"type": "string", "enum": ["clockwise", "counterclockwise", "degenerate"]},
+              "warnings": {"type": "array", "items": {"type": "string"}},
+              "closed": {"type": "boolean", "const": true},
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          }
+        ]
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "point_id", "coords"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "fixed_point_constraint"},
+              "point_id": {"type": "string"},
+              "coords": {
+                "type": "array",
+                "prefixItems": [{"type": "number"}, {"type": "number"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "points", "distance"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "distance_constraint"},
+              "points": {
+                "type": "array",
+                "prefixItems": [{"type": "string"}, {"type": "string"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "distance": {"type": "number"},
+              "unit": {"type": "string"},
+              "anchor": {"type": "string", "enum": ["point_a", "point_b", "midpoint"]},
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "points", "angle"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "angle_constraint"},
+              "points": {
+                "type": "array",
+                "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "string"}],
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "angle": {"type": "number"},
+              "unit": {"type": "string"},
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "points"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "parallel_constraint"},
+              "points": {
+                "type": "array",
+                "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "string"}, {"type": "string"}],
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "points"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "perpendicular_constraint"},
+              "points": {
+                "type": "array",
+                "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "string"}, {"type": "string"}],
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "points"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "equal_length_constraint"},
+              "points": {
+                "type": "array",
+                "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "string"}, {"type": "string"}],
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "points"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"const": "equal_angle_constraint"},
+              "points": {
+                "type": "array",
+                "prefixItems": [
+                  {"type": "string"},
+                  {"type": "string"},
+                  {"type": "string"},
+                  {"type": "string"},
+                  {"type": "string"},
+                  {"type": "string"}
+                ],
+                "minItems": 6,
+                "maxItems": 6
+              },
+              "locked": {"type": "boolean", "default": false},
+              "label": {"type": ["string", "null"]}
+            }
+          }
+        ]
+      }
+    },
+    "named_references": {"type": "object", "additionalProperties": {"type": "string"}}
+  }
+}

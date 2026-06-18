@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_geometry_set_line_polar",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_geom_set_line_polar",
+      "mode": "commit",
+      "command_type": "set_line_polar",
+      "selection": ["point_A", "point_B"],
+      "parameters": {"start": "point_A", "end": "point_B", "length": 5.0, "length_unit": "mm", "angle": 0.0, "angle_unit": "deg"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_geom_04",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [2, 3], "locked": true},
+        {"id": "point_B", "type": "point_2d", "coords": [9, 9], "locked": false}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {"after": {"point_B": [7.0, 3.0]}, "status": "committed"}
+}

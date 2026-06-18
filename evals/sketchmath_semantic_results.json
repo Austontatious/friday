@@ -1,0 +1,1482 @@
+{
+  "case_count": 36,
+  "failed": 0,
+  "passed": 36,
+  "results": [
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_set_distance_preview",
+      "path": "evals/cases/sketchmath_domain_layer.json",
+      "result": {
+        "after": {
+          "point_A": [
+            -3.0,
+            0.0
+          ],
+          "point_B": [
+            7.0,
+            0.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_A",
+          "point_B"
+        ],
+        "metadata": {
+          "constraint_id": "constraint_cmd_eval_set_distance",
+          "history_length": 0
+        },
+        "status": "preview",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_copy_linear",
+      "path": "evals/cases/sketchmath_geometry_copy_linear.json",
+      "result": {
+        "after": {
+          "copy_cmd_geom_copy_1_line_A": {
+            "end": [
+              14.0,
+              4.0
+            ],
+            "start": [
+              10.0,
+              0.0
+            ]
+          },
+          "copy_cmd_geom_copy_1_point_A": [
+            12.0,
+            3.0
+          ],
+          "copy_cmd_geom_copy_2_line_A": {
+            "end": [
+              24.0,
+              4.0
+            ],
+            "start": [
+              20.0,
+              0.0
+            ]
+          },
+          "copy_cmd_geom_copy_2_point_A": [
+            22.0,
+            3.0
+          ],
+          "line_A": {
+            "end": [
+              4.0,
+              4.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "point_A": [
+            2.0,
+            3.0
+          ]
+        },
+        "changed_entity_ids": [
+          "copy_cmd_geom_copy_1_point_A",
+          "copy_cmd_geom_copy_1_line_A",
+          "copy_cmd_geom_copy_2_point_A",
+          "copy_cmd_geom_copy_2_line_A"
+        ],
+        "metadata": {
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "extrude closed profile to STEP",
+      "path": "evals/cases/sketchmath_geometry_extrude_profile.json",
+      "result": {
+        "after": {
+          "profile_box": {
+            "area": 200.0,
+            "vertices": [
+              [
+                0.0,
+                0.0
+              ],
+              [
+                20.0,
+                0.0
+              ],
+              [
+                20.0,
+                10.0
+              ],
+              [
+                0.0,
+                10.0
+              ],
+              [
+                0.0,
+                0.0
+              ]
+            ],
+            "warnings": [],
+            "winding": "counterclockwise"
+          }
+        },
+        "changed_entity_ids": [],
+        "metadata": {
+          "cad_export": {
+            "artifacts": {
+              "preview_path": null,
+              "step_path": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_eval/cmd_extrude_profile_eval/export.step",
+              "validation_json": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_eval/cmd_extrude_profile_eval/validation.json"
+            },
+            "command_id": "cmd_extrude_profile_eval",
+            "command_type": "extrude_profile",
+            "measurements": {
+              "area_mm2": 849.9999999999999,
+              "bbox": {
+                "xmax": 20.0,
+                "xmin": 0.0,
+                "ymax": 10.0,
+                "ymin": 0.0,
+                "zmax": 7.5,
+                "zmin": 0.0
+              },
+              "is_valid_solid": true,
+              "volume_mm3": 1500.0
+            },
+            "metadata": {
+              "adapter_strategy": "face_with_holes",
+              "depth_mm": 7.5,
+              "direction": "positive_normal",
+              "expected_bbox": {
+                "xmax": 20.0,
+                "xmin": 0.0,
+                "ymax": 10.0,
+                "ymin": 0.0,
+                "zmax": 7.5,
+                "zmin": 0.0
+              },
+              "expected_volume_mm3": 1500.0,
+              "fallback_reason": null,
+              "freecad_cmd": "/mnt/data/freecad/squashfs-root/usr/bin/freecadcmd",
+              "freecad_version": null,
+              "hole_count": 0,
+              "hole_windings": [],
+              "input_json": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_eval/cmd_extrude_profile_eval/input.json",
+              "normalized_hole_windings": [],
+              "normalized_outer_winding": "counterclockwise",
+              "out_dir": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_eval/cmd_extrude_profile_eval",
+              "outer_winding": "counterclockwise",
+              "returncode": 0,
+              "worker_script": "/mnt/data/friday/sketchmath/cad/freecad_extrude_profile.py"
+            },
+            "profile_id": "profile_box",
+            "status": "export_ready",
+            "warnings": []
+          },
+          "history_length": 1,
+          "profile_hole_validation": {
+            "details": {
+              "hole_areas": [],
+              "hole_profile_ids": [],
+              "hole_windings": [],
+              "outer_area": 200.0,
+              "outer_profile_id": "profile_box",
+              "outer_winding": "counterclockwise"
+            },
+            "error_code": null,
+            "holes": [],
+            "message": null,
+            "ok": true,
+            "outer": {
+              "area": 200.0,
+              "closed": true,
+              "id": "profile_box",
+              "original_winding": "counterclockwise",
+              "vertices": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  20.0,
+                  0.0
+                ],
+                [
+                  20.0,
+                  10.0
+                ],
+                [
+                  0.0,
+                  10.0
+                ],
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "warnings": [],
+              "winding": "counterclockwise"
+            },
+            "warnings": []
+          }
+        },
+        "status": "committed",
+        "unit": "mm^3",
+        "value": 1500.0
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "geometry_extrude_profile_holes",
+      "path": "evals/cases/sketchmath_geometry_extrude_profile_holes.json",
+      "result": {
+        "after": {
+          "profile_inner": {
+            "area": 72.0,
+            "vertices": [
+              [
+                4.0,
+                2.0
+              ],
+              [
+                16.0,
+                2.0
+              ],
+              [
+                16.0,
+                8.0
+              ],
+              [
+                4.0,
+                8.0
+              ],
+              [
+                4.0,
+                2.0
+              ]
+            ],
+            "warnings": [],
+            "winding": "clockwise"
+          },
+          "profile_outer": {
+            "area": 200.0,
+            "vertices": [
+              [
+                0.0,
+                0.0
+              ],
+              [
+                20.0,
+                0.0
+              ],
+              [
+                20.0,
+                10.0
+              ],
+              [
+                0.0,
+                10.0
+              ],
+              [
+                0.0,
+                0.0
+              ]
+            ],
+            "warnings": [],
+            "winding": "counterclockwise"
+          }
+        },
+        "changed_entity_ids": [],
+        "metadata": {
+          "cad_export": {
+            "artifacts": {
+              "preview_path": null,
+              "step_path": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_holes_eval/cmd_extrude_profile_holes_eval/export.step",
+              "validation_json": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_holes_eval/cmd_extrude_profile_holes_eval/validation.json"
+            },
+            "command_id": "cmd_extrude_profile_holes_eval",
+            "command_type": "extrude_profile",
+            "measurements": {
+              "area_mm2": 975.9999999999999,
+              "bbox": {
+                "xmax": 20.0,
+                "xmin": 0.0,
+                "ymax": 10.0,
+                "ymin": 0.0,
+                "zmax": 7.5,
+                "zmin": 0.0
+              },
+              "is_valid_solid": true,
+              "volume_mm3": 959.9999999999999
+            },
+            "metadata": {
+              "adapter_strategy": "face_with_holes",
+              "depth_mm": 7.5,
+              "direction": "positive_normal",
+              "expected_bbox": {
+                "xmax": 20.0,
+                "xmin": 0.0,
+                "ymax": 10.0,
+                "ymin": 0.0,
+                "zmax": 7.5,
+                "zmin": 0.0
+              },
+              "expected_volume_mm3": 960.0,
+              "fallback_reason": null,
+              "freecad_cmd": "/mnt/data/freecad/squashfs-root/usr/bin/freecadcmd",
+              "freecad_version": null,
+              "hole_count": 1,
+              "hole_windings": [
+                "counterclockwise"
+              ],
+              "input_json": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_holes_eval/cmd_extrude_profile_holes_eval/input.json",
+              "normalized_hole_windings": [
+                "clockwise"
+              ],
+              "normalized_outer_winding": "counterclockwise",
+              "out_dir": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_holes_eval/cmd_extrude_profile_holes_eval",
+              "outer_winding": "counterclockwise",
+              "returncode": 0,
+              "worker_script": "/mnt/data/friday/sketchmath/cad/freecad_extrude_profile.py"
+            },
+            "profile_id": "profile_outer",
+            "status": "export_ready",
+            "warnings": []
+          },
+          "history_length": 1,
+          "profile_hole_validation": {
+            "details": {
+              "hole_areas": [
+                72.0
+              ],
+              "hole_profile_ids": [
+                "profile_inner"
+              ],
+              "hole_windings": [
+                "counterclockwise"
+              ],
+              "outer_area": 200.0,
+              "outer_profile_id": "profile_outer",
+              "outer_winding": "counterclockwise"
+            },
+            "error_code": null,
+            "holes": [
+              {
+                "area": 72.0,
+                "closed": true,
+                "id": "profile_inner",
+                "original_winding": "counterclockwise",
+                "vertices": [
+                  [
+                    4.0,
+                    2.0
+                  ],
+                  [
+                    4.0,
+                    8.0
+                  ],
+                  [
+                    16.0,
+                    8.0
+                  ],
+                  [
+                    16.0,
+                    2.0
+                  ],
+                  [
+                    4.0,
+                    2.0
+                  ]
+                ],
+                "warnings": [
+                  "normalized winding from counterclockwise to clockwise"
+                ],
+                "winding": "clockwise"
+              }
+            ],
+            "message": null,
+            "ok": true,
+            "outer": {
+              "area": 200.0,
+              "closed": true,
+              "id": "profile_outer",
+              "original_winding": "counterclockwise",
+              "vertices": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  20.0,
+                  0.0
+                ],
+                [
+                  20.0,
+                  10.0
+                ],
+                [
+                  0.0,
+                  10.0
+                ],
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "warnings": [],
+              "winding": "counterclockwise"
+            },
+            "warnings": [
+              "normalized winding from counterclockwise to clockwise"
+            ]
+          }
+        },
+        "status": "committed",
+        "unit": "mm^3",
+        "value": 959.9999999999999
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": {
+        "code": "selection_resolution_error",
+        "detail": {
+          "command_type": "extrude_profile",
+          "details": {
+            "hole_profile_id": "profile_tangent",
+            "outer_profile_id": "profile_outer"
+          },
+          "error_code": "profile_intersection",
+          "holes": [],
+          "message": "Hole must be strictly inside the outer profile and cannot touch its boundary",
+          "ok": false,
+          "outer": {
+            "area": 200.0,
+            "closed": true,
+            "id": "profile_outer",
+            "original_winding": "counterclockwise",
+            "vertices": [
+              [
+                0.0,
+                0.0
+              ],
+              [
+                20.0,
+                0.0
+              ],
+              [
+                20.0,
+                10.0
+              ],
+              [
+                0.0,
+                10.0
+              ],
+              [
+                0.0,
+                0.0
+              ]
+            ],
+            "warnings": [],
+            "winding": "counterclockwise"
+          },
+          "warnings": []
+        },
+        "message": "Hole must be strictly inside the outer profile and cannot touch its boundary",
+        "retryable": false
+      },
+      "name": "geometry_extrude_profile_holes_tangent",
+      "path": "evals/cases/sketchmath_geometry_extrude_profile_holes_tangent.json",
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_intersect_lines",
+      "path": "evals/cases/sketchmath_geometry_intersect_lines.json",
+      "result": {
+        "after": {
+          "line_A": {
+            "end": [
+              4.0,
+              4.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "line_A_line_B_intersection": [
+            2.0,
+            2.0
+          ],
+          "line_B": {
+            "end": [
+              4.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              4.0
+            ]
+          }
+        },
+        "changed_entity_ids": [
+          "line_A_line_B_intersection"
+        ],
+        "metadata": {
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_measure_angle",
+      "path": "evals/cases/sketchmath_geometry_measure_angle.json",
+      "result": {
+        "after": {
+          "line_A": {
+            "end": [
+              1.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "line_B": {
+            "end": [
+              0.0,
+              1.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "changed_entity_ids": [],
+        "metadata": {
+          "history_length": 0
+        },
+        "status": "preview",
+        "unit": "deg",
+        "value": 90.0
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_measure_distance",
+      "path": "evals/cases/sketchmath_geometry_measure_distance.json",
+      "result": {
+        "after": {
+          "point_A": [
+            0.0,
+            0.0
+          ],
+          "point_B": [
+            3.0,
+            4.0
+          ]
+        },
+        "changed_entity_ids": [],
+        "metadata": {
+          "history_length": 0
+        },
+        "status": "preview",
+        "unit": "mm",
+        "value": 5.0
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_mirror",
+      "path": "evals/cases/sketchmath_geometry_mirror.json",
+      "result": {
+        "after": {
+          "line_A": {
+            "end": [
+              0.0,
+              0.0
+            ],
+            "start": [
+              2.0,
+              0.0
+            ]
+          },
+          "point_A": [
+            1.0,
+            2.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_A",
+          "line_A"
+        ],
+        "metadata": {
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_project_point_to_line",
+      "path": "evals/cases/sketchmath_geometry_project_point_to_line.json",
+      "result": {
+        "after": {
+          "line_A": {
+            "end": [
+              4.0,
+              4.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "point_A": [
+            2.0,
+            3.0
+          ],
+          "point_A_projected": [
+            2.5,
+            2.5
+          ]
+        },
+        "changed_entity_ids": [
+          "point_A_projected"
+        ],
+        "metadata": {
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_rotate",
+      "path": "evals/cases/sketchmath_geometry_rotate.json",
+      "result": {
+        "after": {
+          "line_A": {
+            "end": [
+              1.2246467991473532e-16,
+              2.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "point_A": [
+            6.123233995736766e-17,
+            1.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_A",
+          "line_A"
+        ],
+        "metadata": {
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_set_distance",
+      "path": "evals/cases/sketchmath_geometry_set_distance.json",
+      "result": {
+        "after": {
+          "point_A": [
+            -3.0,
+            0.0
+          ],
+          "point_B": [
+            7.0,
+            0.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_A",
+          "point_B"
+        ],
+        "metadata": {
+          "constraint_id": "constraint_cmd_geom_set_distance",
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_set_line_polar",
+      "path": "evals/cases/sketchmath_geometry_set_line_polar.json",
+      "result": {
+        "after": {
+          "point_A": [
+            2.0,
+            3.0
+          ],
+          "point_B": [
+            7.0,
+            3.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_B"
+        ],
+        "metadata": {
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_geometry_translate",
+      "path": "evals/cases/sketchmath_geometry_translate.json",
+      "result": {
+        "after": {
+          "line_A": {
+            "end": [
+              5.0,
+              -1.0
+            ],
+            "start": [
+              3.0,
+              -1.0
+            ]
+          },
+          "point_A": [
+            4.0,
+            1.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_A",
+          "line_A"
+        ],
+        "metadata": {
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_slice3_batch_commit",
+      "path": "evals/cases/sketchmath_slice3_batch_commit.json",
+      "result": {
+        "after": {
+          "point_A": [
+            1.0,
+            0.0
+          ],
+          "point_B": [
+            2.0,
+            0.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_B",
+          "point_A"
+        ],
+        "metadata": {
+          "batch": true,
+          "history_length": 1,
+          "subresults": [
+            {
+              "changed_entity_ids": [
+                "point_B"
+              ],
+              "command_id": "cmd_slice3_batch_commit_add",
+              "command_type": "define_point",
+              "index": 0,
+              "metadata": {},
+              "unit": null,
+              "value": null
+            },
+            {
+              "changed_entity_ids": [
+                "point_A"
+              ],
+              "command_id": "cmd_slice3_batch_commit_move",
+              "command_type": "translate",
+              "index": 1,
+              "metadata": {},
+              "unit": null,
+              "value": null
+            }
+          ]
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_slice3_batch_preview",
+      "path": "evals/cases/sketchmath_slice3_batch_preview.json",
+      "result": {
+        "after": {
+          "point_A": [
+            1.0,
+            0.0
+          ],
+          "point_B": [
+            2.0,
+            0.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_B",
+          "point_A"
+        ],
+        "metadata": {
+          "batch": true,
+          "history_length": 0,
+          "subresults": [
+            {
+              "changed_entity_ids": [
+                "point_B"
+              ],
+              "command_id": "cmd_slice3_batch_add",
+              "command_type": "define_point",
+              "index": 0,
+              "metadata": {},
+              "unit": null,
+              "value": null
+            },
+            {
+              "changed_entity_ids": [
+                "point_A"
+              ],
+              "command_id": "cmd_slice3_batch_move",
+              "command_type": "translate",
+              "index": 1,
+              "metadata": {},
+              "unit": null,
+              "value": null
+            }
+          ]
+        },
+        "status": "preview",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_slice3_make_equal_angle",
+      "path": "evals/cases/sketchmath_slice3_make_equal_angle.json",
+      "result": {
+        "after": {
+          "source_a": [
+            0.0,
+            0.0
+          ],
+          "source_b": [
+            1.0,
+            0.0
+          ],
+          "source_c": [
+            1.0,
+            1.0
+          ],
+          "target_a": [
+            0.0,
+            0.0
+          ],
+          "target_b": [
+            2.0,
+            0.0
+          ],
+          "target_c": [
+            2.0,
+            1.0
+          ]
+        },
+        "changed_entity_ids": [
+          "target_c"
+        ],
+        "metadata": {
+          "constraint_id": "constraint_cmd_slice3_make_equal_angle",
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_slice3_make_equal_length",
+      "path": "evals/cases/sketchmath_slice3_make_equal_length.json",
+      "result": {
+        "after": {
+          "point_A": [
+            0.0,
+            0.0
+          ],
+          "point_B": [
+            3.0,
+            4.0
+          ],
+          "point_C": [
+            0.0,
+            2.0
+          ],
+          "point_D": [
+            5.0,
+            2.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_D"
+        ],
+        "metadata": {
+          "constraint_id": "constraint_cmd_slice3_make_equal_length",
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_slice3_make_parallel",
+      "path": "evals/cases/sketchmath_slice3_make_parallel.json",
+      "result": {
+        "after": {
+          "point_A": [
+            0.0,
+            0.0
+          ],
+          "point_B": [
+            4.0,
+            0.0
+          ],
+          "point_C": [
+            0.0,
+            2.0
+          ],
+          "point_D": [
+            1.4142135623730951,
+            2.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_D"
+        ],
+        "metadata": {
+          "constraint_id": "constraint_cmd_slice3_make_parallel",
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_slice3_make_perpendicular",
+      "path": "evals/cases/sketchmath_slice3_make_perpendicular.json",
+      "result": {
+        "after": {
+          "point_A": [
+            0.0,
+            0.0
+          ],
+          "point_B": [
+            4.0,
+            0.0
+          ],
+          "point_C": [
+            0.0,
+            2.0
+          ],
+          "point_D": [
+            0.0,
+            3.414213562373095
+          ]
+        },
+        "changed_entity_ids": [
+          "point_D"
+        ],
+        "metadata": {
+          "constraint_id": "constraint_cmd_slice3_make_perpendicular",
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_slice3_make_profile_closed",
+      "path": "evals/cases/sketchmath_slice3_make_profile_closed.json",
+      "result": {
+        "after": {
+          "point_A": [
+            0.0,
+            0.0
+          ],
+          "point_B": [
+            2.0,
+            0.0
+          ],
+          "point_C": [
+            2.0,
+            2.0
+          ],
+          "point_D": [
+            0.0,
+            2.0
+          ],
+          "profile_square": {
+            "area": 4.0,
+            "vertices": [
+              [
+                0.0,
+                0.0
+              ],
+              [
+                2.0,
+                0.0
+              ],
+              [
+                2.0,
+                2.0
+              ],
+              [
+                0.0,
+                2.0
+              ],
+              [
+                0.0,
+                0.0
+              ]
+            ],
+            "warnings": [],
+            "winding": "counterclockwise"
+          }
+        },
+        "changed_entity_ids": [
+          "profile_square"
+        ],
+        "metadata": {
+          "area": 4.0,
+          "history_length": 1,
+          "warnings": [],
+          "winding": "counterclockwise"
+        },
+        "status": "committed",
+        "unit": "square_mm",
+        "value": 4.0
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": {
+        "code": "selection_resolution_error",
+        "detail": {
+          "first": [
+            0.0,
+            0.0
+          ],
+          "last": [
+            0.0,
+            2.0
+          ]
+        },
+        "message": "Profile is open",
+        "retryable": false
+      },
+      "name": "sketchmath_slice3_make_profile_open",
+      "path": "evals/cases/sketchmath_slice3_make_profile_open.json",
+      "status": "pass"
+    },
+    {
+      "diagnostic": {
+        "code": "solver_error",
+        "detail": {
+          "constraint_id": "c_distance"
+        },
+        "message": "Distance constraint conflicts with locked points",
+        "retryable": false
+      },
+      "name": "sketchmath_slice3_over_constrained",
+      "path": "evals/cases/sketchmath_slice3_over_constrained.json",
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_slice3_set_angle",
+      "path": "evals/cases/sketchmath_slice3_set_angle.json",
+      "result": {
+        "after": {
+          "point_A": [
+            0.0,
+            0.0
+          ],
+          "point_B": [
+            1.0,
+            0.0
+          ],
+          "point_C": [
+            0.9999999999999998,
+            -1.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_C"
+        ],
+        "metadata": {
+          "constraint_id": "constraint_cmd_slice3_set_angle",
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_slice3_solve_quadrilateral",
+      "path": "evals/cases/sketchmath_slice3_solve_quadrilateral.json",
+      "result": {
+        "after": {
+          "point_A": [
+            0.0,
+            0.0
+          ],
+          "point_B": [
+            4.0,
+            0.0
+          ],
+          "point_C": [
+            4.0,
+            3.0
+          ],
+          "point_D": [
+            0.0,
+            3.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_D"
+        ],
+        "metadata": {
+          "history_length": 1,
+          "solved_constraints": [
+            "c_parallel",
+            "c_perp"
+          ]
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": {
+        "code": "clarification_required",
+        "detail": {
+          "constraint_ids": [
+            "c_distance"
+          ]
+        },
+        "message": "Constraint system is under-constrained",
+        "retryable": false
+      },
+      "name": "sketchmath_slice3_under_constrained",
+      "path": "evals/cases/sketchmath_slice3_under_constrained.json",
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_clarification_longer",
+      "path": "evals/cases/sketchmath_translator_slice5_clarification_longer.json",
+      "result": {
+        "command": null,
+        "options": [
+          "Use 'make A-B 17.5 mm at 45 degrees'",
+          "Choose the segment anchors explicitly"
+        ],
+        "reason": "Specify the target length and which two points or segment should move.",
+        "status": "clarification_required"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_equal_angle",
+      "path": "evals/cases/sketchmath_translator_slice5_equal_angle.json",
+      "result": {
+        "command": {
+          "command_id": "cmd_translate_d5649fde3968",
+          "command_type": "make_equal_angle",
+          "mode": "preview",
+          "parameters": {},
+          "selection": [
+            "source_a",
+            "source_b",
+            "source_c",
+            "target_a",
+            "target_b",
+            "target_c"
+          ],
+          "version": "0.1"
+        },
+        "options": [],
+        "reason": null,
+        "status": "command"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_equal_length",
+      "path": "evals/cases/sketchmath_translator_slice5_equal_length.json",
+      "result": {
+        "command": {
+          "command_id": "cmd_translate_e432b4f7fd0d",
+          "command_type": "make_equal_length",
+          "mode": "preview",
+          "parameters": {},
+          "selection": [
+            "point_A",
+            "point_B",
+            "point_C",
+            "point_D"
+          ],
+          "version": "0.1"
+        },
+        "options": [],
+        "reason": null,
+        "status": "command"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_make_line_polar",
+      "path": "evals/cases/sketchmath_translator_slice5_make_line_polar.json",
+      "result": {
+        "command": {
+          "command_id": "cmd_translate_bdd3b00abbdd",
+          "command_type": "set_line_polar",
+          "mode": "preview",
+          "parameters": {
+            "angle": 45.0,
+            "angle_unit": "deg",
+            "end": "point_B",
+            "length": 17.5,
+            "length_unit": "mm",
+            "start": "point_A"
+          },
+          "selection": [
+            "point_A",
+            "point_B"
+          ],
+          "version": "0.1"
+        },
+        "options": [],
+        "reason": null,
+        "status": "command"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_mirror",
+      "path": "evals/cases/sketchmath_translator_slice5_mirror.json",
+      "result": {
+        "command": {
+          "command_id": "cmd_translate_f2e6324827b6",
+          "command_type": "mirror",
+          "mode": "preview",
+          "parameters": {
+            "axis_x": 5.0
+          },
+          "selection": [
+            "line_A"
+          ],
+          "version": "0.1"
+        },
+        "options": [],
+        "reason": null,
+        "status": "command"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_profile",
+      "path": "evals/cases/sketchmath_translator_slice5_profile.json",
+      "result": {
+        "command": {
+          "command_id": "cmd_translate_79d9ff1e6a23",
+          "command_type": "make_profile",
+          "mode": "preview",
+          "parameters": {
+            "name": "profile_497384ab"
+          },
+          "selection": [
+            "point_A",
+            "point_B",
+            "point_C",
+            "point_D"
+          ],
+          "version": "0.1"
+        },
+        "options": [],
+        "reason": null,
+        "status": "command"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_rotate",
+      "path": "evals/cases/sketchmath_translator_slice5_rotate.json",
+      "result": {
+        "command": {
+          "command_id": "cmd_translate_4abc1fb9e4e6",
+          "command_type": "rotate",
+          "mode": "preview",
+          "parameters": {
+            "angle": 90.0,
+            "angle_unit": "deg",
+            "origin": [
+              0.0,
+              0.0
+            ]
+          },
+          "selection": [
+            "point_A"
+          ],
+          "version": "0.1"
+        },
+        "options": [],
+        "reason": null,
+        "status": "command"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_set_angle",
+      "path": "evals/cases/sketchmath_translator_slice5_set_angle.json",
+      "result": {
+        "command": {
+          "command_id": "cmd_translate_3f9d8aedf8fd",
+          "command_type": "set_angle",
+          "mode": "preview",
+          "parameters": {
+            "angle": 90.0,
+            "angle_unit": "deg"
+          },
+          "selection": [
+            "point_A",
+            "point_B",
+            "point_C"
+          ],
+          "version": "0.1"
+        },
+        "options": [],
+        "reason": null,
+        "status": "command"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_translate",
+      "path": "evals/cases/sketchmath_translator_slice5_translate.json",
+      "result": {
+        "command": {
+          "command_id": "cmd_translate_bbea4f5c0054",
+          "command_type": "translate",
+          "mode": "preview",
+          "parameters": {
+            "vector": [
+              10.0,
+              0.0
+            ]
+          },
+          "selection": [
+            "point_A"
+          ],
+          "version": "0.1"
+        },
+        "options": [],
+        "reason": null,
+        "status": "command"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_translator_slice5_unsupported",
+      "path": "evals/cases/sketchmath_translator_slice5_unsupported.json",
+      "result": {
+        "command": null,
+        "options": [],
+        "reason": "No deterministic translator rule matched the utterance.",
+        "status": "unsupported"
+      },
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

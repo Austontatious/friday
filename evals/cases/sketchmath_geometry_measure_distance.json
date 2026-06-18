@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_geometry_measure_distance",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_geom_measure_distance",
+      "mode": "preview",
+      "command_type": "measure_distance",
+      "selection": ["point_A", "point_B"],
+      "parameters": {"unit": "mm"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_geom_01",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": false},
+        {"id": "point_B", "type": "point_2d", "coords": [3, 4], "locked": false}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {"value": 5.0, "unit": "mm", "status": "preview"}
+}

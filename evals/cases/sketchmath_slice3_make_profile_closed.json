@@ -1,0 +1,30 @@
+{
+  "name": "sketchmath_slice3_make_profile_closed",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_slice3_profile_closed",
+      "mode": "commit",
+      "command_type": "make_profile",
+      "selection": ["point_A", "point_B", "point_C", "point_D", "point_A"],
+      "parameters": {"name": "profile_square"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_slice3_11",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": true},
+        {"id": "point_B", "type": "point_2d", "coords": [2, 0], "locked": true},
+        {"id": "point_C", "type": "point_2d", "coords": [2, 2], "locked": true},
+        {"id": "point_D", "type": "point_2d", "coords": [0, 2], "locked": true}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "metadata": {"area": 4.0, "winding": "counterclockwise"}
+  }
+}

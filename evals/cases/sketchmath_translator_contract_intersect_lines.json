@@ -1,0 +1,9 @@
+{
+  "name": "sketchmath_translator_contract_intersect_lines",
+  "input": {
+    "prompt_name": "sketchmath_system",
+    "command_type": "intersect_lines",
+    "requirements": ["typed_geometry_command", "selection_driven", "deterministic_2d_math"]
+  },
+  "expected": {"status": "pass"}
+}

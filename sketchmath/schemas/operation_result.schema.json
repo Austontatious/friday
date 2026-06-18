@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OperationResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["command", "status", "before", "after", "changed_entity_ids", "replay_index", "metadata"],
+  "properties": {
+    "command": {"$ref": "geometry_command.schema.json"},
+    "status": {"type": "string", "enum": ["preview", "committed"]},
+    "before": {"$ref": "selection_context.schema.json"},
+    "after": {"$ref": "selection_context.schema.json"},
+    "changed_entity_ids": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "replay_index": {"type": "integer"},
+    "value": {"type": ["number", "null"]},
+    "unit": {"type": ["string", "null"]},
+    "metadata": {"type": "object", "additionalProperties": true}
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "sketchmath_translator_slice5_set_angle",
+  "input": {
+    "utterance": "set angle 90 degrees",
+    "selection_context": {
+      "selection_set_id": "sel_translator_02",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": true, "label": "A"},
+        {"id": "point_B", "type": "point_2d", "coords": [1, 0], "locked": true, "label": "B"},
+        {"id": "point_C", "type": "point_2d", "coords": [1, 1], "locked": false, "label": "C"}
+      ],
+      "constraints": [],
+      "named_references": {"A": "point_A", "B": "point_B", "C": "point_C"}
+    }
+  },
+  "expected": {
+    "status": "command",
+    "command": {
+      "command_type": "set_angle",
+      "selection": ["point_A", "point_B", "point_C"],
+      "parameters": {"angle": 90.0}
+    }
+  }
+}

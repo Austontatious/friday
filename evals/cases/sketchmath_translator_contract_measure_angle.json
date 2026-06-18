@@ -1,0 +1,9 @@
+{
+  "name": "sketchmath_translator_contract_measure_angle",
+  "input": {
+    "prompt_name": "sketchmath_system",
+    "command_type": "measure_angle",
+    "requirements": ["typed_geometry_command", "no_freehand_geometry", "deterministic_2d_math"]
+  },
+  "expected": {"status": "pass"}
+}

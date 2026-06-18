@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_geometry_intersect_lines",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_geom_intersect",
+      "mode": "commit",
+      "command_type": "intersect_lines",
+      "selection": ["line_A", "line_B"],
+      "parameters": {}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_geom_08",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "line_A", "type": "line_2d", "start": [0, 0], "end": [4, 4], "locked": false},
+        {"id": "line_B", "type": "line_2d", "start": [0, 4], "end": [4, 0], "locked": false}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {"status": "committed"}
+}

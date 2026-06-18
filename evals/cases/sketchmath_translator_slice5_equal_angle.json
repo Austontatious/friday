@@ -1,0 +1,28 @@
+{
+  "name": "sketchmath_translator_slice5_equal_angle",
+  "input": {
+    "utterance": "equal angle",
+    "selection_context": {
+      "selection_set_id": "sel_translator_07",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "source_a", "type": "point_2d", "coords": [0, 0], "locked": true},
+        {"id": "source_b", "type": "point_2d", "coords": [1, 0], "locked": true},
+        {"id": "source_c", "type": "point_2d", "coords": [1, 1], "locked": true},
+        {"id": "target_a", "type": "point_2d", "coords": [0, 0], "locked": true},
+        {"id": "target_b", "type": "point_2d", "coords": [2, 0], "locked": true},
+        {"id": "target_c", "type": "point_2d", "coords": [3, 0], "locked": false}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "command",
+    "command": {
+      "command_type": "make_equal_angle",
+      "selection": ["source_a", "source_b", "source_c", "target_a", "target_b", "target_c"]
+    }
+  }
+}

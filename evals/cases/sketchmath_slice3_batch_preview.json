@@ -1,0 +1,46 @@
+{
+  "name": "sketchmath_slice3_batch_preview",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_slice3_batch_preview",
+      "mode": "preview",
+      "command_type": "batch",
+      "selection": [],
+      "parameters": {
+        "commands": [
+          {
+            "version": "0.1",
+            "command_id": "cmd_slice3_batch_add",
+            "mode": "preview",
+            "command_type": "define_point",
+            "selection": [],
+            "parameters": {"name": "point_B", "coords": [2, 0]}
+          },
+          {
+            "version": "0.1",
+            "command_id": "cmd_slice3_batch_move",
+            "mode": "preview",
+            "command_type": "translate",
+            "selection": ["point_A"],
+            "parameters": {"vector": [1, 0]}
+          }
+        ]
+      }
+    },
+    "selection_context": {
+      "selection_set_id": "sel_slice3_09",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": false}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+    "expected": {
+    "status": "preview",
+    "after": {"point_A": [1.0, 0.0]}
+  }
+}

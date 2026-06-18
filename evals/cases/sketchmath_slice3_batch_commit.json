@@ -1,0 +1,46 @@
+{
+  "name": "sketchmath_slice3_batch_commit",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_slice3_batch_commit",
+      "mode": "commit",
+      "command_type": "batch",
+      "selection": [],
+      "parameters": {
+        "commands": [
+          {
+            "version": "0.1",
+            "command_id": "cmd_slice3_batch_commit_add",
+            "mode": "commit",
+            "command_type": "define_point",
+            "selection": [],
+            "parameters": {"name": "point_B", "coords": [2, 0]}
+          },
+          {
+            "version": "0.1",
+            "command_id": "cmd_slice3_batch_commit_move",
+            "mode": "commit",
+            "command_type": "translate",
+            "selection": ["point_A"],
+            "parameters": {"vector": [1, 0]}
+          }
+        ]
+      }
+    },
+    "selection_context": {
+      "selection_set_id": "sel_slice3_10",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": false}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "after": {"point_A": [1.0, 0.0], "point_B": [2.0, 0.0]}
+  }
+}

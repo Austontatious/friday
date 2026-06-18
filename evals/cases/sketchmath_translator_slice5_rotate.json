@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_translator_slice5_rotate",
+  "input": {
+    "utterance": "rotate selection 90 degrees",
+    "selection_context": {
+      "selection_set_id": "sel_translator_04",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": false, "label": "A"}
+      ],
+      "constraints": [],
+      "named_references": {"A": "point_A"}
+    }
+  },
+  "expected": {
+    "status": "command",
+    "command": {
+      "command_type": "rotate",
+      "selection": ["point_A"],
+      "parameters": {"angle": 90.0}
+    }
+  }
+}

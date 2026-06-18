@@ -1,0 +1,69 @@
+{
+  "name": "geometry_extrude_profile_holes",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_extrude_profile_holes_eval",
+      "mode": "commit",
+      "command_type": "extrude_profile",
+      "selection": ["profile_outer"],
+      "parameters": {
+        "depth": 7.5,
+        "depth_unit": "mm",
+        "direction": "positive_normal",
+        "output_format": "step",
+        "holes": ["profile_inner"]
+      }
+    },
+    "selection_context": {
+      "selection_set_id": "sel_extrude_holes_eval",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {
+          "id": "profile_outer",
+          "type": "profile_2d",
+          "vertices": [[0, 0], [20, 0], [20, 10], [0, 10], [0, 0]],
+          "area": 200.0,
+          "winding": "counterclockwise",
+          "warnings": [],
+          "closed": true,
+          "locked": false,
+          "label": "outer"
+        },
+        {
+          "id": "profile_inner",
+          "type": "profile_2d",
+          "vertices": [[4, 2], [16, 2], [16, 8], [4, 8], [4, 2]],
+          "area": 72.0,
+          "winding": "clockwise",
+          "warnings": [],
+          "closed": true,
+          "locked": false,
+          "label": "inner"
+        }
+      ],
+      "constraints": [],
+      "named_references": {"outer": "profile_outer", "inner": "profile_inner"}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "value": 960.0,
+    "unit": "mm^3",
+    "changed_entity_ids": [],
+    "history_length": 1,
+    "metadata": {
+      "cad_export": {
+        "status": "export_ready",
+        "measurements": {
+          "is_valid_solid": true,
+          "volume_mm3": 960.0
+        }
+      },
+      "profile_hole_validation": {
+        "ok": true
+      }
+    }
+  }
+}

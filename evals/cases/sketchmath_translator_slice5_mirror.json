@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_translator_slice5_mirror",
+  "input": {
+    "utterance": "mirror these lines at 5",
+    "selection_context": {
+      "selection_set_id": "sel_translator_05",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "line_A", "type": "line_2d", "start": [0, 0], "end": [2, 0], "locked": false, "label": "centerline"}
+      ],
+      "constraints": [],
+      "named_references": {"centerline": "line_A"}
+    }
+  },
+  "expected": {
+    "status": "command",
+    "command": {
+      "command_type": "mirror",
+      "selection": ["line_A"],
+      "parameters": {"axis_x": 5.0}
+    }
+  }
+}

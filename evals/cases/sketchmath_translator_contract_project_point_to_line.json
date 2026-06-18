@@ -1,0 +1,9 @@
+{
+  "name": "sketchmath_translator_contract_project_point_to_line",
+  "input": {
+    "prompt_name": "sketchmath_system",
+    "command_type": "project_point_to_line",
+    "requirements": ["typed_geometry_command", "selection_driven", "deterministic_2d_math"]
+  },
+  "expected": {"status": "pass"}
+}

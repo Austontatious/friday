@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_geometry_rotate",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_geom_rotate",
+      "mode": "commit",
+      "command_type": "rotate",
+      "selection": ["point_A", "line_A"],
+      "parameters": {"angle": 90.0, "angle_unit": "deg", "origin": [0, 0]}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_geom_06",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [1, 0], "locked": false},
+        {"id": "line_A", "type": "line_2d", "start": [0, 0], "end": [2, 0], "locked": false}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {"status": "committed"}
+}

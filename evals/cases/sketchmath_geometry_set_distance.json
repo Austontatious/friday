@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_geometry_set_distance",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_geom_set_distance",
+      "mode": "commit",
+      "command_type": "set_distance",
+      "selection": ["point_A", "point_B"],
+      "parameters": {"distance": 10.0, "unit": "mm", "anchor": "midpoint"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_geom_03",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": false},
+        {"id": "point_B", "type": "point_2d", "coords": [4, 0], "locked": false}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {"after": {"point_A": [-3.0, 0.0], "point_B": [7.0, 0.0]}, "status": "committed"}
+}

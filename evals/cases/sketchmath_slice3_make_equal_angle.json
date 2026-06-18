@@ -1,0 +1,32 @@
+{
+  "name": "sketchmath_slice3_make_equal_angle",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_slice3_make_equal_angle",
+      "mode": "commit",
+      "command_type": "make_equal_angle",
+      "selection": ["source_a", "source_b", "source_c", "target_a", "target_b", "target_c"],
+      "parameters": {}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_slice3_05",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "source_a", "type": "point_2d", "coords": [0, 0], "locked": true},
+        {"id": "source_b", "type": "point_2d", "coords": [1, 0], "locked": true},
+        {"id": "source_c", "type": "point_2d", "coords": [1, 1], "locked": true},
+        {"id": "target_a", "type": "point_2d", "coords": [0, 0], "locked": true},
+        {"id": "target_b", "type": "point_2d", "coords": [2, 0], "locked": true},
+        {"id": "target_c", "type": "point_2d", "coords": [3, 0], "locked": false}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "after": {"target_c": [2.0, 1.0]}
+  }
+}

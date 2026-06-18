@@ -1,0 +1,9 @@
+{
+  "name": "sketchmath_translator_contract_copy_linear",
+  "input": {
+    "prompt_name": "sketchmath_system",
+    "command_type": "copy_linear",
+    "requirements": ["typed_geometry_command", "selection_driven", "commit_ready"]
+  },
+  "expected": {"status": "pass"}
+}

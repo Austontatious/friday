@@ -1,0 +1,26 @@
+{
+  "name": "sketchmath_translator_slice5_equal_length",
+  "input": {
+    "utterance": "equal length",
+    "selection_context": {
+      "selection_set_id": "sel_translator_06",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": true, "label": "A"},
+        {"id": "point_B", "type": "point_2d", "coords": [3, 0], "locked": true, "label": "B"},
+        {"id": "point_C", "type": "point_2d", "coords": [0, 2], "locked": true, "label": "C"},
+        {"id": "point_D", "type": "point_2d", "coords": [1, 2], "locked": false, "label": "D"}
+      ],
+      "constraints": [],
+      "named_references": {"A": "point_A", "B": "point_B", "C": "point_C", "D": "point_D"}
+    }
+  },
+  "expected": {
+    "status": "command",
+    "command": {
+      "command_type": "make_equal_length",
+      "selection": ["point_A", "point_B", "point_C", "point_D"]
+    }
+  }
+}

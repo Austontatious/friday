@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GeometryCommand",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "command_id", "mode", "command_type", "selection", "parameters"],
+  "properties": {
+    "version": {"type": "string", "default": "0.1"},
+    "command_id": {"type": "string"},
+    "mode": {"type": "string", "enum": ["preview", "commit"], "default": "preview"},
+    "command_type": {
+      "type": "string",
+      "enum": [
+        "measure_distance",
+        "measure_angle",
+        "define_point",
+        "define_line",
+        "define_profile",
+        "set_distance",
+        "set_line_polar",
+        "set_angle",
+        "make_parallel",
+        "make_perpendicular",
+        "make_equal_length",
+        "make_equal_angle",
+        "solve_constraints",
+        "make_profile",
+        "translate",
+        "rotate",
+        "mirror",
+        "copy_linear",
+        "intersect_lines",
+        "project_point_to_line",
+        "batch",
+        "extrude_profile"
+      ]
+    },
+    "selection": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

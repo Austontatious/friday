@@ -1,0 +1,21 @@
+{
+  "name": "sketchmath_translator_slice5_clarification_longer",
+  "input": {
+    "utterance": "make the selected line longer",
+    "selection_context": {
+      "selection_set_id": "sel_translator_09",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "line_A", "type": "line_2d", "start": [0, 0], "end": [2, 0], "locked": false}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "clarification_required",
+    "reason_contains": "Specify the target length",
+    "options": ["Use 'make A-B 17.5 mm at 45 degrees'", "Choose the segment anchors explicitly"]
+  }
+}

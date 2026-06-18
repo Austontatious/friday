@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_geometry_project_point_to_line",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_geom_project",
+      "mode": "commit",
+      "command_type": "project_point_to_line",
+      "selection": ["point_A", "line_A"],
+      "parameters": {}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_geom_09",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [2, 3], "locked": false},
+        {"id": "line_A", "type": "line_2d", "start": [0, 0], "end": [4, 4], "locked": false}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {"status": "committed"}
+}

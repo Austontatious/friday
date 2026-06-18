@@ -1,0 +1,29 @@
+{
+  "name": "sketchmath_slice3_over_constrained",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_slice3_over",
+      "mode": "commit",
+      "command_type": "solve_constraints",
+      "selection": [],
+      "parameters": {}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_slice3_08",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": true},
+        {"id": "point_B", "type": "point_2d", "coords": [1, 0], "locked": true}
+      ],
+      "constraints": [
+        {"id": "c_distance", "type": "distance_constraint", "points": ["point_A", "point_B"], "distance": 5.0, "unit": "mm", "anchor": "midpoint"}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "error": {"code": "solver_error"}
+  }
+}

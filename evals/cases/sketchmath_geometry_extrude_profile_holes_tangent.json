@@ -1,0 +1,55 @@
+{
+  "name": "geometry_extrude_profile_holes_tangent",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_extrude_profile_holes_tangent_eval",
+      "mode": "commit",
+      "command_type": "extrude_profile",
+      "selection": ["profile_outer"],
+      "parameters": {
+        "depth": 7.5,
+        "depth_unit": "mm",
+        "direction": "positive_normal",
+        "output_format": "step",
+        "holes": ["profile_tangent"]
+      }
+    },
+    "selection_context": {
+      "selection_set_id": "sel_extrude_holes_tangent_eval",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {
+          "id": "profile_outer",
+          "type": "profile_2d",
+          "vertices": [[0, 0], [20, 0], [20, 10], [0, 10], [0, 0]],
+          "area": 200.0,
+          "winding": "counterclockwise",
+          "warnings": [],
+          "closed": true,
+          "locked": false,
+          "label": "outer"
+        },
+        {
+          "id": "profile_tangent",
+          "type": "profile_2d",
+          "vertices": [[20, 2], [18, 2], [18, 4], [20, 4], [20, 2]],
+          "area": 4.0,
+          "winding": "clockwise",
+          "warnings": [],
+          "closed": true,
+          "locked": false,
+          "label": "tangent"
+        }
+      ],
+      "constraints": [],
+      "named_references": {"outer": "profile_outer", "tangent": "profile_tangent"}
+    }
+  },
+  "expected": {
+    "error": {
+      "code": "selection_resolution_error"
+    }
+  }
+}

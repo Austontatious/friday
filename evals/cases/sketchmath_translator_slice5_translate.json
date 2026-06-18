@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_translator_slice5_translate",
+  "input": {
+    "utterance": "translate these points 10 0",
+    "selection_context": {
+      "selection_set_id": "sel_translator_03",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": false, "label": "A"}
+      ],
+      "constraints": [],
+      "named_references": {"A": "point_A"}
+    }
+  },
+  "expected": {
+    "status": "command",
+    "command": {
+      "command_type": "translate",
+      "selection": ["point_A"],
+      "parameters": {"vector": [10.0, 0.0]}
+    }
+  }
+}

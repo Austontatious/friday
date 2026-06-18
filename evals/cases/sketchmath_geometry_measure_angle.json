@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_geometry_measure_angle",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_geom_measure_angle",
+      "mode": "preview",
+      "command_type": "measure_angle",
+      "selection": ["line_A", "line_B"],
+      "parameters": {"unit": "deg"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_geom_02",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "line_A", "type": "line_2d", "start": [0, 0], "end": [1, 0], "locked": false},
+        {"id": "line_B", "type": "construction_line_2d", "start": [0, 0], "end": [0, 1], "locked": false}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {"value": 90.0, "unit": "deg", "status": "preview"}
+}

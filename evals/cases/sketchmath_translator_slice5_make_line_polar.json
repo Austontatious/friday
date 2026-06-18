@@ -1,0 +1,25 @@
+{
+  "name": "sketchmath_translator_slice5_make_line_polar",
+  "input": {
+    "utterance": "make A-B 17.5 mm at 45 degrees",
+    "selection_context": {
+      "selection_set_id": "sel_translator_01",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": true, "label": "A"},
+        {"id": "point_B", "type": "point_2d", "coords": [10, 0], "locked": false, "label": "B"}
+      ],
+      "constraints": [],
+      "named_references": {"A": "point_A", "B": "point_B"}
+    }
+  },
+  "expected": {
+    "status": "command",
+    "command": {
+      "command_type": "set_line_polar",
+      "selection": ["point_A", "point_B"],
+      "parameters": {"length": 17.5, "angle": 45.0}
+    }
+  }
+}

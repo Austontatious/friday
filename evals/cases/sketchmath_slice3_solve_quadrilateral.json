@@ -1,0 +1,33 @@
+{
+  "name": "sketchmath_slice3_solve_quadrilateral",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_slice3_solve_quad",
+      "mode": "commit",
+      "command_type": "solve_constraints",
+      "selection": [],
+      "parameters": {}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_slice3_06",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": true},
+        {"id": "point_B", "type": "point_2d", "coords": [4, 0], "locked": true},
+        {"id": "point_C", "type": "point_2d", "coords": [4, 3], "locked": true},
+        {"id": "point_D", "type": "point_2d", "coords": [1, 1], "locked": false}
+      ],
+      "constraints": [
+        {"id": "c_parallel", "type": "parallel_constraint", "points": ["point_A", "point_B", "point_C", "point_D"]},
+        {"id": "c_perp", "type": "perpendicular_constraint", "points": ["point_A", "point_B", "point_A", "point_D"]}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "after": {"point_D": [0.0, 3.0]}
+  }
+}

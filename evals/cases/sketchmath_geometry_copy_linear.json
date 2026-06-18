@@ -1,0 +1,24 @@
+{
+  "name": "sketchmath_geometry_copy_linear",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_geom_copy",
+      "mode": "commit",
+      "command_type": "copy_linear",
+      "selection": ["point_A", "line_A"],
+      "parameters": {"vector": [10, 0], "count": 2, "id_prefix": "copy"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_geom_10",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [2, 3], "locked": false},
+        {"id": "line_A", "type": "line_2d", "start": [0, 0], "end": [4, 4], "locked": false}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {"status": "committed"}
+}

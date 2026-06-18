@@ -1,0 +1,70 @@
+{
+  "name": "extrude closed profile to STEP",
+  "input": {
+    "selection_context": {
+      "selection_set_id": "sel_extrude_eval",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {
+          "id": "profile_box",
+          "type": "profile_2d",
+          "vertices": [[0, 0], [20, 0], [20, 10], [0, 10], [0, 0]],
+          "area": 200.0,
+          "winding": "counterclockwise",
+          "warnings": [],
+          "closed": true,
+          "locked": false,
+          "label": "box"
+        }
+      ],
+      "constraints": [],
+      "named_references": {"box": "profile_box"}
+    },
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_extrude_profile_eval",
+      "mode": "commit",
+      "command_type": "extrude_profile",
+      "selection": ["profile_box"],
+      "parameters": {
+        "depth": 7.5,
+        "depth_unit": "mm",
+        "direction": "positive_normal",
+        "output_format": "step"
+      }
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "history_length": 1,
+    "changed_entity_ids": [],
+    "metadata": {
+      "cad_export": {
+        "status": "export_ready",
+        "profile_id": "profile_box",
+        "command_id": "cmd_extrude_profile_eval",
+        "command_type": "extrude_profile",
+        "artifacts": {
+          "step_path": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_eval/cmd_extrude_profile_eval/export.step",
+          "validation_json": "/mnt/data/friday/artifacts/sketchmath/cad/sel_extrude_eval/cmd_extrude_profile_eval/validation.json",
+          "preview_path": null
+        },
+        "measurements": {
+          "bbox": {
+            "xmin": 0.0,
+            "ymin": 0.0,
+            "zmin": 0.0,
+            "xmax": 20.0,
+            "ymax": 10.0,
+            "zmax": 7.5
+          },
+          "volume_mm3": 1500.0,
+          "area_mm2": 850.0,
+          "is_valid_solid": true
+        },
+        "warnings": []
+      }
+    }
+  }
+}

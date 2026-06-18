@@ -1,0 +1,29 @@
+{
+  "name": "sketchmath_slice3_set_angle",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_slice3_set_angle",
+      "mode": "commit",
+      "command_type": "set_angle",
+      "selection": ["point_A", "point_B", "point_C"],
+      "parameters": {"angle": 90.0, "angle_unit": "deg"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_slice3_01",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": true},
+        {"id": "point_B", "type": "point_2d", "coords": [1, 0], "locked": true},
+        {"id": "point_C", "type": "point_2d", "coords": [1, 1], "locked": false}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "after": {"point_C": [1.0, -1.0]}
+  }
+}

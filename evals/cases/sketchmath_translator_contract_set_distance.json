@@ -1,0 +1,9 @@
+{
+  "name": "sketchmath_translator_contract_set_distance",
+  "input": {
+    "prompt_name": "sketchmath_system",
+    "command_type": "set_distance",
+    "requirements": ["typed_geometry_command", "preview_first", "commit_ready"]
+  },
+  "expected": {"status": "pass"}
+}

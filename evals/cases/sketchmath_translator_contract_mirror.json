@@ -1,0 +1,9 @@
+{
+  "name": "sketchmath_translator_contract_mirror",
+  "input": {
+    "prompt_name": "sketchmath_system",
+    "command_type": "mirror",
+    "requirements": ["typed_geometry_command", "no_freehand_geometry", "selection_driven"]
+  },
+  "expected": {"status": "pass"}
+}
