@@ -292,6 +292,14 @@ body {
   filter: drop-shadow(0 0 8px rgba(255, 207, 90, 0.45));
 }
 
+.sketchmath-hole-placement-ghost {
+  fill: rgba(255, 207, 90, 0.12);
+  stroke: #ffcf5a;
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  pointer-events: none;
+}
+
 .sketchmath-rectangle-selection-outline {
   fill: rgba(116, 187, 255, 0.08);
   stroke: #74bbff;
@@ -326,6 +334,11 @@ body {
   stroke-width: 1.5;
   stroke-dasharray: 5 5;
   opacity: 0.82;
+  pointer-events: none;
+}
+
+.sketchmath-placement-active [data-entity-id],
+.sketchmath-placement-active .sketchmath-dimension-label {
   pointer-events: none;
 }
 

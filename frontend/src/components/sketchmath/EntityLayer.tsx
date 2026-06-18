@@ -5,6 +5,7 @@ type EntityLayerProps = {
   entities: SketchMathEntity[];
   selectedEntityIds: string[];
   focusedEntityId: string | null;
+  placementActive?: boolean;
   onEntityClick: (entityId: string, event: React.MouseEvent<SVGGElement | SVGCircleElement | SVGPolygonElement>) => void;
   onEntityMouseDown?: (entityId: string, entityType: SketchMathEntity["type"], event: React.MouseEvent<SVGGElement>) => void;
   onDimensionLabelEdit?: (baseId: string, dimension: "width" | "height") => void;
@@ -41,7 +42,7 @@ const rectangleBaseIdFromEntityId = (entityId: string): string | null => {
   return profileMatch ? profileMatch[1] : null;
 };
 
-const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
+const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementActive = false, onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
   const linesById = new Map(entities.filter(isLine).map((entity) => [entity.id, entity] as const));
   const profileById = new Map(entities.filter(isProfile).map((entity) => [entity.id, entity] as const));
   const profileHoleIds = new Set(
@@ -55,7 +56,7 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, onEntityCli
   );
 
   return (
-  <g data-testid="sketchmath-entities">
+  <g data-testid="sketchmath-entities" className={placementActive ? "sketchmath-placement-active" : undefined}>
     {Array.from(selectedRectangleBaseIds).map((baseId) => {
       const top = linesById.get(`${baseId}_ab`);
       const right = linesById.get(`${baseId}_bc`);

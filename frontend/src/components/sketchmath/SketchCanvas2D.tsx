@@ -16,6 +16,8 @@ type SketchCanvas2DProps = {
   draftPoint: Point | null;
   rectangleDraft: { anchor: Point; current: Point } | null;
   dragPreviewPoint: { id: string; point: Point } | null;
+  holePlacementPreview?: { center: Point; diameter: number } | null;
+  holePlacementActive?: boolean;
   onCanvasClick: (point: Point) => void;
   onCanvasMouseDown: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
   onCanvasMouseMove: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
@@ -36,6 +38,8 @@ const SketchCanvas2D = ({
   draftPoint,
   rectangleDraft,
   dragPreviewPoint,
+  holePlacementPreview,
+  holePlacementActive = false,
   onCanvasClick,
   onCanvasMouseDown,
   onCanvasMouseMove,
@@ -110,10 +114,20 @@ const SketchCanvas2D = ({
       <GridLayer width={width} height={height} />
       {rectangleDraft ? <polygon points={rectanglePoints} className="sketchmath-draft-rectangle" data-testid="sketchmath-rectangle-draft" /> : null}
       {dragPreviewPoint ? <circle cx={dragPreviewPoint.point.x} cy={dragPreviewPoint.point.y} r={7} className="sketchmath-draft-point" data-testid={`sketchmath-drag-${dragPreviewPoint.id}`} /> : null}
+      {holePlacementPreview ? (
+        <circle
+          cx={holePlacementPreview.center.x}
+          cy={holePlacementPreview.center.y}
+          r={Math.max(4, holePlacementPreview.diameter / 2)}
+          className="sketchmath-hole-placement-ghost"
+          data-testid="sketchmath-hole-placement-ghost"
+        />
+      ) : null}
       <EntityLayer
         entities={entities}
         selectedEntityIds={selectedEntityIds}
         focusedEntityId={focusedEntityId}
+        placementActive={holePlacementActive}
         onEntityClick={onEntityClick}
         onEntityMouseDown={onEntityMouseDown}
         onDimensionLabelEdit={onDimensionLabelEdit}

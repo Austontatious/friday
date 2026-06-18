@@ -857,6 +857,8 @@ describe("SketchMath workspace", () => {
     expect(screen.getByLabelText("Hole diameter")).toHaveValue(8);
     fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "12" } });
     await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+    await screen.findByTestId("sketchmath-hole-placement");
+    await userEvent.click(screen.getByRole("button", { name: "Preview Centered Hole" }));
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
     const previewCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("add_profile_hole"));
@@ -893,11 +895,64 @@ describe("SketchMath workspace", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Add Hole" })).toBeEnabled());
     fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "12" } });
     await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+    await screen.findByTestId("sketchmath-hole-placement");
+    await userEvent.click(screen.getByRole("button", { name: "Preview Centered Hole" }));
     await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
     await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
 
     await waitFor(() => expect(screen.getByTestId(/^entity-hole_/)).toBeVisible());
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Profile holes: 1");
+  });
+
+  it("enters Add Hole placement mode and previews the clicked center", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add Hole" })).toBeEnabled());
+    fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "10" } });
+    await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+
+    expect(await screen.findByTestId("sketchmath-hole-placement")).toHaveTextContent("Click inside selected profile");
+    clickCanvasAt(canvas, 250, 160);
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    const previewCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("add_profile_hole"));
+    const previewBody = JSON.parse(String(previewCall?.[1]?.body || "{}"));
+    expect(previewBody.command).toMatchObject({
+      command_type: "add_profile_hole",
+      selection: [`profile_${baseId}`],
+      parameters: { diameter: 10, unit: "mm", center: [250, 160] },
+    });
+  });
+
+  it("handles outside Add Hole placement clicks without previewing", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add Hole" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+    clickCanvasAt(canvas, 800, 500);
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-hole-placement")).toHaveTextContent("inside the selected profile"));
+    const previewCalls = fetchMock.mock.calls.filter(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("add_profile_hole"));
+    expect(previewCalls).toHaveLength(0);
   });
 
   it("selects rectangle corners as editable anchor targets", async () => {

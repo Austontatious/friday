@@ -59,6 +59,7 @@ type RectangleSelectionDetail =
   | { kind: "profile"; baseId: string };
 type DimensionEditorState = { baseId: string; dimension: "width" | "height"; value: string } | null;
 type DeletePromptState = { kind: "rectangle"; baseId: string; message: string } | null;
+type HolePlacementState = { profileId: string; baseId: string | null; center: Point; message: string } | null;
 type SelectionRef = {
   kind: "none" | "rectangle_edge" | "rectangle_corner" | "rectangle_profile" | "rectangle" | "one_line" | "two_lines" | "one_point" | "two_points" | "mixed";
   summary: string;
@@ -117,6 +118,25 @@ const profileCenter = (profile: Extract<SketchMathEntity, { type: "profile_2d" }
     x: Number(((Math.min(...xs) + Math.max(...xs)) / 2).toFixed(2)),
     y: Number(((Math.min(...ys) + Math.max(...ys)) / 2).toFixed(2)),
   };
+};
+
+const pointInsideProfile = (point: Point, profile: Extract<SketchMathEntity, { type: "profile_2d" }>): boolean => {
+  const vertices = profile.vertices;
+  if (vertices.length < 4) {
+    return false;
+  }
+  let inside = false;
+  for (let index = 0, previous = vertices.length - 1; index < vertices.length; previous = index++) {
+    const currentVertex = vertices[index];
+    const previousVertex = vertices[previous];
+    const intersects =
+      (currentVertex[1] > point.y) !== (previousVertex[1] > point.y) &&
+      point.x < ((previousVertex[0] - currentVertex[0]) * (point.y - currentVertex[1])) / (previousVertex[1] - currentVertex[1]) + currentVertex[0];
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
 };
 
 const rectangleBaseIdFromPointId = (pointId: string): string | null => {
@@ -224,6 +244,7 @@ const SketchMathWorkspace = () => {
   const [deletePrompt, setDeletePrompt] = useState<DeletePromptState>(null);
   const [extrudeDepthValue, setExtrudeDepthValue] = useState("10");
   const [holeDiameterValue, setHoleDiameterValue] = useState("8");
+  const [holePlacement, setHolePlacement] = useState<HolePlacementState>(null);
   const [cadFeatureSummary, setCadFeatureSummary] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -680,6 +701,7 @@ const SketchMathWorkspace = () => {
 
   const clearPreview = () => {
     setPreviewResult(null);
+    setHolePlacement(null);
     setError(null);
   };
 
@@ -743,6 +765,7 @@ const SketchMathWorkspace = () => {
   const clearDimensionPreview = () => {
     setPreviewResult(null);
     setPendingCommandText("");
+    setHolePlacement(null);
     setError(null);
   };
 
@@ -758,6 +781,7 @@ const SketchMathWorkspace = () => {
     setRectangleSelectionDetail(null);
     setDimensionEditor(null);
     setDeletePrompt(null);
+    setHolePlacement(null);
     setPreviewResult(null);
     setDraftPoint(null);
     clearRectangleInteraction();
@@ -803,6 +827,25 @@ const SketchMathWorkspace = () => {
   const handleCanvasClick = (point: Point) => {
     if (ignoreNextCanvasClickRef.current) {
       ignoreNextCanvasClickRef.current = false;
+      return;
+    }
+    if (holePlacement) {
+      const profile = committedEntities.find((entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => entity.id === holePlacement.profileId && isClosedProfileEntity(entity));
+      const center = { x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) };
+      if (!profile || !pointInsideProfile(center, profile)) {
+        setHolePlacement((current) =>
+          current
+            ? {
+                ...current,
+                message: "That point is outside the selected profile. Click inside the selected profile.",
+              }
+            : current,
+        );
+        setError("Hole center must be inside the selected profile");
+        return;
+      }
+      setHolePlacement((current) => (current ? { ...current, center } : current));
+      void previewProfileHole(center);
       return;
     }
     if (tool === "point") {
@@ -1224,6 +1267,7 @@ const SketchMathWorkspace = () => {
       setSelectedEntityIds(profileId ? [profileId] : []);
       const profileBaseId = profileId ? rectangleBaseIdFromEntityId(profileId) : null;
       setRectangleSelectionDetail(profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
+      setHolePlacement(null);
     }
   };
 
@@ -1295,20 +1339,50 @@ const SketchMathWorkspace = () => {
       setError("Select a rectangle or closed profile before adding a hole");
       return;
     }
-    const diameter = Number(holeDiameterValue);
-    if (!Number.isFinite(diameter) || diameter <= 0) {
-      setError("Hole diameter must be a positive number");
-      return;
-    }
     const center = profileCenter(activeProfileForHole);
     if (!center) {
       setError("Selected profile does not have usable bounds");
       return;
     }
-    const command = buildAddProfileHoleCommand(activeProfileForHole.id, Number(diameter.toFixed(2)), center, "mm");
     setSelectedEntityIds([activeProfileForHole.id]);
     const baseId = rectangleBaseIdFromEntityId(activeProfileForHole.id);
     setRectangleSelectionDetail(baseId ? { kind: "profile", baseId } : null);
+    setTool("select");
+    setHolePlacement({
+      profileId: activeProfileForHole.id,
+      baseId,
+      center,
+      message: "Click inside selected profile to place the hole center.",
+    });
+    setError(null);
+  };
+
+  const previewProfileHole = async (center: Point) => {
+    const profile = holePlacement
+      ? committedEntities.find((entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => entity.id === holePlacement.profileId && isClosedProfileEntity(entity))
+      : activeProfileForHole;
+    if (!profile) {
+      setError("Select a rectangle or closed profile before adding a hole");
+      return;
+    }
+    const diameter = Number(holeDiameterValue);
+    if (!Number.isFinite(diameter) || diameter <= 0) {
+      setError("Hole diameter must be a positive number");
+      return;
+    }
+    if (!pointInsideProfile(center, profile)) {
+      setHolePlacement((current) =>
+        current
+          ? {
+              ...current,
+              message: "That point is outside the selected profile. Click inside the selected profile.",
+            }
+          : current,
+      );
+      setError("Hole center must be inside the selected profile");
+      return;
+    }
+    const command = buildAddProfileHoleCommand(profile.id, Number(diameter.toFixed(2)), center, "mm");
     await previewCommand(command);
   };
 
@@ -1322,6 +1396,7 @@ const SketchMathWorkspace = () => {
     setRectangleSelectionDetail(null);
     setDimensionEditor(null);
     setDeletePrompt(null);
+    setHolePlacement(null);
     setCadFeatureSummary(null);
     setTranslationOutcome(null);
     setPendingCommandText("");
@@ -1391,6 +1466,7 @@ const SketchMathWorkspace = () => {
         (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable || target.getAttribute("role") === "textbox");
       if (event.key === "Escape") {
         clearRectangleInteraction();
+        setHolePlacement(null);
         setDraftPoint(null);
         setError(null);
         return;
@@ -1495,6 +1571,7 @@ const SketchMathWorkspace = () => {
   const handleToolChange = (nextTool: SketchMathMode) => {
     if (nextTool !== tool) {
       clearRectangleInteraction();
+      setHolePlacement(null);
       setDraftPoint(null);
     }
     if (nextTool === "solve") {
@@ -1541,6 +1618,11 @@ const SketchMathWorkspace = () => {
   }
 
   const hasUsableGeometry = Boolean(closedProfileEntity);
+  const holePlacementDiameter = Number(holeDiameterValue);
+  const holePlacementPreview =
+    holePlacement && Number.isFinite(holePlacementDiameter) && holePlacementDiameter > 0
+      ? { center: holePlacement.center, diameter: holePlacementDiameter }
+      : null;
 
   return (
     <Box className="sketchmath-shell" data-testid="sketchmath-workspace">
@@ -1584,6 +1666,8 @@ const SketchMathWorkspace = () => {
             draftPoint={draftPoint}
             rectangleDraft={rectangleDraft}
             dragPreviewPoint={dragPreviewPoint}
+            holePlacementPreview={holePlacementPreview}
+            holePlacementActive={Boolean(holePlacement)}
             onCanvasClick={handleCanvasClick}
             onCanvasMouseDown={handleCanvasMouseDown}
             onCanvasMouseMove={handleCanvasMouseMove}
@@ -1686,6 +1770,21 @@ const SketchMathWorkspace = () => {
                       Add Hole
                     </Button>
                   </HStack>
+                ) : null}
+                {holePlacement ? (
+                  <Box mt={2} data-testid="sketchmath-hole-placement">
+                    <Text fontSize="sm" opacity={0.85}>
+                      {holePlacement.message}
+                    </Text>
+                    <HStack spacing={2} flexWrap="wrap" mt={2}>
+                      <Button size="sm" onClick={() => void previewProfileHole(holePlacement.center)}>
+                        Preview Centered Hole
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setHolePlacement(null)}>
+                        Cancel Hole Placement
+                      </Button>
+                    </HStack>
+                  </Box>
                 ) : null}
                 <Text fontSize="sm" opacity={0.75} mt={2}>
                   Select geometry on the canvas, then apply constraints here.

@@ -150,7 +150,7 @@ Edit Height payload:
 
 Add Hole payload:
 
-The browser workspace exposes Add Hole only when a semantic rectangle/profile is selected. The first UX loop places the hole at the selected profile's bounding-box center; later direct point placement should keep the same `add_profile_hole` command shape and only change `parameters.center`.
+The browser workspace exposes Add Hole only when a semantic rectangle/profile is selected. Add Hole enters placement mode: the user can preview the default centered hole or click inside the selected profile to send the same `add_profile_hole` command with the clicked `parameters.center`.
 
 ```json
 {

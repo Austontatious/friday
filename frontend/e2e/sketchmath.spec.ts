@@ -155,6 +155,15 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-canvas")).toContainText("40 mm", { timeout: 20000 });
     await expect(page.getByTestId("sketchmath-canvas")).toContainText("25 mm", { timeout: 20000 });
 
+    await page.getByLabel("Hole diameter").fill("8");
+    await clickWorkbenchButton(page, "Add Hole");
+    await expect(page.getByTestId("sketchmath-hole-placement")).toContainText("Click inside selected profile");
+    await clickSvgPrimitiveCenter(page, '[data-testid^="rectangle-selection-outline-"]');
+    await commitDimensionPreview(page);
+    await expect(page.locator('[data-testid^="entity-hole_"]').last()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId("sketchmath-selection-inspector")).toContainText("Profile holes: 1");
+    await page.screenshot({ path: screenshotPath("sketchmath-hole-placed-committed.png"), fullPage: true });
+
     await page.locator('[data-testid^="rectangle-corner-rect_"][data-testid$="-a"]').last().click();
     await expect(page.getByTestId("sketchmath-selection-inspector")).toContainText("Selected: Rectangle corner");
     await expect(page.getByTestId("sketchmath-selection-inspector")).toContainText("Corner: A");
