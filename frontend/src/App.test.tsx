@@ -93,6 +93,8 @@ describe("FRIDAY shell", () => {
     expect(screen.getByRole("button", { name: "Direct Friday" })).toBeVisible();
     expect(screen.getByRole("button", { name: "SUBMIT" })).toBeVisible();
     expect(screen.getByRole("button", { name: "SketchMath" })).toBeVisible();
+    expect(screen.getByTestId("friday-telemetry-panel")).toBeVisible();
+    expect(screen.getByTestId("friday-session-map")).toBeVisible();
   });
 
   it("renders Direct Friday and hides SketchMath when the feature flag is off", () => {
@@ -131,6 +133,10 @@ describe("FRIDAY shell", () => {
     process.env.REACT_APP_SKETCHMATH_ENABLED = "1";
     mockSendPrompt.mockResolvedValue({
       text: "Direct Friday reply",
+      meta: {
+        model: "local-test-model",
+        context_usage: { used: 1200, limit: 4096 },
+      },
     });
 
     renderApp();
@@ -138,8 +144,38 @@ describe("FRIDAY shell", () => {
     await userEvent.type(screen.getByPlaceholderText("Ask FRIDAY something..."), "hello friday");
     await userEvent.click(screen.getByRole("button", { name: "SUBMIT" }));
 
-    expect(await screen.findByText("hello friday")).toBeVisible();
-    expect(await screen.findByText("Direct Friday reply")).toBeVisible();
+    expect((await screen.findAllByText("hello friday"))[0]).toBeVisible();
+    expect((await screen.findAllByText("Direct Friday reply"))[0]).toBeVisible();
+    expect((await screen.findAllByText(/local-test-model/))[0]).toBeVisible();
     expect(mockSendPrompt).toHaveBeenCalled();
+  });
+
+  it("renders assistant markdown as document content", async () => {
+    mockSendPrompt.mockResolvedValue({
+      assistant_text: "## Plan\n\n- Inspect shell\n- Ship `telemetry`\n\n```ts\nconst ok = true;\n```",
+    });
+
+    renderApp();
+
+    await userEvent.type(screen.getByPlaceholderText("Ask FRIDAY something..."), "show markdown");
+    await userEvent.click(screen.getByRole("button", { name: "SUBMIT" }));
+
+    expect(await screen.findByRole("heading", { name: "Plan" })).toBeVisible();
+    expect(await screen.findByText("Inspect shell")).toBeVisible();
+    expect(await screen.findByText("telemetry")).toBeVisible();
+    expect(await screen.findByText("const ok = true;")).toBeVisible();
+  });
+
+  it("routes failed requests into system events instead of assistant content", async () => {
+    mockSendPrompt.mockRejectedValue(new Error("HTTP 503: backend offline"));
+
+    renderApp();
+
+    await userEvent.type(screen.getByPlaceholderText("Ask FRIDAY something..."), "fail please");
+    await userEvent.click(screen.getByRole("button", { name: "SUBMIT" }));
+
+    expect(await screen.findByText("Request failed")).toBeVisible();
+    expect(await screen.findByText("HTTP 503: backend offline")).toBeVisible();
+    expect(screen.queryByText("[Direct Friday request failed.]")).toBeNull();
   });
 });

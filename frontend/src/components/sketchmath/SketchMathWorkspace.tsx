@@ -1659,61 +1659,96 @@ const SketchMathWorkspace = () => {
       : null;
 
   return (
-    <Box className="sketchmath-shell" data-testid="sketchmath-workspace">
-      <Box className="sketchmath-shell-header">
-        <VStack align="start" spacing={1}>
-          <Heading size="lg" className="sketchmath-title">
-            SketchMath
-          </Heading>
-          <Text opacity={0.8}>Deterministic 2D drawing pad mounted inside FRIDAY.</Text>
-          <Text fontSize="sm" opacity={0.6}>
-            Session: {sessionId || "loading"} {sessionMetadata.storage_path ? `• ${String(sessionMetadata.storage_path)}` : ""}
-          </Text>
-        </VStack>
-        <HStack spacing={3}>
-          <Link href="/" className="sketchmath-link">
-            Back to FRIDAY chat
-          </Link>
-          <Button size="sm" variant="outline" onClick={toggleColorMode}>
+    <Box className="friday-command-shell sketchmath-command-shell" data-testid="sketchmath-workspace">
+      <aside className="friday-mode-rail" aria-label="Friday workspaces">
+        <Link href="/" className="friday-brand-mark">F</Link>
+        <Link href="/" className="friday-rail-item" aria-label="Direct Friday">
+          <span>FR</span>
+          <strong>Direct</strong>
+        </Link>
+        <span className="friday-rail-item friday-rail-item-active" aria-label="SketchMath">
+          <span>SM</span>
+          <strong>Sketch</strong>
+        </span>
+      </aside>
+
+      <section className="friday-shell-frame">
+        <header className="friday-status-bar">
+          <div>
+            <p className="friday-kicker">FRIDAY</p>
+            <Heading size="lg" className="sketchmath-title">
+              SketchMath
+            </Heading>
+          </div>
+          <div className="friday-status-grid" aria-label="SketchMath runtime status">
+            <span><b>Mode</b> CAD workspace</span>
+            <span><b>Route</b> Deterministic CAD executor</span>
+            <span><b>Context</b> {committedEntities.length} entities / {committedContext.constraints.length} constraints</span>
+            <span><b>Health</b> {error ? "Degraded" : "Ready"}</span>
+          </div>
+          <Button size="sm" variant="ghost" onClick={toggleColorMode} className="friday-icon-button">
             {colorMode === "light" ? "Dark grid" : "Light grid"}
           </Button>
-        </HStack>
-      </Box>
+        </header>
 
-      <SketchMathToolbar mode={tool} onModeChange={handleToolChange} theme={colorMode} onToggleTheme={toggleColorMode} />
+        <Box className="friday-workbench sketchmath-workbench-layout">
+          <Box className="friday-workspace-pane sketchmath-main-pane">
+            <Box className="sketchmath-shell-header">
+              <VStack align="start" spacing={1}>
+                <Text opacity={0.8}>Deterministic 2D drawing pad mounted inside FRIDAY.</Text>
+                <Text fontSize="sm" opacity={0.6}>
+                  Session: {sessionId || "loading"} {sessionMetadata.storage_path ? `• ${String(sessionMetadata.storage_path)}` : ""}
+                </Text>
+              </VStack>
+              <Link href="/" className="sketchmath-link">
+                Back to FRIDAY chat
+              </Link>
+            </Box>
 
-      <Box className="sketchmath-layout">
-        <Box className="sketchmath-canvas-panel">
-          <SketchCanvas2D
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            entities={committedEntities}
-            previewResult={previewResult}
-            selectedEntityIds={selectedEntityIds}
-            focusedEntityId={
-              rectangleSelectionDetail?.kind === "edge"
-                ? rectangleIdsFromBaseId(rectangleSelectionDetail.baseId).lineIds[rectangleSelectionDetail.edgeId]
-                : rectangleSelectionDetail?.kind === "corner"
-                  ? rectangleIdsFromBaseId(rectangleSelectionDetail.baseId).pointIds[rectangleSelectionDetail.cornerId]
-                  : null
-            }
-            draftPoint={draftPoint}
-            rectangleDraft={rectangleDraft}
-            dragPreviewPoint={dragPreviewPoint}
-            holePlacementPreview={holePlacementPreview}
-            holePlacementActive={Boolean(holePlacement)}
-            onCanvasClick={handleCanvasClick}
-            onCanvasMouseDown={handleCanvasMouseDown}
-            onCanvasMouseMove={handleCanvasMouseMove}
-            onCanvasMouseUp={handleCanvasMouseUp}
-            onCanvasContextMenu={handleCanvasContextMenu}
-            onEntityClick={handleEntityClick}
-            onEntityMouseDown={handleEntityMouseDown}
-            onDimensionLabelEdit={handleDimensionLabelEdit}
-          />
-        </Box>
+            <SketchMathToolbar mode={tool} onModeChange={handleToolChange} theme={colorMode} onToggleTheme={toggleColorMode} />
 
-        <VStack align="stretch" spacing={4} className="sketchmath-sidebar">
+            <Box className="sketchmath-canvas-panel">
+              <SketchCanvas2D
+                width={CANVAS_WIDTH}
+                height={CANVAS_HEIGHT}
+                entities={committedEntities}
+                previewResult={previewResult}
+                selectedEntityIds={selectedEntityIds}
+                focusedEntityId={
+                  rectangleSelectionDetail?.kind === "edge"
+                    ? rectangleIdsFromBaseId(rectangleSelectionDetail.baseId).lineIds[rectangleSelectionDetail.edgeId]
+                    : rectangleSelectionDetail?.kind === "corner"
+                      ? rectangleIdsFromBaseId(rectangleSelectionDetail.baseId).pointIds[rectangleSelectionDetail.cornerId]
+                      : null
+                }
+                draftPoint={draftPoint}
+                rectangleDraft={rectangleDraft}
+                dragPreviewPoint={dragPreviewPoint}
+                holePlacementPreview={holePlacementPreview}
+                holePlacementActive={Boolean(holePlacement)}
+                onCanvasClick={handleCanvasClick}
+                onCanvasMouseDown={handleCanvasMouseDown}
+                onCanvasMouseMove={handleCanvasMouseMove}
+                onCanvasMouseUp={handleCanvasMouseUp}
+                onCanvasContextMenu={handleCanvasContextMenu}
+                onEntityClick={handleEntityClick}
+                onEntityMouseDown={handleEntityMouseDown}
+                onDimensionLabelEdit={handleDimensionLabelEdit}
+              />
+            </Box>
+          </Box>
+
+          <VStack align="stretch" spacing={4} className="friday-telemetry-sidecar sketchmath-sidebar" data-testid="friday-telemetry-panel">
+            <section className="friday-session-map" data-testid="friday-session-map">
+              <h2>Session Map</h2>
+              <dl>
+                <div><dt>Objective</dt><dd>Model a 2D sketch and produce CAD-ready geometry.</dd></div>
+                <div><dt>Workspace</dt><dd>SketchMath canvas</dd></div>
+                <div><dt>Recent decisions</dt><dd>{history.length ? history.slice(-3).map((entry) => entry.command.command_type).join(" / ") : "No commands yet"}</dd></div>
+                <div><dt>Attached context</dt><dd>{selectionRef.summary}</dd></div>
+                <div><dt>Artifacts</dt><dd>{cadExportPath || "No export artifact"}</dd></div>
+              </dl>
+            </section>
           <Box className="sketchmath-panel" data-testid="sketchmath-workbench-panel">
             <Heading size="sm" mb={3} className="sketchmath-panel-title">
               Sketch Workbench
@@ -1957,10 +1992,11 @@ const SketchMathWorkspace = () => {
             </>
           ) : null}
         </VStack>
-      </Box>
-      <Button size="sm" variant="ghost" onClick={() => void refreshSession()} className="sketchmath-refresh">
-        Refresh session
-      </Button>
+        </Box>
+        <Button size="sm" variant="ghost" onClick={() => void refreshSession()} className="sketchmath-refresh">
+          Refresh session
+        </Button>
+      </section>
     </Box>
   );
 };
