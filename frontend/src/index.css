@@ -308,6 +308,14 @@ body {
   stroke-linejoin: round;
 }
 
+.sketchmath-dimension-guide {
+  stroke: var(--friday-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+  opacity: 0.82;
+  pointer-events: none;
+}
+
 @media (max-width: 1200px) {
   .sketchmath-layout {
     grid-template-columns: 1fr;

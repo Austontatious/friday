@@ -17,6 +17,8 @@ const isLine = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, {
   entity.type === "line_2d" || entity.type === "construction_line_2d";
 
 const formatDimension = (value: number): string => Number(value.toFixed(2)).toString();
+const DIMENSION_GUIDE_OFFSET = 34;
+const DIMENSION_TICK = 9;
 
 const rectangleBaseIdFromPointId = (pointId: string): string | null => {
   const match = /^rect_(.+)_[abcd]$/.exec(pointId);
@@ -174,20 +176,46 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, onEntityCli
     {Array.from(selectedRectangleBaseIds).map((baseId) => {
       const top = linesById.get(`${baseId}_ab`);
       const left = linesById.get(`${baseId}_da`);
-      if (!top || !left) {
+      const right = linesById.get(`${baseId}_bc`);
+      const bottom = linesById.get(`${baseId}_cd`);
+      if (!top || !left || !right || !bottom) {
         return null;
       }
       const width = Math.abs(top.end[0] - top.start[0]);
       const height = Math.abs(left.start[1] - left.end[1]);
       const widthX = (top.start[0] + top.end[0]) / 2;
-      const widthY = top.start[1] - 24;
-      const heightX = left.end[0] - 54;
+      const guideAbove = top.start[1] <= bottom.start[1];
+      const guideLeft = left.start[0] <= right.start[0];
+      const widthGuideY = top.start[1] + (guideAbove ? -DIMENSION_GUIDE_OFFSET : DIMENSION_GUIDE_OFFSET);
+      const widthLabelY = widthGuideY + (guideAbove ? -6 : 18);
+      const heightGuideX = left.end[0] + (guideLeft ? -DIMENSION_GUIDE_OFFSET : DIMENSION_GUIDE_OFFSET);
+      const heightLabelX = heightGuideX + (guideLeft ? -20 : 20);
       const heightY = (left.start[1] + left.end[1]) / 2;
       return (
         <g key={`${baseId}-dimensions`} className="sketchmath-dimensions">
+          <line
+            x1={top.start[0]}
+            y1={widthGuideY}
+            x2={top.end[0]}
+            y2={widthGuideY}
+            className="sketchmath-dimension-guide"
+            data-testid={`dimension-guide-${baseId}-width`}
+          />
+          <line x1={top.start[0]} y1={top.start[1]} x2={top.start[0]} y2={widthGuideY + (guideAbove ? DIMENSION_TICK : -DIMENSION_TICK)} className="sketchmath-dimension-guide" />
+          <line x1={top.end[0]} y1={top.end[1]} x2={top.end[0]} y2={widthGuideY + (guideAbove ? DIMENSION_TICK : -DIMENSION_TICK)} className="sketchmath-dimension-guide" />
+          <line
+            x1={heightGuideX}
+            y1={left.end[1]}
+            x2={heightGuideX}
+            y2={left.start[1]}
+            className="sketchmath-dimension-guide"
+            data-testid={`dimension-guide-${baseId}-height`}
+          />
+          <line x1={left.end[0]} y1={left.end[1]} x2={heightGuideX + (guideLeft ? DIMENSION_TICK : -DIMENSION_TICK)} y2={left.end[1]} className="sketchmath-dimension-guide" />
+          <line x1={left.start[0]} y1={left.start[1]} x2={heightGuideX + (guideLeft ? DIMENSION_TICK : -DIMENSION_TICK)} y2={left.start[1]} className="sketchmath-dimension-guide" />
           <text
             x={widthX}
-            y={widthY}
+            y={widthLabelY}
             className="sketchmath-dimension-label"
             data-testid={`dimension-${baseId}-width`}
             role="button"
@@ -204,7 +232,7 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, onEntityCli
             {formatDimension(width)} mm
           </text>
           <text
-            x={heightX}
+            x={heightLabelX}
             y={heightY}
             className="sketchmath-dimension-label"
             data-testid={`dimension-${baseId}-height`}

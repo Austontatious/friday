@@ -657,6 +657,8 @@ describe("SketchMath workspace", () => {
     expect(screen.getByLabelText("Rectangle height")).toHaveValue(100);
     expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("240 mm");
     expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("100 mm");
+    expect(screen.getByTestId(`dimension-guide-${baseId}-width`)).toBeVisible();
+    expect(screen.getByTestId(`dimension-guide-${baseId}-height`)).toBeVisible();
     expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Underdefined: size/profile exists, position is free");
     expect(screen.getByTestId(`rectangle-selection-outline-${baseId}`)).toBeVisible();
 
@@ -690,6 +692,41 @@ describe("SketchMath workspace", () => {
     expect(screen.getByRole("button", { name: "Select profile" })).toBeEnabled();
     expect(topEdge.querySelector("line.sketchmath-line")).toHaveClass("sketchmath-line-focus");
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(`profile_${baseId}`);
+  });
+
+  it("shows CAD-style dimension guides only for the selected rectangle", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    stamp.value = 1710000001000;
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 500, 180);
+    clickCanvasAt(canvas, 620, 260);
+
+    const firstBaseId = `rect_${firstStamp.toString(36)}`;
+    const secondBaseId = `rect_${stamp.value.toString(36)}`;
+
+    await waitFor(() => expect(screen.getByTestId(`dimension-${secondBaseId}-width`)).toHaveTextContent("120 mm"));
+    expect(screen.getByTestId(`dimension-guide-${secondBaseId}-width`)).toBeVisible();
+    expect(screen.getByTestId(`dimension-guide-${secondBaseId}-height`)).toBeVisible();
+    expect(screen.queryByTestId(`dimension-${firstBaseId}-width`)).toBeNull();
+    expect(screen.queryByTestId(`dimension-guide-${firstBaseId}-width`)).toBeNull();
+
+    await userEvent.click(await screen.findByTestId(`entity-${firstBaseId}_ab`));
+
+    await waitFor(() => expect(screen.getByTestId(`dimension-${firstBaseId}-width`)).toHaveTextContent("240 mm"));
+    expect(screen.getByTestId(`dimension-guide-${firstBaseId}-width`)).toBeVisible();
+    expect(screen.getByTestId(`dimension-guide-${firstBaseId}-height`)).toBeVisible();
+    expect(screen.queryByTestId(`dimension-${secondBaseId}-width`)).toBeNull();
+    expect(screen.queryByTestId(`dimension-guide-${secondBaseId}-width`)).toBeNull();
   });
 
   it("opens edge-specific rectangle dimension editors from direct label clicks", async () => {
