@@ -1,0 +1,52 @@
+{
+  "name": "geometry_add_profile_hole",
+  "input": {
+    "command": {
+      "version": "0.1",
+      "command_id": "cmd_add_profile_hole_eval",
+      "mode": "preview",
+      "command_type": "add_profile_hole",
+      "selection": ["profile_rect_eval"],
+      "parameters": {
+        "diameter": 8,
+        "unit": "mm",
+        "center": [30, 32.5]
+      }
+    },
+    "selection_context": {
+      "selection_set_id": "sel_add_profile_hole_eval",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {
+          "id": "profile_rect_eval",
+          "type": "profile_2d",
+          "vertices": [[10, 20], [50, 20], [50, 45], [10, 45], [10, 20]],
+          "area": 1000,
+          "winding": "counterclockwise",
+          "warnings": [],
+          "closed": true,
+          "locked": false,
+          "label": "rectangle"
+        }
+      ],
+      "constraints": [],
+      "named_references": {"rectangle": "profile_rect_eval"}
+    }
+  },
+  "expected": {
+    "status": "preview",
+    "value": 8,
+    "unit": "mm",
+    "changed_entity_ids": ["profile_rect_eval", "hole_profile_rect_eval_cmd_add_profile_hole_eval"],
+    "metadata": {
+      "profile_id": "profile_rect_eval",
+      "hole_id": "hole_profile_rect_eval_cmd_add_profile_hole_eval",
+      "diameter": 8,
+      "center": [30, 32.5],
+      "profile_hole_validation": {
+        "ok": true
+      }
+    }
+  }
+}

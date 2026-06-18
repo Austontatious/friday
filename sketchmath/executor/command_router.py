@@ -14,7 +14,7 @@ from sketchmath.geometry.transforms import (
     set_line_polar,
     translate_point,
 )
-from sketchmath.geometry.units import denormalize_angle, denormalize_length, normalize_angle
+from sketchmath.geometry.units import denormalize_angle, denormalize_length, normalize_angle, normalize_length
 from sketchmath.geometry.vectors import Point2D, add, distance, normalize, rotate_point, scale, subtract
 from sketchmath.models.constraints import (
     AngleConstraint,
@@ -114,6 +114,7 @@ def apply_geometry_command(
         "define_profile": _handle_define_profile,
         "delete_entity": _handle_delete_entity,
         "set_distance": _handle_set_distance,
+        "set_rectangle_dimension": _handle_set_rectangle_dimension,
         "set_line_polar": _handle_set_line_polar,
         "set_angle": _handle_set_angle,
         "make_parallel": _handle_make_parallel,
@@ -122,6 +123,7 @@ def apply_geometry_command(
         "make_equal_angle": _handle_make_equal_angle,
         "solve_constraints": _handle_solve_constraints,
         "make_profile": _handle_make_profile,
+        "add_profile_hole": _handle_add_profile_hole,
         "extrude_profile": _handle_extrude_profile,
         "translate": _handle_translate,
         "rotate": _handle_rotate,
@@ -298,6 +300,107 @@ def _handle_set_distance(command: GeometryCommand, state: SelectionContext) -> t
         state.replace_constraint(constraint)
         return state, [start.id], None, None, {"constraint_id": constraint.id}
     raise SelectionResolutionError(f"Unsupported anchor for set_distance: {anchor}", detail={"command_type": command.command_type, "anchor": anchor})
+
+
+def _handle_set_rectangle_dimension(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    base_id = str(command.parameters.get("base_id") or _rectangle_base_id_from_selection(command.selection))
+    dimension = str(_parameter(command, "dimension")).strip().lower()
+    if dimension not in {"width", "height"}:
+        raise SelectionResolutionError(
+            "Rectangle dimension must be width or height",
+            detail={"command_type": command.command_type, "dimension": dimension},
+        )
+    unit = str(_parameter(command, "unit", default=state.units))
+    try:
+        value_mm = normalize_length(float(_parameter(command, "value")), unit)
+    except ValueError as exc:
+        raise InvalidUnitsError(str(exc), detail={"command_type": command.command_type, "unit": unit}) from exc
+    if value_mm <= 0:
+        raise SelectionResolutionError(
+            "Rectangle dimension must be positive",
+            detail={"command_type": command.command_type, "dimension": dimension, "value": value_mm},
+        )
+
+    bundle = _resolve_rectangle_bundle(state, base_id)
+    sign_x = 1.0 if bundle["ab"].end[0] >= bundle["ab"].start[0] else -1.0
+    sign_y = 1.0 if bundle["da"].start[1] >= bundle["da"].end[1] else -1.0
+    current_width = abs(bundle["ab"].end[0] - bundle["ab"].start[0])
+    current_height = abs(bundle["da"].start[1] - bundle["da"].end[1])
+    width = value_mm if dimension == "width" else current_width
+    height = value_mm if dimension == "height" else current_height
+    if width <= 0 or height <= 0:
+        raise SelectionResolutionError(
+            "Rectangle width and height must be positive",
+            detail={"command_type": command.command_type, "width": width, "height": height},
+        )
+
+    top_left = bundle["a"].coords
+    top_right = (round(top_left[0] + sign_x * width, 10), top_left[1])
+    bottom_left = (top_left[0], round(top_left[1] + sign_y * height, 10))
+    bottom_right = (top_right[0], bottom_left[1])
+
+    point_updates = {
+        bundle["a"].id: top_left,
+        bundle["b"].id: top_right,
+        bundle["c"].id: bottom_right,
+        bundle["d"].id: bottom_left,
+    }
+    line_updates = {
+        bundle["ab"].id: (top_left, top_right),
+        bundle["bc"].id: (top_right, bottom_right),
+        bundle["cd"].id: (bottom_right, bottom_left),
+        bundle["da"].id: (bottom_left, top_left),
+    }
+    vertices = [top_left, top_right, bottom_right, bottom_left, top_left]
+    analysis = analyze_closed_polygon(vertices)
+
+    moving_ids = [entity_id for entity_id, coords in point_updates.items() if bundle[_rectangle_suffix(entity_id)].coords != coords]
+    moving_ids.extend(
+        entity_id
+        for entity_id, (start, end) in line_updates.items()
+        if bundle[_rectangle_suffix(entity_id)].start != start or bundle[_rectangle_suffix(entity_id)].end != end
+    )
+    moving_ids.append(bundle["profile"].id)
+    _ensure_mutable(state, _dedupe(moving_ids), command.command_type)
+
+    for key in ("a", "b", "c", "d"):
+        point = bundle[key]
+        state.replace_entity(_replace_point(point, point_updates[point.id]))
+    for key in ("ab", "bc", "cd", "da"):
+        line = bundle[key]
+        start, end = line_updates[line.id]
+        state.replace_entity(Line2DEntity(**{**line.model_dump(), "start": start, "end": end}))
+    state.replace_entity(
+        Profile2DEntity(
+            **{
+                **bundle["profile"].model_dump(),
+                "vertices": analysis.vertices,
+                "area": analysis.area,
+                "winding": analysis.winding,
+                "warnings": analysis.warnings,
+                "closed": analysis.closed,
+            }
+        )
+    )
+    changed = [bundle[key].id for key in ("a", "b", "c", "d", "ab", "bc", "cd", "da")] + [bundle["profile"].id]
+    solver_status = "solved" if bundle["a"].locked else "underconstrained"
+    return (
+        state,
+        changed,
+        denormalize_length(value_mm, unit),
+        unit,
+        {
+            "base_id": base_id,
+            "dimension": dimension,
+            "width": denormalize_length(width, unit),
+            "height": denormalize_length(height, unit),
+            "area": analysis.area,
+            "winding": analysis.winding,
+            "warnings": analysis.warnings,
+            "solver_status": solver_status,
+            "profile_status": "valid" if analysis.closed and not analysis.warnings else "invalid",
+        },
+    )
 
 
 def _handle_set_line_polar(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
@@ -491,6 +594,69 @@ def _handle_make_profile(command: GeometryCommand, state: SelectionContext) -> t
     return state, [profile.id], analysis.area, "square_mm", {"area": analysis.area, "winding": analysis.winding, "warnings": analysis.warnings}
 
 
+def _handle_add_profile_hole(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    if not command.selection:
+        raise SelectionResolutionError(
+            "add_profile_hole requires a selected profile",
+            detail={"command_type": command.command_type, "error_code": "missing_profile_selection"},
+        )
+    profile = _resolve_profile(state, command.selection[0])
+    _ensure_mutable(state, [profile.id], command.command_type)
+    unit = str(_parameter(command, "unit", default=state.units))
+    try:
+        diameter_mm = normalize_length(float(_parameter(command, "diameter")), unit)
+    except ValueError as exc:
+        raise InvalidUnitsError(str(exc), detail={"command_type": command.command_type, "unit": unit}) from exc
+    if diameter_mm <= 0:
+        raise SelectionResolutionError(
+            "Hole diameter must be a positive number",
+            detail={"command_type": command.command_type, "error_code": "invalid_hole_diameter", "diameter": diameter_mm},
+        )
+    center = _point_tuple(_parameter(command, "center"))
+    segments = int(command.parameters.get("segments", 32))
+    if segments < 12:
+        segments = 12
+    if segments > 96:
+        segments = 96
+    hole_id = str(command.parameters.get("name") or f"hole_{profile.id}_{command.command_id}")
+    hole_vertices = _circle_profile_vertices(center, diameter_mm / 2.0, segments)
+    analysis = analyze_closed_polygon(hole_vertices)
+    hole = Profile2DEntity(
+        id=hole_id,
+        vertices=analysis.vertices,
+        area=analysis.area,
+        winding="clockwise",
+        warnings=analysis.warnings,
+        closed=analysis.closed,
+        label=command.parameters.get("label") or "Hole",
+    )
+    existing_holes = [_resolve_profile(state, hole_ref) for hole_ref in profile.holes if hole_ref != hole_id]
+    validation = validate_profile_holes(profile, [*existing_holes, hole])
+    if not validation.ok:
+        raise SelectionResolutionError(
+            validation.message or "Invalid profile hole",
+            detail={"command_type": command.command_type, **validation.to_dict()},
+        )
+    updated_profile = Profile2DEntity(**{**profile.model_dump(), "holes": _dedupe([*profile.holes, hole_id])})
+    state.replace_entity(updated_profile)
+    state.replace_entity(hole)
+    return (
+        state,
+        [profile.id, hole.id],
+        denormalize_length(diameter_mm, unit),
+        unit,
+        {
+            "profile_id": profile.id,
+            "hole_id": hole.id,
+            "diameter": denormalize_length(diameter_mm, unit),
+            "unit": unit,
+            "center": [center[0], center[1]],
+            "segments": segments,
+            "profile_hole_validation": validation.to_dict(),
+        },
+    )
+
+
 def _handle_extrude_profile(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float | None, str | None, dict[str, Any]]:
     if len(command.selection) != 1:
         raise SelectionResolutionError(
@@ -498,7 +664,7 @@ def _handle_extrude_profile(command: GeometryCommand, state: SelectionContext) -
             detail={"command_type": command.command_type, "selection": command.selection},
         )
     profile = _resolve_profile(state, command.selection[0])
-    hole_ids = command.parameters.get("holes", [])
+    hole_ids = command.parameters.get("holes", profile.holes)
     if hole_ids is None:
         hole_ids = []
     if not isinstance(hole_ids, list):
@@ -891,6 +1057,67 @@ def _copy_entity(entity: SelectionEntity, delta: Point2D, copy_id: str) -> Selec
     if isinstance(entity, Profile2DEntity):
         return Profile2DEntity(**{**entity.model_dump(), "id": copy_id, "vertices": [translate_point(vertex, delta) for vertex in entity.vertices]})
     raise SketchMathError(f"Unsupported entity for copy_linear: {entity.type}")
+
+
+def _circle_profile_vertices(center: Point2D, radius: float, segments: int) -> list[Point2D]:
+    vertices: list[Point2D] = []
+    for index in range(segments):
+        angle = -2.0 * math.pi * index / segments
+        vertices.append((center[0] + radius * math.cos(angle), center[1] + radius * math.sin(angle)))
+    vertices.append(vertices[0])
+    return vertices
+
+
+def _rectangle_base_id_from_selection(selection: list[str]) -> str:
+    for entity_id in selection:
+        if entity_id.startswith("profile_rect_"):
+            return entity_id.removeprefix("profile_")
+        parts = entity_id.rsplit("_", 1)
+        if len(parts) == 2 and parts[0].startswith("rect_") and parts[1] in {"a", "b", "c", "d", "ab", "bc", "cd", "da"}:
+            return parts[0]
+    raise SelectionResolutionError("set_rectangle_dimension requires a rectangle selection", detail={"selection": selection})
+
+
+def _rectangle_suffix(entity_id: str) -> str:
+    if entity_id.startswith("profile_rect_"):
+        return "profile"
+    parts = entity_id.rsplit("_", 1)
+    if len(parts) == 2 and parts[1] in {"a", "b", "c", "d", "ab", "bc", "cd", "da"}:
+        return parts[1]
+    raise SelectionResolutionError("Invalid rectangle entity id", detail={"entity_id": entity_id})
+
+
+def _resolve_rectangle_bundle(state: SelectionContext, base_id: str) -> dict[str, Any]:
+    expected = {
+        "a": f"{base_id}_a",
+        "b": f"{base_id}_b",
+        "c": f"{base_id}_c",
+        "d": f"{base_id}_d",
+        "ab": f"{base_id}_ab",
+        "bc": f"{base_id}_bc",
+        "cd": f"{base_id}_cd",
+        "da": f"{base_id}_da",
+        "profile": f"profile_{base_id}",
+    }
+    bundle = {key: state.get_entity(entity_id) for key, entity_id in expected.items()}
+    for key in ("a", "b", "c", "d"):
+        if not isinstance(bundle[key], Point2DEntity):
+            raise WrongEntityTypeError(
+                "Rectangle corner must be point_2d",
+                detail={"entity_id": expected[key], "expected": "point_2d", "actual": bundle[key].type},
+            )
+    for key in ("ab", "bc", "cd", "da"):
+        if not isinstance(bundle[key], Line2DEntity):
+            raise WrongEntityTypeError(
+                "Rectangle edge must be line_2d",
+                detail={"entity_id": expected[key], "expected": "line_2d", "actual": bundle[key].type},
+            )
+    if not isinstance(bundle["profile"], Profile2DEntity):
+        raise WrongEntityTypeError(
+            "Rectangle profile must be profile_2d",
+            detail={"entity_id": expected["profile"], "expected": "profile_2d", "actual": bundle["profile"].type},
+        )
+    return bundle
 
 
 def _resolve_points(state: SelectionContext, selection: list[str]) -> tuple[Point2DEntity, Point2DEntity]:

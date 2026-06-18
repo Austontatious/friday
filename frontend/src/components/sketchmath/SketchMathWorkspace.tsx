@@ -27,6 +27,7 @@ import {
   upsertSketchMathEntity,
 } from "../../services/sketchmath";
 import {
+  buildAddProfileHoleCommand,
   buildDeleteEntityCommand,
   buildDefineLineCommand,
   buildDefinePointCommand,
@@ -40,6 +41,7 @@ import {
   buildSolveConstraintsCommand,
   buildSetAngleCommand,
   buildSetLengthCommand,
+  buildSetRectangleDimensionCommand,
 } from "./commandBuilders";
 
 const CANVAS_WIDTH = 1200;
@@ -103,6 +105,19 @@ const pointsMatch = (point: SketchMathEntity | undefined, coords: [number, numbe
   !!point && isPointEntity(point) && point.coords[0] === coords[0] && point.coords[1] === coords[1];
 
 const distanceBetween = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+
+const profileCenter = (profile: Extract<SketchMathEntity, { type: "profile_2d" }>): Point | null => {
+  const vertices = profile.vertices.filter((vertex, index) => index === 0 || vertex[0] !== profile.vertices[0][0] || vertex[1] !== profile.vertices[0][1]);
+  if (vertices.length === 0) {
+    return null;
+  }
+  const xs = vertices.map((vertex) => vertex[0]);
+  const ys = vertices.map((vertex) => vertex[1]);
+  return {
+    x: Number(((Math.min(...xs) + Math.max(...xs)) / 2).toFixed(2)),
+    y: Number(((Math.min(...ys) + Math.max(...ys)) / 2).toFixed(2)),
+  };
+};
 
 const rectangleBaseIdFromPointId = (pointId: string): string | null => {
   const match = /^rect_(.+)_[abcd]$/.exec(pointId);
@@ -208,6 +223,7 @@ const SketchMathWorkspace = () => {
   const [dimensionEditedRectangleIds, setDimensionEditedRectangleIds] = useState<string[]>([]);
   const [deletePrompt, setDeletePrompt] = useState<DeletePromptState>(null);
   const [extrudeDepthValue, setExtrudeDepthValue] = useState("10");
+  const [holeDiameterValue, setHoleDiameterValue] = useState("8");
   const [cadFeatureSummary, setCadFeatureSummary] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -289,6 +305,12 @@ const SketchMathWorkspace = () => {
     const profile = committedEntities.find((entity) => entity.id === profileId);
     return profile && isClosedProfileEntity(profile) ? profile : null;
   }, [committedEntities, selectedRectangleBaseId]);
+  const selectedClosedProfile = useMemo(
+    () => selectedEntities.find(isClosedProfileEntity) || null,
+    [selectedEntities],
+  );
+  const activeProfileForHole = selectedRectangleProfile || selectedClosedProfile;
+  const activeProfileHoleCount = activeProfileForHole ? activeProfileForHole.holes?.length || 0 : null;
   const rectangleAnchorPoint = useMemo(() => {
     if (!selectedRectangleBaseId) {
       return null;
@@ -661,6 +683,30 @@ const SketchMathWorkspace = () => {
     setError(null);
   };
 
+  const previewCommand = async (command: SketchMathCommand): Promise<SketchMathOperationResult | null> => {
+    if (!sessionId) {
+      return null;
+    }
+    setPendingCommandText(asCommandText(command));
+    try {
+      const response = await previewSketchMathCommand(sessionId, command);
+      setPreviewResult(response.result);
+      setError(null);
+      return response.result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Preview failed";
+      setError(message);
+      toast({
+        title: "Preview failed",
+        description: message,
+        status: "error",
+        duration: 2500,
+        isClosable: true,
+      });
+      return null;
+    }
+  };
+
   const rejectProposal = () => {
     setTranslationOutcome(null);
     setPendingCommandText("");
@@ -692,6 +738,12 @@ const SketchMathWorkspace = () => {
       const message = err instanceof Error ? err.message : "Revert failed";
       setError(message);
     }
+  };
+
+  const clearDimensionPreview = () => {
+    setPreviewResult(null);
+    setPendingCommandText("");
+    setError(null);
   };
 
   const clearRectangleInteraction = () => {
@@ -1091,94 +1143,50 @@ const SketchMathWorkspace = () => {
     setError(null);
   };
 
-  const applyRectangleDimensions = async (width: number, height: number) => {
+  const previewRectangleDimension = async (dimension: "width" | "height", value: number) => {
     if (!sessionId || !rectangleDimensions) {
+      return;
+    }
+    if (!Number.isFinite(value) || value <= 0) {
+      setError("Rectangle dimension must be a positive number");
+      return;
+    }
+    const command = buildSetRectangleDimensionCommand(rectangleSelectionIds(rectangleDimensions.baseId), dimension, value, "mm");
+    await previewCommand(command);
+  };
+
+  const restoreRectangleSelection = (baseId: string, activeRectangleDetail: RectangleSelectionDetail | null) => {
+    const ids = rectangleIdsFromBaseId(baseId);
+    if (activeRectangleDetail?.kind === "edge") {
+      setSelectedEntityIds([ids.lineIds[activeRectangleDetail.edgeId]]);
+      setRectangleSelectionDetail(activeRectangleDetail);
+    } else if (activeRectangleDetail?.kind === "corner") {
+      setSelectedEntityIds([ids.pointIds[activeRectangleDetail.cornerId]]);
+      setRectangleSelectionDetail(activeRectangleDetail);
+    } else if (activeRectangleDetail?.kind === "profile") {
+      setSelectedEntityIds([ids.profileId]);
+      setRectangleSelectionDetail(activeRectangleDetail);
+    } else {
+      setSelectedEntityIds(rectangleSelectionIds(baseId));
+      setRectangleSelectionDetail(activeRectangleDetail?.kind === "rectangle" ? activeRectangleDetail : null);
+    }
+  };
+
+  const applyRectangleDimensions = async (width: number, height: number) => {
+    if (!rectangleDimensions) {
       return;
     }
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
       setError("Rectangle width and height must be positive numbers");
       return;
     }
-
-    const ids = rectangleIdsFromBaseId(rectangleDimensions.baseId);
-    const pointById = new Map(
-      committedEntities
-        .filter(isPointEntity)
-        .map((entity) => [entity.id, entity] as const),
-    );
-    const lineById = new Map(
-      committedEntities
-        .filter(isLineEntity)
-        .map((entity) => [entity.id, entity] as const),
-    );
-    const a = pointById.get(ids.pointIds.a);
-    const b = pointById.get(ids.pointIds.b);
-    const c = pointById.get(ids.pointIds.c);
-    const d = pointById.get(ids.pointIds.d);
-    const top = lineById.get(ids.lineIds.ab);
-    const left = lineById.get(ids.lineIds.da);
-    if (!a || !b || !c || !d || !top || !left) {
-      setError("Rectangle geometry is incomplete");
+    if (width !== rectangleDimensions.width) {
+      await previewRectangleDimension("width", width);
       return;
     }
-
-    const signX = top.end[0] >= top.start[0] ? 1 : -1;
-    const signY = left.start[1] >= left.end[1] ? 1 : -1;
-    const topLeft = { x: top.start[0], y: top.start[1] };
-    const topRight = { x: Number((top.start[0] + signX * width).toFixed(2)), y: top.start[1] };
-    const bottomLeft = { x: top.start[0], y: Number((top.start[1] + signY * height).toFixed(2)) };
-    const bottomRight = { x: topRight.x, y: bottomLeft.y };
-    const updates: SketchMathEntity[] = [
-      { ...a, coords: [topLeft.x, topLeft.y] },
-      { ...b, coords: [topRight.x, topRight.y] },
-      { ...c, coords: [bottomRight.x, bottomRight.y] },
-      { ...d, coords: [bottomLeft.x, bottomLeft.y] },
-      { id: ids.lineIds.ab, type: "line_2d", start: [topLeft.x, topLeft.y], end: [topRight.x, topRight.y], locked: false, label: "AB" },
-      { id: ids.lineIds.bc, type: "line_2d", start: [topRight.x, topRight.y], end: [bottomRight.x, bottomRight.y], locked: false, label: "BC" },
-      { id: ids.lineIds.cd, type: "line_2d", start: [bottomRight.x, bottomRight.y], end: [bottomLeft.x, bottomLeft.y], locked: false, label: "CD" },
-      { id: ids.lineIds.da, type: "line_2d", start: [bottomLeft.x, bottomLeft.y], end: [topLeft.x, topLeft.y], locked: false, label: "DA" },
-      {
-        id: ids.profileId,
-        type: "profile_2d",
-        vertices: [
-          [topLeft.x, topLeft.y],
-          [topRight.x, topRight.y],
-          [bottomRight.x, bottomRight.y],
-          [bottomLeft.x, bottomLeft.y],
-        ],
-        area: Number((width * height).toFixed(2)),
-        winding: "counterclockwise",
-        warnings: [],
-        closed: true,
-        locked: false,
-        label: ids.profileId,
-      },
-    ];
-
-    const activeRectangleDetail = rectangleSelectionDetail?.baseId === rectangleDimensions.baseId ? rectangleSelectionDetail : null;
-
-    try {
-      for (const entity of updates) {
-        await upsertSketchMathEntity(sessionId, entity, "commit");
-      }
-      await refreshSession();
-      if (activeRectangleDetail?.kind === "edge") {
-        setSelectedEntityIds([ids.lineIds[activeRectangleDetail.edgeId]]);
-        setRectangleSelectionDetail(activeRectangleDetail);
-      } else if (activeRectangleDetail?.kind === "corner") {
-        setSelectedEntityIds([ids.pointIds[activeRectangleDetail.cornerId]]);
-        setRectangleSelectionDetail(activeRectangleDetail);
-      } else if (activeRectangleDetail?.kind === "profile") {
-        setSelectedEntityIds([ids.profileId]);
-        setRectangleSelectionDetail(activeRectangleDetail);
-      } else {
-        setSelectedEntityIds(rectangleSelectionIds(rectangleDimensions.baseId));
-        setRectangleSelectionDetail(null);
-      }
-      setDimensionEditedRectangleIds((current) => Array.from(new Set([...current, rectangleDimensions.baseId])));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update rectangle dimensions");
+    if (height !== rectangleDimensions.height) {
+      await previewRectangleDimension("height", height);
+      return;
     }
   };
 
@@ -1191,10 +1199,32 @@ const SketchMathWorkspace = () => {
       return;
     }
     const value = Number(dimensionEditor.value);
-    const nextWidth = dimensionEditor.dimension === "width" ? value : rectangleDimensions.width;
-    const nextHeight = dimensionEditor.dimension === "height" ? value : rectangleDimensions.height;
-    await applyRectangleDimensions(nextWidth, nextHeight);
-    setDimensionEditor(null);
+    await previewRectangleDimension(dimensionEditor.dimension, value);
+  };
+
+  const commitPreview = async () => {
+    if (!previewResult) {
+      return;
+    }
+    const previewCommandPayload = previewResult.command;
+    const activeRectangleDetail = rectangleDimensions?.baseId && rectangleSelectionDetail?.baseId === rectangleDimensions.baseId ? rectangleSelectionDetail : null;
+    const baseId = previewCommandPayload.selection.map(rectangleBaseIdFromEntityId).find((value): value is string => Boolean(value)) || rectangleDimensions?.baseId || null;
+    const result = await commitCommand(previewCommandPayload);
+    if (!result) {
+      return;
+    }
+    if (previewCommandPayload.command_type === "set_rectangle_dimension" && baseId) {
+      setDimensionEditor(null);
+      setDimensionEditedRectangleIds((current) => Array.from(new Set([...current, baseId])));
+      restoreRectangleSelection(baseId, activeRectangleDetail);
+      return;
+    }
+    if (previewCommandPayload.command_type === "add_profile_hole") {
+      const profileId = previewCommandPayload.selection[0];
+      setSelectedEntityIds(profileId ? [profileId] : []);
+      const profileBaseId = profileId ? rectangleBaseIdFromEntityId(profileId) : null;
+      setRectangleSelectionDetail(profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
+    }
   };
 
   const handleFixRectangleCorner = async () => {
@@ -1258,6 +1288,28 @@ const SketchMathWorkspace = () => {
     const baseId = rectangleBaseIdFromEntityId(profile.id);
     setRectangleSelectionDetail(baseId ? { kind: "profile", baseId } : null);
     setError(null);
+  };
+
+  const handleAddProfileHole = async () => {
+    if (!activeProfileForHole) {
+      setError("Select a rectangle or closed profile before adding a hole");
+      return;
+    }
+    const diameter = Number(holeDiameterValue);
+    if (!Number.isFinite(diameter) || diameter <= 0) {
+      setError("Hole diameter must be a positive number");
+      return;
+    }
+    const center = profileCenter(activeProfileForHole);
+    if (!center) {
+      setError("Selected profile does not have usable bounds");
+      return;
+    }
+    const command = buildAddProfileHoleCommand(activeProfileForHole.id, Number(diameter.toFixed(2)), center, "mm");
+    setSelectedEntityIds([activeProfileForHole.id]);
+    const baseId = rectangleBaseIdFromEntityId(activeProfileForHole.id);
+    setRectangleSelectionDetail(baseId ? { kind: "profile", baseId } : null);
+    await previewCommand(command);
   };
 
   const deleteRectangleCascade = async (baseId: string) => {
@@ -1621,9 +1673,33 @@ const SketchMathWorkspace = () => {
                     Clear sketch
                   </Button>
                 </HStack>
+                {activeProfileForHole ? (
+                  <HStack spacing={2} flexWrap="wrap" mt={3}>
+                    <Input
+                      type="number"
+                      aria-label="Hole diameter"
+                      value={holeDiameterValue}
+                      onChange={(event) => setHoleDiameterValue(event.target.value)}
+                      width="110px"
+                    />
+                    <Button size="sm" onClick={() => void handleAddProfileHole()}>
+                      Add Hole
+                    </Button>
+                  </HStack>
+                ) : null}
                 <Text fontSize="sm" opacity={0.75} mt={2}>
                   Select geometry on the canvas, then apply constraints here.
                 </Text>
+                {previewResult?.status === "preview" ? (
+                  <HStack spacing={2} flexWrap="wrap" mt={3} data-testid="sketchmath-preview-controls">
+                    <Button size="sm" onClick={() => void commitPreview()}>
+                      Commit Preview
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={clearDimensionPreview}>
+                      Revert Preview
+                    </Button>
+                  </HStack>
+                ) : null}
               </Box>
               <Box>
                 <Text fontWeight="600" mb={2}>
@@ -1673,6 +1749,7 @@ const SketchMathWorkspace = () => {
             rectangleSelectionDetail={rectangleSelectionDetail}
             rectangleAnchorSummary={rectangleAnchorSummary}
             profileSummary={profileSummary}
+            profileHoleCount={activeProfileHoleCount}
             rectangleWidthDraft={rectangleWidthDraft}
             rectangleHeightDraft={rectangleHeightDraft}
             dimensionEditor={dimensionEditor}

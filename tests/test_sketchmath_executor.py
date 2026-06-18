@@ -375,6 +375,182 @@ def test_rectangle_batch_keeps_generated_points_aligned_with_edges_and_profile()
     assert profile.vertices == [(10.0, 20.0), (50.0, 20.0), (50.0, 45.0), (10.0, 45.0), (10.0, 20.0)]
 
 
+def test_plain_set_distance_does_not_preserve_rectangle_edges_and_profile() -> None:
+    session = _session([])
+    session.execute(_rectangle_batch_command())
+
+    result = session.execute(
+        _command(
+            "set_distance",
+            "cmd_rect_width_set_distance",
+            selection=["rect_test_a", "rect_test_b"],
+            parameters={"distance": 60.0, "unit": "mm", "anchor": "point_a"},
+        )
+    )
+
+    coords = _coords_by_id(result.after)
+    assert coords["rect_test_b"] == pytest.approx((70.0, 20.0))
+    assert coords["rect_test_c"] == pytest.approx((50.0, 45.0))
+
+    top = result.after.get_entity("rect_test_ab")
+    right = result.after.get_entity("rect_test_bc")
+    bottom = result.after.get_entity("rect_test_cd")
+    profile = result.after.get_entity("profile_rect_test")
+    assert top.end == pytest.approx((50.0, 20.0))
+    assert right.start == pytest.approx((50.0, 20.0))
+    assert right.end == pytest.approx((50.0, 45.0))
+    assert bottom.start == pytest.approx((50.0, 45.0))
+    assert profile.vertices == [(10.0, 20.0), (50.0, 20.0), (50.0, 45.0), (10.0, 45.0), (10.0, 20.0)]
+
+
+def test_set_rectangle_dimension_preview_updates_points_edges_and_profile_without_commit() -> None:
+    session = _session([])
+    session.execute(_rectangle_batch_command())
+
+    result = session.execute(
+        _command(
+            "set_rectangle_dimension",
+            "cmd_rect_width_preview",
+            selection=["rect_test_ab"],
+            parameters={"dimension": "width", "value": 60.0, "unit": "mm"},
+        )
+    )
+
+    assert result.status == "preview"
+    assert result.value == pytest.approx(60.0)
+    assert result.metadata["solver_status"] == "underconstrained"
+    assert _coords_by_id(session.state)["rect_test_c"] == pytest.approx((50.0, 45.0))
+    assert _coords_by_id(result.after) == {
+        "rect_test_a": (10.0, 20.0),
+        "rect_test_b": pytest.approx((70.0, 20.0)),
+        "rect_test_c": pytest.approx((70.0, 45.0)),
+        "rect_test_d": (10.0, 45.0),
+    }
+    assert result.after.get_entity("rect_test_ab").end == pytest.approx((70.0, 20.0))
+    assert result.after.get_entity("rect_test_bc").start == pytest.approx((70.0, 20.0))
+    assert result.after.get_entity("rect_test_bc").end == pytest.approx((70.0, 45.0))
+    assert result.after.get_entity("rect_test_cd").start == pytest.approx((70.0, 45.0))
+    assert result.after.get_entity("profile_rect_test").vertices == [
+        (10.0, 20.0),
+        (70.0, 20.0),
+        (70.0, 45.0),
+        (10.0, 45.0),
+        (10.0, 20.0),
+    ]
+
+
+def test_set_rectangle_dimension_commit_and_revert_keep_rectangle_semantic() -> None:
+    session = _session([])
+    session.execute(_rectangle_batch_command())
+
+    result = session.execute(
+        _command(
+            "set_rectangle_dimension",
+            "cmd_rect_height_commit",
+            mode="commit",
+            selection=["profile_rect_test"],
+            parameters={"dimension": "height", "value": 15.0, "unit": "mm"},
+        )
+    )
+
+    assert result.status == "committed"
+    assert _coords_by_id(session.state)["rect_test_c"] == pytest.approx((50.0, 35.0))
+    assert session.state.get_entity("rect_test_bc").end == pytest.approx((50.0, 35.0))
+    assert session.state.get_entity("profile_rect_test").vertices == [
+        (10.0, 20.0),
+        (50.0, 20.0),
+        (50.0, 35.0),
+        (10.0, 35.0),
+        (10.0, 20.0),
+    ]
+
+    reverted = session.revert()
+
+    assert _coords_by_id(reverted)["rect_test_c"] == pytest.approx((50.0, 45.0))
+    assert reverted.get_entity("profile_rect_test").vertices == [
+        (10.0, 20.0),
+        (50.0, 20.0),
+        (50.0, 45.0),
+        (10.0, 45.0),
+        (10.0, 20.0),
+    ]
+
+
+def test_add_profile_hole_preview_does_not_mutate_session() -> None:
+    session = _session([])
+    session.execute(_rectangle_batch_command())
+
+    result = session.execute(
+        _command(
+            "add_profile_hole",
+            "cmd_add_hole_preview",
+            selection=["profile_rect_test"],
+            parameters={"diameter": 8.0, "unit": "mm", "center": [30.0, 32.5]},
+        )
+    )
+
+    assert result.status == "preview"
+    assert "hole_profile_rect_test_cmd_add_hole_preview" in result.changed_entity_ids
+    assert result.after.get_entity("profile_rect_test").holes == ["hole_profile_rect_test_cmd_add_hole_preview"]
+    hole = result.after.get_entity("hole_profile_rect_test_cmd_add_hole_preview")
+    assert hole.type == "profile_2d"
+    assert hole.closed is True
+    assert hole.area == pytest.approx(50.265, rel=1e-2)
+    assert session.state.get_entity("profile_rect_test").holes == []
+    assert "hole_profile_rect_test_cmd_add_hole_preview" not in {item.id for item in session.state.items}
+    assert session.history.records[-1].command.command_type == "batch"
+
+
+def test_add_profile_hole_commit_persists_hole_profile_and_replayable_history() -> None:
+    session = _session([])
+    session.execute(_rectangle_batch_command())
+
+    result = session.execute(
+        _command(
+            "add_profile_hole",
+            "cmd_add_hole_commit",
+            mode="commit",
+            selection=["profile_rect_test"],
+            parameters={"diameter": 8.0, "unit": "mm", "center": [30.0, 32.5]},
+        )
+    )
+
+    hole_id = "hole_profile_rect_test_cmd_add_hole_commit"
+    assert result.status == "committed"
+    assert session.state.get_entity("profile_rect_test").holes == [hole_id]
+    assert session.state.get_entity(hole_id).winding == "clockwise"
+    assert session.history.records[-1].command.command_type == "add_profile_hole"
+    assert session.history.replay(session.initial_state).get_entity("profile_rect_test").holes == [hole_id]
+
+
+@pytest.mark.parametrize(
+    ("selection", "parameters", "error_code", "detail_code"),
+    [
+        ([], {"diameter": 8.0, "unit": "mm", "center": [30.0, 32.5]}, "selection_resolution_error", "missing_profile_selection"),
+        (["profile_rect_test"], {"diameter": 0.0, "unit": "mm", "center": [30.0, 32.5]}, "selection_resolution_error", "invalid_hole_diameter"),
+        (["profile_rect_test"], {"diameter": 8.0, "unit": "mm", "center": [80.0, 32.5]}, "selection_resolution_error", "hole_outside_outer"),
+        (["profile_rect_test"], {"diameter": 40.0, "unit": "mm", "center": [30.0, 32.5]}, "selection_resolution_error", "profile_intersection"),
+    ],
+)
+def test_add_profile_hole_invalid_cases_are_structured(selection, parameters, error_code, detail_code) -> None:
+    session = _session([])
+    session.execute(_rectangle_batch_command())
+
+    with pytest.raises(Exception) as exc_info:
+        session.execute(
+            _command(
+                "add_profile_hole",
+                "cmd_add_hole_invalid",
+                selection=selection,
+                parameters=parameters,
+            )
+        )
+
+    payload = exc_info.value.to_dict()
+    assert payload["code"] == error_code
+    assert payload["detail"]["error_code"] == detail_code
+
+
 def test_revert_restores_prior_state() -> None:
     session = _session(
         [

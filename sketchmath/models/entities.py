@@ -43,6 +43,7 @@ class Profile2DEntity(_EntityBase):
     winding: Literal["clockwise", "counterclockwise", "degenerate"]
     warnings: list[str] = Field(default_factory=list)
     closed: bool = True
+    holes: list[str] = Field(default_factory=list)
 
 
 SelectionEntity = Annotated[

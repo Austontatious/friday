@@ -16,6 +16,7 @@ type SelectionInspectorProps = {
     | null;
   rectangleAnchorSummary: string | null;
   profileSummary: string;
+  profileHoleCount: number | null;
   rectangleWidthDraft: string;
   rectangleHeightDraft: string;
   dimensionEditor: { baseId: string; dimension: "width" | "height"; value: string } | null;
@@ -50,6 +51,7 @@ const SelectionInspector = ({
   rectangleSelectionDetail,
   rectangleAnchorSummary,
   profileSummary,
+  profileHoleCount,
   rectangleWidthDraft,
   rectangleHeightDraft,
   dimensionEditor,
@@ -160,6 +162,11 @@ const SelectionInspector = ({
           <Text fontSize="sm" opacity={0.8}>
             {profileSummary}
           </Text>
+          {profileHoleCount !== null ? (
+            <Text fontSize="sm" opacity={0.8}>
+              Profile holes: {profileHoleCount}
+            </Text>
+          ) : null}
           {rectangleSelectionDetail?.kind !== "corner" ? (
             <Button size="sm" mt={2} onClick={onFixRectangleCorner}>
               Fix corner

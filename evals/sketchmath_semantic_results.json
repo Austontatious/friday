@@ -1,7 +1,7 @@
 {
-  "case_count": 36,
+  "case_count": 38,
   "failed": 0,
-  "passed": 36,
+  "passed": 38,
   "results": [
     {
       "diagnostic": "ok",
@@ -29,6 +29,395 @@
         "status": "preview",
         "unit": null,
         "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "geometry_add_profile_hole",
+      "path": "evals/cases/sketchmath_geometry_add_profile_hole.json",
+      "result": {
+        "after": {
+          "hole_profile_rect_eval_cmd_add_profile_hole_eval": {
+            "area": 49.9431224361291,
+            "vertices": [
+              [
+                34.0,
+                32.5
+              ],
+              [
+                33.92314112161292,
+                31.719638711935488
+              ],
+              [
+                33.695518130045144,
+                30.96926627053964
+              ],
+              [
+                33.32587844921018,
+                30.27771906792159
+              ],
+              [
+                32.82842712474619,
+                29.67157287525381
+              ],
+              [
+                32.22228093207841,
+                29.17412155078982
+              ],
+              [
+                31.53073372946036,
+                28.804481869954852
+              ],
+              [
+                30.780361288064512,
+                28.57685887838708
+              ],
+              [
+                30.0,
+                28.5
+              ],
+              [
+                29.219638711935488,
+                28.57685887838708
+              ],
+              [
+                28.46926627053964,
+                28.804481869954852
+              ],
+              [
+                27.77771906792159,
+                29.174121550789817
+              ],
+              [
+                27.17157287525381,
+                29.67157287525381
+              ],
+              [
+                26.67412155078982,
+                30.27771906792159
+              ],
+              [
+                26.304481869954852,
+                30.96926627053964
+              ],
+              [
+                26.07685887838708,
+                31.719638711935485
+              ],
+              [
+                26.0,
+                32.5
+              ],
+              [
+                26.07685887838708,
+                33.28036128806451
+              ],
+              [
+                26.304481869954852,
+                34.03073372946036
+              ],
+              [
+                26.674121550789817,
+                34.722280932078405
+              ],
+              [
+                27.17157287525381,
+                35.32842712474619
+              ],
+              [
+                27.77771906792159,
+                35.82587844921018
+              ],
+              [
+                28.469266270539638,
+                36.195518130045144
+              ],
+              [
+                29.219638711935485,
+                36.42314112161292
+              ],
+              [
+                30.0,
+                36.5
+              ],
+              [
+                30.780361288064512,
+                36.42314112161292
+              ],
+              [
+                31.53073372946036,
+                36.195518130045144
+              ],
+              [
+                32.222280932078405,
+                35.82587844921018
+              ],
+              [
+                32.82842712474619,
+                35.32842712474619
+              ],
+              [
+                33.32587844921018,
+                34.722280932078405
+              ],
+              [
+                33.695518130045144,
+                34.03073372946036
+              ],
+              [
+                33.92314112161292,
+                33.28036128806451
+              ],
+              [
+                34.0,
+                32.5
+              ]
+            ],
+            "warnings": [],
+            "winding": "clockwise"
+          },
+          "profile_rect_eval": {
+            "area": 1000.0,
+            "vertices": [
+              [
+                10.0,
+                20.0
+              ],
+              [
+                50.0,
+                20.0
+              ],
+              [
+                50.0,
+                45.0
+              ],
+              [
+                10.0,
+                45.0
+              ],
+              [
+                10.0,
+                20.0
+              ]
+            ],
+            "warnings": [],
+            "winding": "counterclockwise"
+          }
+        },
+        "changed_entity_ids": [
+          "profile_rect_eval",
+          "hole_profile_rect_eval_cmd_add_profile_hole_eval"
+        ],
+        "metadata": {
+          "center": [
+            30.0,
+            32.5
+          ],
+          "diameter": 8.0,
+          "history_length": 0,
+          "hole_id": "hole_profile_rect_eval_cmd_add_profile_hole_eval",
+          "profile_hole_validation": {
+            "details": {
+              "hole_areas": [
+                49.94312243612884
+              ],
+              "hole_profile_ids": [
+                "hole_profile_rect_eval_cmd_add_profile_hole_eval"
+              ],
+              "hole_windings": [
+                "clockwise"
+              ],
+              "outer_area": 1000.0,
+              "outer_profile_id": "profile_rect_eval",
+              "outer_winding": "counterclockwise"
+            },
+            "error_code": null,
+            "holes": [
+              {
+                "area": 49.94312243612884,
+                "closed": true,
+                "id": "hole_profile_rect_eval_cmd_add_profile_hole_eval",
+                "original_winding": "clockwise",
+                "vertices": [
+                  [
+                    34.0,
+                    32.5
+                  ],
+                  [
+                    33.92314112161292,
+                    31.719638711935488
+                  ],
+                  [
+                    33.695518130045144,
+                    30.96926627053964
+                  ],
+                  [
+                    33.32587844921018,
+                    30.27771906792159
+                  ],
+                  [
+                    32.82842712474619,
+                    29.67157287525381
+                  ],
+                  [
+                    32.22228093207841,
+                    29.17412155078982
+                  ],
+                  [
+                    31.53073372946036,
+                    28.804481869954852
+                  ],
+                  [
+                    30.780361288064512,
+                    28.57685887838708
+                  ],
+                  [
+                    30.0,
+                    28.5
+                  ],
+                  [
+                    29.219638711935488,
+                    28.57685887838708
+                  ],
+                  [
+                    28.46926627053964,
+                    28.804481869954852
+                  ],
+                  [
+                    27.77771906792159,
+                    29.174121550789817
+                  ],
+                  [
+                    27.17157287525381,
+                    29.67157287525381
+                  ],
+                  [
+                    26.67412155078982,
+                    30.27771906792159
+                  ],
+                  [
+                    26.304481869954852,
+                    30.96926627053964
+                  ],
+                  [
+                    26.07685887838708,
+                    31.719638711935485
+                  ],
+                  [
+                    26.0,
+                    32.5
+                  ],
+                  [
+                    26.07685887838708,
+                    33.28036128806451
+                  ],
+                  [
+                    26.304481869954852,
+                    34.03073372946036
+                  ],
+                  [
+                    26.674121550789817,
+                    34.722280932078405
+                  ],
+                  [
+                    27.17157287525381,
+                    35.32842712474619
+                  ],
+                  [
+                    27.77771906792159,
+                    35.82587844921018
+                  ],
+                  [
+                    28.469266270539638,
+                    36.195518130045144
+                  ],
+                  [
+                    29.219638711935485,
+                    36.42314112161292
+                  ],
+                  [
+                    30.0,
+                    36.5
+                  ],
+                  [
+                    30.780361288064512,
+                    36.42314112161292
+                  ],
+                  [
+                    31.53073372946036,
+                    36.195518130045144
+                  ],
+                  [
+                    32.222280932078405,
+                    35.82587844921018
+                  ],
+                  [
+                    32.82842712474619,
+                    35.32842712474619
+                  ],
+                  [
+                    33.32587844921018,
+                    34.722280932078405
+                  ],
+                  [
+                    33.695518130045144,
+                    34.03073372946036
+                  ],
+                  [
+                    33.92314112161292,
+                    33.28036128806451
+                  ],
+                  [
+                    34.0,
+                    32.5
+                  ]
+                ],
+                "warnings": [],
+                "winding": "clockwise"
+              }
+            ],
+            "message": null,
+            "ok": true,
+            "outer": {
+              "area": 1000.0,
+              "closed": true,
+              "id": "profile_rect_eval",
+              "original_winding": "counterclockwise",
+              "vertices": [
+                [
+                  10.0,
+                  20.0
+                ],
+                [
+                  50.0,
+                  20.0
+                ],
+                [
+                  50.0,
+                  45.0
+                ],
+                [
+                  10.0,
+                  45.0
+                ],
+                [
+                  10.0,
+                  20.0
+                ]
+              ],
+              "warnings": [],
+              "winding": "counterclockwise"
+            },
+            "warnings": []
+          },
+          "profile_id": "profile_rect_eval",
+          "segments": 32,
+          "unit": "mm"
+        },
+        "status": "preview",
+        "unit": "mm",
+        "value": 8.0
       },
       "status": "pass"
     },
@@ -768,6 +1157,125 @@
     },
     {
       "diagnostic": "ok",
+      "name": "set_rectangle_dimension updates rectangle bundle and profile",
+      "path": "evals/cases/sketchmath_geometry_set_rectangle_dimension.json",
+      "result": {
+        "after": {
+          "profile_rect_eval": {
+            "area": 1500.0,
+            "vertices": [
+              [
+                10.0,
+                20.0
+              ],
+              [
+                70.0,
+                20.0
+              ],
+              [
+                70.0,
+                45.0
+              ],
+              [
+                10.0,
+                45.0
+              ],
+              [
+                10.0,
+                20.0
+              ]
+            ],
+            "warnings": [],
+            "winding": "counterclockwise"
+          },
+          "rect_eval_a": [
+            10.0,
+            20.0
+          ],
+          "rect_eval_ab": {
+            "end": [
+              70.0,
+              20.0
+            ],
+            "start": [
+              10.0,
+              20.0
+            ]
+          },
+          "rect_eval_b": [
+            70.0,
+            20.0
+          ],
+          "rect_eval_bc": {
+            "end": [
+              70.0,
+              45.0
+            ],
+            "start": [
+              70.0,
+              20.0
+            ]
+          },
+          "rect_eval_c": [
+            70.0,
+            45.0
+          ],
+          "rect_eval_cd": {
+            "end": [
+              10.0,
+              45.0
+            ],
+            "start": [
+              70.0,
+              45.0
+            ]
+          },
+          "rect_eval_d": [
+            10.0,
+            45.0
+          ],
+          "rect_eval_da": {
+            "end": [
+              10.0,
+              20.0
+            ],
+            "start": [
+              10.0,
+              45.0
+            ]
+          }
+        },
+        "changed_entity_ids": [
+          "rect_eval_a",
+          "rect_eval_b",
+          "rect_eval_c",
+          "rect_eval_d",
+          "rect_eval_ab",
+          "rect_eval_bc",
+          "rect_eval_cd",
+          "rect_eval_da",
+          "profile_rect_eval"
+        ],
+        "metadata": {
+          "area": 1500.0,
+          "base_id": "rect_eval",
+          "dimension": "width",
+          "height": 25.0,
+          "history_length": 0,
+          "profile_status": "valid",
+          "solver_status": "underconstrained",
+          "warnings": [],
+          "width": 60.0,
+          "winding": "counterclockwise"
+        },
+        "status": "preview",
+        "unit": "mm",
+        "value": 60.0
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
       "name": "sketchmath_geometry_translate",
       "path": "evals/cases/sketchmath_geometry_translate.json",
       "result": {
@@ -1263,7 +1771,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_equal_angle.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_d5649fde3968",
+          "command_id": "cmd_translate_99c5df6df353",
           "command_type": "make_equal_angle",
           "mode": "preview",
           "parameters": {},
@@ -1289,7 +1797,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_equal_length.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_e432b4f7fd0d",
+          "command_id": "cmd_translate_edffd426b476",
           "command_type": "make_equal_length",
           "mode": "preview",
           "parameters": {},
@@ -1313,7 +1821,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_make_line_polar.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_bdd3b00abbdd",
+          "command_id": "cmd_translate_e2f167f9d5bb",
           "command_type": "set_line_polar",
           "mode": "preview",
           "parameters": {
@@ -1342,7 +1850,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_mirror.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_f2e6324827b6",
+          "command_id": "cmd_translate_c2e6df4ecf19",
           "command_type": "mirror",
           "mode": "preview",
           "parameters": {
@@ -1365,11 +1873,11 @@
       "path": "evals/cases/sketchmath_translator_slice5_profile.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_79d9ff1e6a23",
+          "command_id": "cmd_translate_4c162e9bd0b4",
           "command_type": "make_profile",
           "mode": "preview",
           "parameters": {
-            "name": "profile_497384ab"
+            "name": "profile_fb96e465"
           },
           "selection": [
             "point_A",
@@ -1391,7 +1899,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_rotate.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_4abc1fb9e4e6",
+          "command_id": "cmd_translate_02337f80d24f",
           "command_type": "rotate",
           "mode": "preview",
           "parameters": {
@@ -1419,7 +1927,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_set_angle.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_3f9d8aedf8fd",
+          "command_id": "cmd_translate_bb7bcc0c5fab",
           "command_type": "set_angle",
           "mode": "preview",
           "parameters": {
@@ -1445,7 +1953,7 @@
       "path": "evals/cases/sketchmath_translator_slice5_translate.json",
       "result": {
         "command": {
-          "command_id": "cmd_translate_bbea4f5c0054",
+          "command_id": "cmd_translate_067de3c6b4b4",
           "command_type": "translate",
           "mode": "preview",
           "parameters": {

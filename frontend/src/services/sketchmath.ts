@@ -42,6 +42,7 @@ export type SketchMathProfileEntity = {
   vertices: [number, number][];
   area: number;
   winding: "clockwise" | "counterclockwise" | "degenerate";
+  holes?: string[];
   warnings?: string[];
   closed?: boolean;
   locked?: boolean;

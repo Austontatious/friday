@@ -21,7 +21,7 @@ type SketchCanvas2DProps = {
   onCanvasMouseMove: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
   onCanvasMouseUp: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
   onCanvasContextMenu: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
-  onEntityClick: (entityId: string, event: React.MouseEvent<SVGGElement | SVGCircleElement>) => void;
+  onEntityClick: (entityId: string, event: React.MouseEvent<SVGGElement | SVGCircleElement | SVGPolygonElement>) => void;
   onEntityMouseDown?: (entityId: string, entityType: SketchMathEntity["type"], event: React.MouseEvent<SVGGElement>) => void;
   onDimensionLabelEdit?: (baseId: string, dimension: "width" | "height") => void;
 };

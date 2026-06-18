@@ -1,4 +1,10 @@
-import { buildDeleteEntityCommand, buildSetLengthCommand, buildTranslateCommand } from "./commandBuilders";
+import {
+  buildAddProfileHoleCommand,
+  buildDeleteEntityCommand,
+  buildSetLengthCommand,
+  buildSetRectangleDimensionCommand,
+  buildTranslateCommand,
+} from "./commandBuilders";
 
 describe("SketchMath command builders", () => {
   it("generates a valid set length GeometryCommand", () => {
@@ -16,6 +22,33 @@ describe("SketchMath command builders", () => {
 
     expect(command.command_type).toBe("delete_entity");
     expect(command.selection).toEqual(["point_A", "point_B"]);
+  });
+
+  it("generates a typed rectangle dimension command for semantic rectangle edits", () => {
+    const selection = [
+      "rect_test_a",
+      "rect_test_b",
+      "rect_test_c",
+      "rect_test_d",
+      "rect_test_ab",
+      "rect_test_bc",
+      "rect_test_cd",
+      "rect_test_da",
+      "profile_rect_test",
+    ];
+    const command = buildSetRectangleDimensionCommand(selection, "width", 60, "mm");
+
+    expect(command.command_type).toBe("set_rectangle_dimension");
+    expect(command.selection).toEqual(selection);
+    expect(command.parameters).toEqual({ dimension: "width", value: 60, unit: "mm" });
+  });
+
+  it("generates a typed add profile hole command", () => {
+    const command = buildAddProfileHoleCommand("profile_rect_A", 12, { x: 280, y: 170 }, "mm");
+
+    expect(command.command_type).toBe("add_profile_hole");
+    expect(command.selection).toEqual(["profile_rect_A"]);
+    expect(command.parameters).toEqual({ diameter: 12, unit: "mm", center: [280, 170] });
   });
 
   it("marks delete commands as cascade only when requested", () => {

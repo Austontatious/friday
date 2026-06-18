@@ -33,6 +33,18 @@ export const buildDefineLineCommand = (start: Point, end: Point, name: string, l
 export const buildSetLengthCommand = (selection: string[], length: number, unit: string, anchor: "point_a" | "point_b" | "midpoint" = "midpoint"): SketchMathCommand =>
   baseCommand("set_distance", selection.slice(0, 2), { distance: length, unit, anchor });
 
+export const buildSetRectangleDimensionCommand = (
+  selection: string[],
+  dimension: "width" | "height",
+  value: number,
+  unit: string = "mm",
+): SketchMathCommand =>
+  baseCommand("set_rectangle_dimension", selection, {
+    dimension,
+    value,
+    unit,
+  });
+
 export const buildSetAngleCommand = (selection: string[], angle: number, angleUnit: string = "deg"): SketchMathCommand =>
   baseCommand("set_angle", selection.slice(0, 3), { angle, angle_unit: angleUnit });
 
@@ -56,6 +68,13 @@ export const buildExtrudeProfileCommand = (profileId: string, depth: number, uni
     depth,
     unit,
     direction: "positive_z",
+  });
+
+export const buildAddProfileHoleCommand = (profileId: string, diameter: number, center: Point, unit: string = "mm"): SketchMathCommand =>
+  baseCommand("add_profile_hole", [profileId], {
+    diameter,
+    unit,
+    center: [Number(center.x.toFixed(2)), Number(center.y.toFixed(2))],
   });
 
 export const buildTranslateCommand = (selection: string[], vector: Point): SketchMathCommand =>

@@ -1,0 +1,76 @@
+{
+  "name": "set_rectangle_dimension updates rectangle bundle and profile",
+  "input": {
+    "selection_context": {
+      "selection_set_id": "eval_rectangle_dimension",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "rect_eval_a", "type": "point_2d", "coords": [10, 20], "locked": false},
+        {"id": "rect_eval_b", "type": "point_2d", "coords": [50, 20], "locked": false},
+        {"id": "rect_eval_c", "type": "point_2d", "coords": [50, 45], "locked": false},
+        {"id": "rect_eval_d", "type": "point_2d", "coords": [10, 45], "locked": false},
+        {"id": "rect_eval_ab", "type": "line_2d", "start": [10, 20], "end": [50, 20], "locked": false},
+        {"id": "rect_eval_bc", "type": "line_2d", "start": [50, 20], "end": [50, 45], "locked": false},
+        {"id": "rect_eval_cd", "type": "line_2d", "start": [50, 45], "end": [10, 45], "locked": false},
+        {"id": "rect_eval_da", "type": "line_2d", "start": [10, 45], "end": [10, 20], "locked": false},
+        {
+          "id": "profile_rect_eval",
+          "type": "profile_2d",
+          "vertices": [[10, 20], [50, 20], [50, 45], [10, 45], [10, 20]],
+          "area": 1000,
+          "winding": "counterclockwise",
+          "warnings": [],
+          "closed": true,
+          "locked": false
+        }
+      ],
+      "constraints": [],
+      "named_references": {}
+    },
+    "command": {
+      "version": "0.1",
+      "command_id": "eval_set_rectangle_width",
+      "mode": "preview",
+      "command_type": "set_rectangle_dimension",
+      "selection": [
+        "rect_eval_a",
+        "rect_eval_b",
+        "rect_eval_c",
+        "rect_eval_d",
+        "rect_eval_ab",
+        "rect_eval_bc",
+        "rect_eval_cd",
+        "rect_eval_da",
+        "profile_rect_eval"
+      ],
+      "parameters": {
+        "dimension": "width",
+        "value": 60,
+        "unit": "mm"
+      }
+    }
+  },
+  "expected": {
+    "status": "preview",
+    "value": 60,
+    "unit": "mm",
+    "metadata": {
+      "dimension": "width",
+      "solver_status": "underconstrained",
+      "profile_status": "valid"
+    },
+    "after": {
+      "rect_eval_b": [70, 20],
+      "rect_eval_c": [70, 45],
+      "rect_eval_ab": {"start": [10, 20], "end": [70, 20]},
+      "rect_eval_bc": {"start": [70, 20], "end": [70, 45]},
+      "profile_rect_eval": {
+        "vertices": [[10, 20], [70, 20], [70, 45], [10, 45], [10, 20]],
+        "area": 1500,
+        "winding": "counterclockwise",
+        "warnings": []
+      }
+    }
+  }
+}

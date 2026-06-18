@@ -279,6 +279,19 @@ body {
   pointer-events: none;
 }
 
+.sketchmath-hole-profile {
+  fill: rgba(5, 10, 24, 0.55);
+  stroke: #ffcf5a;
+  stroke-width: 2.2;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.sketchmath-hole-profile-selected {
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 8px rgba(255, 207, 90, 0.45));
+}
+
 .sketchmath-rectangle-selection-outline {
   fill: rgba(116, 187, 255, 0.08);
   stroke: #74bbff;

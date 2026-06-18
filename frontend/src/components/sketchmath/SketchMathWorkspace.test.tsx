@@ -54,6 +54,7 @@ type Entity =
       warnings: string[];
       closed: boolean;
       locked: boolean;
+      holes?: string[];
       label?: string | null;
     };
 
@@ -425,6 +426,45 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
     return setSnapshot(nextItems, changed, command, mutate);
   };
 
+  const addProfileHole = (command: any, mutate: boolean) => {
+    const profileId = command.selection[0];
+    const profileEntity = snapshot.selection_context.items.find(
+      (item): item is Extract<Entity, { type: "profile_2d" }> => item.type === "profile_2d" && item.id === profileId,
+    );
+    if (!profileEntity) {
+      throw new Error("add_profile_hole requires profile selection");
+    }
+    const center = command.parameters.center as [number, number];
+    const diameter = Number(command.parameters.diameter);
+    const radius = diameter / 2;
+    const holeId = `hole_${profileId}_${command.command_id}`;
+    const vertices: [number, number][] = [
+      [center[0] - radius, center[1] - radius],
+      [center[0] - radius, center[1] + radius],
+      [center[0] + radius, center[1] + radius],
+      [center[0] + radius, center[1] - radius],
+      [center[0] - radius, center[1] - radius],
+    ];
+    const hole: Entity = {
+      id: holeId,
+      type: "profile_2d",
+      vertices,
+      area: diameter * diameter,
+      winding: "clockwise",
+      warnings: [],
+      closed: true,
+      locked: false,
+      label: "Hole",
+    };
+    const updatedProfile: Entity = { ...profileEntity, holes: [...(profileEntity.holes || []), holeId] };
+    const nextItems = [
+      ...snapshot.selection_context.items.filter((item) => item.id !== profileId && item.id !== holeId),
+      updatedProfile,
+      hole,
+    ];
+    return setSnapshot(nextItems, [profileId, holeId], command, mutate);
+  };
+
   async function fetchMockImpl(input: RequestInfo | URL, init?: RequestInit): Promise<any> {
     const url = String(input);
     const method = (init?.method || "GET").toUpperCase();
@@ -496,6 +536,9 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
       }
       if (command.command_type === "set_rectangle_dimension") {
         return makeResponse(setRectangleDimension(command, mutate));
+      }
+      if (command.command_type === "add_profile_hole") {
+        return makeResponse(addProfileHole(command, mutate));
       }
       if (command.command_type === "set_angle") {
         return makeResponse(constraintHandler(command, mutate, "angle_constraint", command.selection.slice(0, 3)));
@@ -795,6 +838,66 @@ describe("SketchMath workspace", () => {
     await userEvent.click(rightEdge);
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Height edge"));
     expect(screen.getByLabelText("Height dimension value")).toHaveValue(25);
+  });
+
+  it("exposes Add Hole on selected rectangles and previews a typed hole command", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add Hole" })).toBeEnabled());
+    expect(screen.getByLabelText("Hole diameter")).toHaveValue(8);
+    fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "12" } });
+    await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    const previewCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("add_profile_hole"));
+    expect(previewCall).toBeTruthy();
+    const previewBody = JSON.parse(String(previewCall?.[1]?.body || "{}"));
+    expect(previewBody.command).toMatchObject({
+      mode: "preview",
+      command_type: "add_profile_hole",
+      selection: [`profile_${baseId}`],
+      parameters: { diameter: 12, unit: "mm", center: [280, 170] },
+    });
+    expect(screen.getByTestId("sketchmath-preview")).toBeVisible();
+    expect(screen.queryByTestId(/^entity-hole_/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Revert Preview" }));
+
+    await waitFor(() => expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull());
+    expect(screen.queryByTestId("sketchmath-preview")).toBeNull();
+    expect(screen.queryByTestId(/^entity-hole_/)).toBeNull();
+  });
+
+  it("commits Add Hole previews into visible profile holes", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add Hole" })).toBeEnabled());
+    fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "12" } });
+    await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
+
+    await waitFor(() => expect(screen.getByTestId(/^entity-hole_/)).toBeVisible());
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Profile holes: 1");
   });
 
   it("selects rectangle corners as editable anchor targets", async () => {

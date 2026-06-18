@@ -79,6 +79,36 @@ def _profile_selection_context_with_hole() -> dict[str, object]:
     }
 
 
+def _rectangle_selection_context() -> dict[str, object]:
+    return {
+        "selection_set_id": "sel_workspace_rectangle",
+        "units": "mm",
+        "frame": "canvas_2d",
+        "items": [
+            {"id": "rect_api_a", "type": "point_2d", "coords": [10, 20], "locked": False},
+            {"id": "rect_api_b", "type": "point_2d", "coords": [50, 20], "locked": False},
+            {"id": "rect_api_c", "type": "point_2d", "coords": [50, 45], "locked": False},
+            {"id": "rect_api_d", "type": "point_2d", "coords": [10, 45], "locked": False},
+            {"id": "rect_api_ab", "type": "line_2d", "start": [10, 20], "end": [50, 20], "locked": False},
+            {"id": "rect_api_bc", "type": "line_2d", "start": [50, 20], "end": [50, 45], "locked": False},
+            {"id": "rect_api_cd", "type": "line_2d", "start": [50, 45], "end": [10, 45], "locked": False},
+            {"id": "rect_api_da", "type": "line_2d", "start": [10, 45], "end": [10, 20], "locked": False},
+            {
+                "id": "profile_rect_api",
+                "type": "profile_2d",
+                "vertices": [[10, 20], [50, 20], [50, 45], [10, 45], [10, 20]],
+                "area": 1000.0,
+                "winding": "counterclockwise",
+                "warnings": [],
+                "closed": True,
+                "locked": False,
+            },
+        ],
+        "constraints": [],
+        "named_references": {},
+    }
+
+
 def _command(command_type: str, command_id: str, *, mode: str = "preview", selection: list[str] | None = None, parameters: dict[str, object] | None = None) -> dict[str, object]:
     return {
         "version": "0.1",
@@ -151,6 +181,65 @@ def test_sketchmath_session_preview_commit_and_revert(monkeypatch):
     assert reverted.status_code == 200
     assert reverted.json()["selection_context"]["items"][1]["coords"] == [1.0, 0.0]
     assert reverted.json()["history_length"] == 0
+    client.close()
+
+
+def test_sketchmath_rectangle_dimension_preview_and_commit(monkeypatch):
+    client = _client(monkeypatch)
+    created = client.post(
+        "/api/sketchmath/sessions",
+        json={"selection_context": _rectangle_selection_context()},
+    )
+    assert created.status_code == 200
+    session_id = created.json()["session_id"]
+    selection = [
+        "rect_api_a",
+        "rect_api_b",
+        "rect_api_c",
+        "rect_api_d",
+        "rect_api_ab",
+        "rect_api_bc",
+        "rect_api_cd",
+        "rect_api_da",
+        "profile_rect_api",
+    ]
+
+    preview = client.post(
+        f"/api/sketchmath/sessions/{session_id}/commands/preview",
+        json={
+            "command": _command(
+                "set_rectangle_dimension",
+                "cmd_rect_width_preview",
+                selection=selection,
+                parameters={"dimension": "width", "value": 60.0, "unit": "mm"},
+            )
+        },
+    )
+    assert preview.status_code == 200
+    assert preview.json()["result"]["status"] == "preview"
+    assert preview.json()["result"]["after"]["items"][2]["coords"] == [70.0, 45.0]
+    assert preview.json()["result"]["metadata"]["solver_status"] == "underconstrained"
+
+    current = client.get(f"/api/sketchmath/sessions/{session_id}")
+    assert current.status_code == 200
+    assert current.json()["selection_context"]["items"][2]["coords"] == [50.0, 45.0]
+
+    commit = client.post(
+        f"/api/sketchmath/sessions/{session_id}/commands/commit",
+        json={
+            "command": _command(
+                "set_rectangle_dimension",
+                "cmd_rect_width_commit",
+                mode="commit",
+                selection=selection,
+                parameters={"dimension": "width", "value": 60.0, "unit": "mm"},
+            )
+        },
+    )
+    assert commit.status_code == 200
+    assert commit.json()["selection_context"]["items"][2]["coords"] == [70.0, 45.0]
+    assert commit.json()["selection_context"]["items"][8]["vertices"] == [[10.0, 20.0], [70.0, 20.0], [70.0, 45.0], [10.0, 45.0], [10.0, 20.0]]
+    assert commit.json()["history_length"] == 1
     client.close()
 
 

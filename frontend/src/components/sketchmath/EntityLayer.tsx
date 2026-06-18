@@ -5,7 +5,7 @@ type EntityLayerProps = {
   entities: SketchMathEntity[];
   selectedEntityIds: string[];
   focusedEntityId: string | null;
-  onEntityClick: (entityId: string, event: React.MouseEvent<SVGGElement | SVGCircleElement>) => void;
+  onEntityClick: (entityId: string, event: React.MouseEvent<SVGGElement | SVGCircleElement | SVGPolygonElement>) => void;
   onEntityMouseDown?: (entityId: string, entityType: SketchMathEntity["type"], event: React.MouseEvent<SVGGElement>) => void;
   onDimensionLabelEdit?: (baseId: string, dimension: "width" | "height") => void;
 };
@@ -15,6 +15,9 @@ const isPoint = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, 
 
 const isLine = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "line_2d" | "construction_line_2d" }> =>
   entity.type === "line_2d" || entity.type === "construction_line_2d";
+
+const isProfile = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> =>
+  entity.type === "profile_2d";
 
 const formatDimension = (value: number): string => Number(value.toFixed(2)).toString();
 const DIMENSION_GUIDE_OFFSET = 34;
@@ -40,6 +43,13 @@ const rectangleBaseIdFromEntityId = (entityId: string): string | null => {
 
 const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
   const linesById = new Map(entities.filter(isLine).map((entity) => [entity.id, entity] as const));
+  const profileById = new Map(entities.filter(isProfile).map((entity) => [entity.id, entity] as const));
+  const profileHoleIds = new Set(
+    entities
+      .filter(isProfile)
+      .flatMap((entity) => entity.holes || [])
+      .filter((entityId) => profileById.has(entityId)),
+  );
   const selectedRectangleBaseIds = new Set(
     selectedEntityIds.map(rectangleBaseIdFromEntityId).filter((value): value is string => Boolean(value)),
   );
@@ -60,6 +70,26 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, onEntityCli
           points={`${top.start.join(",")} ${top.end.join(",")} ${right.end.join(",")} ${bottom.end.join(",")}`}
           className="sketchmath-rectangle-selection-outline"
           data-testid={`rectangle-selection-outline-${baseId}`}
+        />
+      );
+    })}
+    {entities.filter((entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => isProfile(entity) && profileHoleIds.has(entity.id)).map((entity) => {
+      const points = entity.vertices.map((vertex) => vertex.join(",")).join(" ");
+      const selected = selectedEntityIds.includes(entity.id);
+      return (
+        <polygon
+          key={entity.id}
+          points={points}
+          className={selected ? "sketchmath-hole-profile sketchmath-hole-profile-selected" : "sketchmath-hole-profile"}
+          data-testid={`entity-${entity.id}`}
+          data-entity-id={entity.id}
+          data-entity-type={entity.type}
+          role="button"
+          tabIndex={0}
+          onClick={(event) => {
+            event.stopPropagation();
+            onEntityClick(entity.id, event);
+          }}
         />
       );
     })}

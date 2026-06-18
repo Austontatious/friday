@@ -35,6 +35,10 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
   - `parameters.cascade=true` is reserved for semantic parent-object deletion, such as deleting a whole rectangle bundle after the UI has warned the user.
 - `set_distance`
   - Repositions selected points to enforce a target distance.
+- `set_rectangle_dimension`
+  - Rebuilds a semantic rectangle bundle when the user edits width or height.
+  - Updates the four corner points, four generated edges, and closed profile together.
+  - This command is intentionally separate from `set_distance`: plain point distance edits do not carry enough rectangle/profile ownership to preserve the semantic rectangle bundle.
 - `set_line_polar`
   - Rebuilds a line endpoint from length and angle.
 - `set_angle`
@@ -51,6 +55,11 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
   - Runs the conservative 2D solver over stored constraints.
 - `make_profile`
   - Detects a closed 2D profile and stores its area and winding.
+- `add_profile_hole`
+  - Adds a circular inner `profile_2d` hole to a selected closed profile.
+  - Preview mode returns the updated outer profile plus hole entity without mutating session state.
+  - Commit mode persists the hole, updates the outer profile's `holes` list, and records replayable history.
+  - Invalid diameter, missing profile selection, centers outside the profile, and holes that touch or exceed profile bounds return structured selection errors.
 - `translate`
   - Shifts selected geometry by a vector.
 - `rotate`
@@ -80,6 +89,83 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 
 Locked entities act as fixed anchors. The solver only moves unlocked points, and it prefers closed-form cases over iterative search.
 Profile hole validation is strict: holes must be closed polygons, strictly inside the outer profile, non-touching, and non-overlapping.
+
+## Frontend Dimension Payloads
+
+Edit Width and Edit Height in the browser workspace submit typed `GeometryCommand` payloads through preview first. Commit resubmits the same command with `mode: "commit"` after the user accepts the preview.
+
+Edit Width payload:
+
+```json
+{
+  "version": "0.1",
+  "command_id": "set_rectangle_dimension_<generated>",
+  "mode": "preview",
+  "command_type": "set_rectangle_dimension",
+  "selection": [
+    "rect_<id>_a",
+    "rect_<id>_b",
+    "rect_<id>_c",
+    "rect_<id>_d",
+    "rect_<id>_ab",
+    "rect_<id>_bc",
+    "rect_<id>_cd",
+    "rect_<id>_da",
+    "profile_rect_<id>"
+  ],
+  "parameters": {
+    "dimension": "width",
+    "value": 60,
+    "unit": "mm"
+  }
+}
+```
+
+Edit Height payload:
+
+```json
+{
+  "version": "0.1",
+  "command_id": "set_rectangle_dimension_<generated>",
+  "mode": "preview",
+  "command_type": "set_rectangle_dimension",
+  "selection": [
+    "rect_<id>_a",
+    "rect_<id>_b",
+    "rect_<id>_c",
+    "rect_<id>_d",
+    "rect_<id>_ab",
+    "rect_<id>_bc",
+    "rect_<id>_cd",
+    "rect_<id>_da",
+    "profile_rect_<id>"
+  ],
+  "parameters": {
+    "dimension": "height",
+    "value": 25,
+    "unit": "mm"
+  }
+}
+```
+
+Add Hole payload:
+
+The browser workspace exposes Add Hole only when a semantic rectangle/profile is selected. The first UX loop places the hole at the selected profile's bounding-box center; later direct point placement should keep the same `add_profile_hole` command shape and only change `parameters.center`.
+
+```json
+{
+  "version": "0.1",
+  "command_id": "add_profile_hole_<generated>",
+  "mode": "preview",
+  "command_type": "add_profile_hole",
+  "selection": ["profile_rect_<id>"],
+  "parameters": {
+    "diameter": 12,
+    "unit": "mm",
+    "center": [280, 170]
+  }
+}
+```
 
 ## Validation Errors
 
@@ -111,6 +197,6 @@ All geometry changes must continue to flow through typed `GeometryCommand` objec
 
 ## Non-Goals
 
-- No UI.
+- No full drafting UI or arbitrary CAD feature tree beyond the current focused browser workspace loops.
 - No FreeCAD GUI, MCP wrapper, arbitrary Python execution, or general CAD feature tree.
 - No full CAD sketcher solver.
