@@ -1,0 +1,29 @@
+import { defineConfig } from "@playwright/test";
+
+const port = Number(process.env.FRONTEND_E2E_PORT || "4173");
+
+export default defineConfig({
+  testDir: "./e2e",
+  timeout: 120000,
+  fullyParallel: false,
+  reporter: "list",
+  use: {
+    baseURL: `http://127.0.0.1:${port}`,
+    headless: true,
+    launchOptions: {
+      executablePath: process.env.PLAYWRIGHT_CHROME_PATH || "/usr/bin/google-chrome",
+      args: ["--no-sandbox", "--disable-dev-shm-usage"],
+    },
+  },
+  webServer: {
+    command: "bash ./scripts/start-sketchmath-e2e.sh",
+    url: `http://127.0.0.1:${port}`,
+    reuseExistingServer: false,
+    timeout: 120000,
+    env: {
+      FRIDAY_SKETCHMATH_ENABLED: "1",
+      REACT_APP_SKETCHMATH_ENABLED: "1",
+      FRONTEND_E2E_PORT: String(port),
+    },
+  },
+});

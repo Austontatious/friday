@@ -1,0 +1,972 @@
+import React from "react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import SketchMathWorkspace from "./SketchMathWorkspace";
+
+jest.mock("@chakra-ui/react", () => {
+  const React = require("react");
+  const makeElement = (tag: string) =>
+    React.forwardRef(({ as, children, flexWrap, whiteSpace, alignItems, isDisabled, ...props }: any, ref: React.Ref<HTMLElement>) =>
+      React.createElement(as || tag, { ...props, ref, disabled: isDisabled }, children),
+    );
+  const Textarea = React.forwardRef(({ children, ...props }: any, ref: React.Ref<HTMLTextAreaElement>) =>
+    React.createElement("textarea", { ...props, ref }, children),
+  );
+  const Input = React.forwardRef(({ children, ...props }: any, ref: React.Ref<HTMLInputElement>) =>
+    React.createElement("input", { ...props, ref }, children),
+  );
+  const ChakraProvider = ({ children }: any) => React.createElement(React.Fragment, null, children);
+  const useColorMode = () => {
+    const [colorMode, setColorMode] = React.useState("light");
+    return {
+      colorMode,
+      toggleColorMode: () => setColorMode((mode: string) => (mode === "light" ? "dark" : "light")),
+    };
+  };
+  const useToast = () => () => undefined;
+  return {
+    Box: makeElement("div"),
+    Button: makeElement("button"),
+    Divider: makeElement("hr"),
+    Heading: makeElement("h2"),
+    HStack: makeElement("div"),
+    Input,
+    Link: makeElement("a"),
+    Spinner: makeElement("div"),
+    Text: makeElement("span"),
+    Textarea,
+    VStack: makeElement("div"),
+    ChakraProvider,
+    useColorMode,
+    useToast,
+  };
+});
+
+type Entity =
+  | { id: string; type: "point_2d"; coords: [number, number]; locked: boolean; label?: string | null }
+  | { id: string; type: "line_2d"; start: [number, number]; end: [number, number]; locked: boolean; label?: string | null }
+  | {
+      id: string;
+      type: "profile_2d";
+      vertices: [number, number][];
+      area: number;
+      winding: "clockwise" | "counterclockwise" | "degenerate";
+      warnings: string[];
+      closed: boolean;
+      locked: boolean;
+      label?: string | null;
+    };
+
+type Snapshot = {
+  session_id: string;
+  selection_context: {
+    selection_set_id: string;
+    units: string;
+    frame: "canvas_2d";
+    items: Entity[];
+    constraints: Array<Record<string, any>>;
+    named_references: Record<string, string>;
+  };
+  session_metadata: Record<string, unknown>;
+  history: Array<Record<string, any>>;
+  history_length: number;
+};
+
+const baseSnapshot = (): Snapshot => ({
+  session_id: "sm_test_session",
+  selection_context: {
+    selection_set_id: "sel_workspace",
+    units: "mm",
+    frame: "canvas_2d",
+    items: [],
+    constraints: [],
+    named_references: {},
+  },
+  session_metadata: { persisted: true, storage_path: "/tmp/sketchmath/sm_test_session.json" },
+  history: [],
+  history_length: 0,
+});
+
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+
+const makeResponse = (payload: any) => ({
+  ok: true,
+  status: 200,
+  json: async () => clone(payload),
+  text: async () => JSON.stringify(payload),
+  headers: { get: () => "application/json" },
+});
+
+const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
+  let snapshot = baseSnapshot();
+
+  const replaceNamedReference = (entityId: string, label: string | null | undefined) => {
+    Object.entries(snapshot.selection_context.named_references).forEach(([name, mapped]) => {
+      if (mapped === entityId) {
+        delete snapshot.selection_context.named_references[name];
+      }
+    });
+    if (label) {
+      snapshot.selection_context.named_references[label] = entityId;
+    }
+  };
+
+  const setSnapshot = (nextItems: Entity[], changedEntityIds: string[], command: any, mutate: boolean) => {
+    const nextContext = { ...snapshot.selection_context, items: nextItems };
+    if (mutate) {
+      snapshot = {
+        ...snapshot,
+        selection_context: nextContext,
+        history: [
+          ...snapshot.history,
+          {
+            command: { ...command, mode: "commit" },
+            committed: true,
+            before: snapshot.selection_context,
+            after: nextContext,
+          },
+        ],
+        history_length: snapshot.history.length + 1,
+      };
+      changedEntityIds.forEach((entityId) => {
+        const entity = snapshot.selection_context.items.find((item) => item.id === entityId);
+        replaceNamedReference(entityId, entity?.label || null);
+      });
+    }
+    return {
+      session_id: snapshot.session_id,
+      selection_context: mutate ? snapshot.selection_context : nextContext,
+      result: {
+        command: { ...command, mode: command.mode || "preview" },
+        status: mutate ? "committed" : "preview",
+        before: snapshot.selection_context,
+        after: nextContext,
+        changed_entity_ids: changedEntityIds,
+        replay_index: snapshot.history.length,
+        metadata: {},
+      },
+      history_length: snapshot.history.length,
+      session_metadata: snapshot.session_metadata,
+    };
+  };
+
+  const appendConstraint = (constraint: Record<string, any>, command: any, changedEntityIds: string[], mutate: boolean) => {
+    const nextContext = { ...snapshot.selection_context, constraints: [...snapshot.selection_context.constraints, constraint] };
+    if (mutate) {
+      snapshot = {
+        ...snapshot,
+        selection_context: nextContext,
+        history: [
+          ...snapshot.history,
+          {
+            command: { ...command, mode: "commit" },
+            committed: true,
+            before: snapshot.selection_context,
+            after: nextContext,
+          },
+        ],
+        history_length: snapshot.history.length + 1,
+      };
+    }
+    return {
+      session_id: snapshot.session_id,
+      selection_context: mutate ? snapshot.selection_context : nextContext,
+      result: {
+        command: { ...command, mode: command.mode || "preview" },
+        status: mutate ? "committed" : "preview",
+        before: snapshot.selection_context,
+        after: nextContext,
+        changed_entity_ids: changedEntityIds,
+        replay_index: snapshot.history.length,
+        metadata: {},
+      },
+      history_length: snapshot.history.length,
+      session_metadata: snapshot.session_metadata,
+    };
+  };
+
+  const definePoint = (command: any, mutate: boolean) => {
+    const entity: Entity = {
+      id: command.parameters.name,
+      type: "point_2d",
+      coords: command.parameters.coords,
+      locked: !!command.parameters.locked,
+      label: command.parameters.label || null,
+    };
+    const nextItems = [...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity];
+    return setSnapshot(nextItems, [entity.id], command, mutate);
+  };
+
+  const defineLine = (command: any, mutate: boolean) => {
+    const entity: Entity = {
+      id: command.parameters.name,
+      type: "line_2d",
+      start: command.parameters.start,
+      end: command.parameters.end,
+      locked: !!command.parameters.locked,
+      label: command.parameters.label || null,
+    };
+    const nextItems = [...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity];
+    return setSnapshot(nextItems, [entity.id], command, mutate);
+  };
+
+  const deleteEntity = (command: any, mutate: boolean) => {
+    const ids = command.selection as string[];
+    const cascade = command.parameters?.cascade === true;
+    const referenced = new Set<string>();
+    snapshot.selection_context.constraints.forEach((constraint) => {
+      (constraint.points || []).forEach((pointId: string) => referenced.add(pointId));
+    });
+    Object.values(snapshot.selection_context.named_references).forEach((entityId) => referenced.add(entityId));
+    if (!cascade && ids.some((entityId) => referenced.has(entityId))) {
+      return {
+        __mockErrorResponse: true,
+        ok: false,
+        status: 422,
+        json: async () => ({
+          detail: {
+            code: "selection_resolution_error",
+            message: "Cannot delete an entity that is still referenced",
+          },
+        }),
+        text: async () => "Cannot delete an entity that is still referenced",
+        headers: { get: () => "application/json" },
+      };
+    }
+    const nextItems = snapshot.selection_context.items.filter((item) => !ids.includes(item.id));
+    const nextNamed = Object.fromEntries(
+      Object.entries(snapshot.selection_context.named_references).filter(([, mapped]) => !ids.includes(mapped)),
+    );
+    const nextConstraints = cascade
+      ? snapshot.selection_context.constraints.filter((constraint) => !(constraint.points || []).some((pointId: string) => ids.includes(pointId)))
+      : snapshot.selection_context.constraints;
+    const nextContext = { ...snapshot.selection_context, items: nextItems, constraints: nextConstraints, named_references: nextNamed };
+    if (mutate) {
+      snapshot = {
+        ...snapshot,
+        selection_context: nextContext,
+        history: [
+          ...snapshot.history,
+          {
+            command: { ...command, mode: "commit" },
+            committed: true,
+            before: snapshot.selection_context,
+            after: nextContext,
+          },
+        ],
+        history_length: snapshot.history.length + 1,
+      };
+    }
+    return {
+      session_id: snapshot.session_id,
+      selection_context: mutate ? snapshot.selection_context : nextContext,
+      result: {
+        command: { ...command, mode: command.mode || "preview" },
+        status: mutate ? "committed" : "preview",
+        before: snapshot.selection_context,
+        after: nextContext,
+        changed_entity_ids: ids,
+        replay_index: snapshot.history.length,
+        metadata: {},
+      },
+      history_length: snapshot.history.length,
+      session_metadata: snapshot.session_metadata,
+    };
+  };
+
+  const constraintHandler = (command: any, mutate: boolean, type: string, changedEntityIds: string[]) =>
+    appendConstraint(
+      {
+        id: `${type}_${snapshot.history.length + 1}`,
+        type,
+        points: command.selection,
+        distance: command.parameters.distance,
+        unit: command.parameters.unit || "mm",
+        angle: command.parameters.angle,
+        anchor: command.parameters.anchor,
+      },
+      command,
+      changedEntityIds,
+      mutate,
+    );
+
+  const profile = (command: any, mutate: boolean) => {
+    const selected = command.selection
+      .map((entityId: string) => snapshot.selection_context.items.find((item) => item.id === entityId))
+      .filter(Boolean) as Entity[];
+    let vertices: [number, number][];
+    if (selected.length > 0 && selected.every((item) => item.type === "point_2d")) {
+      vertices = selected.map((point) => (point as Extract<Entity, { type: "point_2d" }>).coords) as [number, number][];
+    } else if (selected.length > 0 && selected.every((item) => item.type === "line_2d")) {
+      const lines = selected as Extract<Entity, { type: "line_2d" }>[];
+      vertices = [lines[0].start];
+      for (const line of lines) {
+        const start = line.start;
+        const end = line.end;
+        if (vertices[vertices.length - 1][0] === start[0] && vertices[vertices.length - 1][1] === start[1]) {
+          vertices.push(end);
+        } else if (vertices[vertices.length - 1][0] === end[0] && vertices[vertices.length - 1][1] === end[1]) {
+          vertices.push(start);
+        } else {
+          vertices.push(end);
+        }
+      }
+    } else {
+      vertices = [];
+    }
+    const entity: Entity = {
+      id: command.parameters.name || `profile_${snapshot.history.length + 1}`,
+      type: "profile_2d",
+      vertices,
+      area: vertices.length >= 3 ? vertices.length * 10 : 0,
+      winding: "counterclockwise",
+      warnings: [],
+      closed: vertices.length >= 3,
+      locked: false,
+      label: command.parameters.name || null,
+    };
+    const nextItems = [...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity];
+    return setSnapshot(nextItems, [entity.id], command, mutate);
+  };
+
+  const solveConstraints = (command: any, mutate: boolean) => {
+    const nextItems = snapshot.selection_context.items.map((item) => {
+      if (item.type !== "point_2d") {
+        return item;
+      }
+      const match = /^rect_(.+)_([abcd])$/.exec(item.id);
+      if (!match) {
+        return item;
+      }
+      const baseId = `rect_${match[1]}`;
+      const rectanglePoints = snapshot.selection_context.items.filter(
+        (candidate): candidate is Extract<Entity, { type: "point_2d" }> =>
+          candidate.type === "point_2d" && candidate.id.startsWith(baseId),
+      );
+      if (rectanglePoints.length !== 4) {
+        return item;
+      }
+      const xs = rectanglePoints.map((point) => point.coords[0]);
+      const ys = rectanglePoints.map((point) => point.coords[1]);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const coordsBySuffix: Record<string, [number, number]> = {
+        a: [minX, minY],
+        b: [maxX, minY],
+        c: [maxX, maxY],
+        d: [minX, maxY],
+      };
+      const suffix = match[2];
+      return { ...item, coords: coordsBySuffix[suffix] || item.coords };
+    });
+    return setSnapshot(nextItems as Entity[], [], command, mutate);
+  };
+
+  async function fetchMockImpl(input: RequestInfo | URL, init?: RequestInit): Promise<any> {
+    const url = String(input);
+    const method = (init?.method || "GET").toUpperCase();
+
+    if (url.endsWith("/api/sketchmath/sessions") && method === "POST") {
+      snapshot = baseSnapshot();
+      return makeResponse(snapshot);
+    }
+    if (url.endsWith(`/api/sketchmath/sessions/${snapshot.session_id}`) && method === "GET") {
+      return makeResponse(snapshot);
+    }
+    if (url.endsWith(`/api/sketchmath/sessions/${snapshot.session_id}/history`) && method === "GET") {
+      return makeResponse({ session_id: snapshot.session_id, history: snapshot.history, history_length: snapshot.history_length });
+    }
+    if (url.endsWith(`/api/sketchmath/sessions/${snapshot.session_id}/revert`) && method === "POST") {
+      snapshot = baseSnapshot();
+      return makeResponse(snapshot);
+    }
+    if (url.endsWith(`/api/sketchmath/sessions/${snapshot.session_id}/entities`) && method === "POST") {
+      const body = JSON.parse(String(init?.body || "{}"));
+      const entity = body.entity;
+      const nextItems = [...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity];
+      return makeResponse(setSnapshot(nextItems, [entity.id], body, body.mode === "commit"));
+    }
+    if (init?.body && (url.includes("/commands/preview") || url.includes("/commands/commit"))) {
+      const body = JSON.parse(String(init.body));
+      const command = body.command;
+      const mutate = url.includes("/commit");
+      if (command.command_type === "batch") {
+        const beforeBatch = clone(snapshot);
+        let response: ReturnType<typeof makeResponse> | null = null;
+        for (const subcommand of command.parameters.commands || []) {
+          response = await fetchMockImpl(url, { ...(init || {}), body: JSON.stringify({ command: subcommand }) });
+          if ((response as any).__mockErrorResponse) {
+            snapshot = beforeBatch;
+            return response;
+          }
+        }
+        if (!mutate) {
+          snapshot = beforeBatch;
+        }
+        return response || makeResponse(snapshot);
+      }
+      if (command.command_type === "define_point") {
+        return makeResponse(definePoint(command, mutate));
+      }
+      if (command.command_type === "define_line") {
+        if (options.failDefineLine) {
+          return {
+            __mockErrorResponse: true,
+            ok: false,
+            status: 500,
+            json: async () => ({ detail: { message: "Failed to create line" } }),
+            text: async () => "Failed to create line",
+            headers: { get: () => "application/json" },
+          };
+        }
+        return makeResponse(defineLine(command, mutate));
+      }
+      if (command.command_type === "delete_entity") {
+        const deleted = deleteEntity(command, mutate);
+        if ((deleted as any).__mockErrorResponse) {
+          return deleted;
+        }
+        return makeResponse(deleted);
+      }
+      if (command.command_type === "set_distance") {
+        return makeResponse(constraintHandler(command, mutate, "distance_constraint", command.selection.slice(0, 2)));
+      }
+      if (command.command_type === "set_angle") {
+        return makeResponse(constraintHandler(command, mutate, "angle_constraint", command.selection.slice(0, 3)));
+      }
+      if (command.command_type === "make_parallel") {
+        return makeResponse(constraintHandler(command, mutate, "parallel_constraint", command.selection.slice(0, 4)));
+      }
+      if (command.command_type === "make_perpendicular") {
+        return makeResponse(constraintHandler(command, mutate, "perpendicular_constraint", command.selection.slice(0, 4)));
+      }
+      if (command.command_type === "make_equal_length") {
+        return makeResponse(constraintHandler(command, mutate, "equal_length_constraint", command.selection.slice(0, 4)));
+      }
+      if (command.command_type === "make_equal_angle") {
+        return makeResponse(constraintHandler(command, mutate, "equal_angle_constraint", command.selection.slice(0, 6)));
+      }
+      if (command.command_type === "solve_constraints") {
+        return makeResponse(solveConstraints(command, mutate));
+      }
+      if (command.command_type === "make_profile") {
+        return makeResponse(profile(command, mutate));
+      }
+    }
+
+    throw new Error(`Unhandled fetch call: ${method} ${url}`);
+  }
+
+  const fetchMock = jest.fn(fetchMockImpl);
+
+  return { fetchMock };
+};
+
+const renderWorkspace = () => render(<SketchMathWorkspace />);
+
+const clickCanvasAt = (canvas: HTMLElement, x: number, y: number) => {
+  const bounds = { left: 0, top: 0, width: 1200, height: 800, right: 1200, bottom: 800, x: 0, y: 0, toJSON: () => ({}) };
+  if (!jest.isMockFunction(canvas.getBoundingClientRect)) {
+    jest.spyOn(canvas, "getBoundingClientRect").mockReturnValue(bounds as DOMRect);
+  }
+  fireEvent.click(canvas, { clientX: x, clientY: y });
+};
+
+describe("SketchMath workspace", () => {
+  const stamp = { value: 1710000000000 };
+  const firstStamp = 1710000000000;
+  const secondStamp = 1710000001000;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    process.env.REACT_APP_SKETCHMATH_ENABLED = "1";
+    stamp.value = 1710000000000;
+    jest.spyOn(Date, "now").mockImplementation(() => stamp.value);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("loads canvas-first and keeps advanced JSON hidden by default", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    expect(screen.getByTestId("sketchmath-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("sketchmath-canvas")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Select" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Line" })).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "Dimension" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Parallel" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
+    expect(screen.queryByTestId("sketchmath-command-box")).toBeNull();
+  });
+
+  it("draws geometry, selects it, and exposes dimensions and constraints in the normal workspace", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    const workbench = screen.getByTestId("sketchmath-workbench-panel");
+
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 380, 120);
+
+    const lineId = `line_${stamp.value.toString(36)}`;
+    const startPointId = `point_${stamp.value.toString(36)}_start`;
+    const endPointId = `point_${stamp.value.toString(36)}_end`;
+
+    await waitFor(() => expect(screen.getByTestId(`entity-${lineId}`)).toBeVisible());
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(lineId));
+
+    await userEvent.click(within(workbench).getByRole("button", { name: "Set Length" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("distance 17.5 mm"),
+    );
+    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Fully defined");
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(startPointId);
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(endPointId);
+
+    stamp.value = 1710000001000;
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    clickCanvasAt(canvas, 160, 220);
+    clickCanvasAt(canvas, 380, 220);
+
+    const secondLineId = `line_${stamp.value.toString(36)}`;
+    await waitFor(() => expect(screen.getByTestId(`entity-${secondLineId}`)).toBeVisible());
+    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeDisabled());
+    await userEvent.click(within(workbench).getByRole("button", { name: "Make Parallel" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("parallel_constraint"),
+    );
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("distance 17.5 mm");
+  });
+
+  it("creates a parametric rectangle from two clicks and keeps the workbench CAD-ready", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    const workbench = screen.getByTestId("sketchmath-workbench-panel");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("profile_"));
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("4 lines");
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("3 constraints");
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected object");
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Rectangle");
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Closed profile: valid");
+    expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled();
+  });
+
+  it("exposes rectangle dimensions that drive grouped rectangle geometry", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    const workbench = screen.getByTestId("sketchmath-workbench-panel");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    const topEdge = await screen.findByTestId(`entity-${baseId}_ab`);
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Rectangle dimensions"));
+    expect(screen.getByLabelText("Rectangle width")).toHaveValue(240);
+    expect(screen.getByLabelText("Rectangle height")).toHaveValue(100);
+    expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("240 mm");
+    expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("100 mm");
+    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Underdefined: size/profile exists, position is free");
+    expect(screen.getByTestId(`rectangle-selection-outline-${baseId}`)).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
+    fireEvent.change(screen.getByLabelText("Rectangle height"), { target: { value: "25" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
+
+    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
+    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
+    expect(topEdge.querySelector("line")).toHaveAttribute("x1", "160");
+    expect(topEdge.querySelector("line")).toHaveAttribute("x2", "200");
+
+    await userEvent.click(topEdge);
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Width edge"));
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Parent: Rectangle");
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Width: 40 mm");
+    expect(screen.getByRole("button", { name: "Edit dimension" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Dimension this edge" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Select whole rectangle" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Select profile" })).toBeEnabled();
+    expect(topEdge.querySelector("line.sketchmath-line")).toHaveClass("sketchmath-line-focus");
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(`profile_${baseId}`);
+  });
+
+  it("opens edge-specific rectangle dimension editors from the dimension tool and canvas labels", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    const topEdge = await screen.findByTestId(`entity-${baseId}_ab`);
+    const rightEdge = await screen.findByTestId(`entity-${baseId}_bc`);
+    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
+    await userEvent.click(topEdge);
+
+    await screen.findByRole("heading", { name: "Edit width dimension" });
+    fireEvent.change(screen.getByLabelText("Width dimension value"), { target: { value: "40" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
+    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
+    await waitFor(() =>
+      expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Underdefined: width and height set, position is free"),
+    );
+
+    await userEvent.dblClick(screen.getByTestId(`dimension-${baseId}-height`));
+    await screen.findByRole("heading", { name: "Edit height dimension" });
+    fireEvent.change(screen.getByLabelText("Height dimension value"), { target: { value: "25" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
+    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
+    await userEvent.click(rightEdge);
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Height edge"));
+    expect(screen.getByLabelText("Height dimension value")).toHaveValue(25);
+  });
+
+  it("selects rectangle corners as editable anchor targets", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await userEvent.click(await screen.findByTestId(`entity-${baseId}_a`));
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected: Rectangle corner"));
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Corner: A");
+    expect(screen.getByRole("button", { name: "Fix / Anchor corner" })).toBeEnabled();
+  });
+
+  it("anchors a rectangle corner and reports fully defined status honestly", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    const workbench = screen.getByTestId("sketchmath-workbench-panel");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Position free"));
+    await userEvent.click(screen.getByRole("button", { name: "Fix corner" }));
+
+    await waitFor(() =>
+      expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Fully defined: width, height, and anchor are fixed"),
+    );
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Anchored at corner A");
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("locked");
+  });
+
+  it("creates a visible extrude feature summary while debug JSON stays collapsed", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    const workbench = screen.getByTestId("sketchmath-workbench-panel");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled());
+    expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
+    expect(screen.getByLabelText("Extrusion depth")).toHaveValue(10);
+
+    await userEvent.click(within(workbench).getByRole("button", { name: "Create CAD Feature" }));
+
+    await waitFor(() => expect(workbench).toHaveTextContent("Extrude Profile 1 by 10 mm"));
+    expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /Show Advanced \/ Debug/ }));
+    expect(screen.getByTestId("sketchmath-command-panel")).toBeVisible();
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("extrude_profile");
+  });
+
+  it("routes vertical rectangle edge edits through the parent rectangle without creating loose geometry", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    const rightEdge = await screen.findByTestId(`entity-${baseId}_bc`);
+
+    fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
+    await userEvent.click(rightEdge);
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Height edge"));
+    fireEvent.change(screen.getByLabelText("Height dimension value"), { target: { value: "25" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
+
+    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Closed profile: valid");
+    expect(screen.getAllByTestId(/^entity-rect_.*_[abcd]$/).length).toBe(4);
+    expect(screen.getAllByTestId(/^entity-rect_.*_(ab|bc|cd|da)$/).length).toBe(4);
+  });
+
+  it("does not expose raw backend reference errors when deleting a referenced rectangle edge", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await userEvent.click(await screen.findByTestId(`entity-${baseId}_ab`));
+    fireEvent.keyDown(window, { key: "Delete" });
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("This edge belongs to a rectangle"));
+    expect(screen.getByRole("button", { name: "Delete whole rectangle" })).toBeEnabled();
+    expect(screen.queryByText(/Cannot delete an entity that is still referenced/)).toBeNull();
+  });
+
+  it("summarizes rectangle edge roles and enables contextual width and height actions", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await userEvent.click(await screen.findByTestId(`entity-${baseId}_ab`));
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle width edge"));
+    expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent(`Parent: Rectangle ${baseId}`);
+    expect(screen.getByRole("button", { name: "Edit Width" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Make Parallel" })).toBeDisabled();
+
+    await userEvent.click(await screen.findByTestId(`entity-${baseId}_bc`));
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle height edge"));
+    expect(screen.getByRole("button", { name: "Edit Height" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Make Perpendicular" })).toBeDisabled();
+  });
+
+  it("shift-click toggles rectangle edges into a contextual two-line selection", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    fireEvent.click(await screen.findByTestId(`entity-${baseId}_ab`), { shiftKey: true });
+    fireEvent.click(await screen.findByTestId(`entity-${baseId}_cd`), { shiftKey: true });
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: 2 lines"));
+    expect(screen.getByRole("button", { name: "Make Parallel" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Make Perpendicular" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Equal Length" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Set Angle" })).toBeEnabled();
+
+    fireEvent.click(await screen.findByTestId(`entity-${baseId}_cd`), { shiftKey: true });
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle width edge"));
+  });
+
+  it("rectangle corner selection exposes fix and angle context without raw IDs as the main summary", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await userEvent.click(await screen.findByTestId(`entity-${baseId}_a`));
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle corner A"));
+    expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Angle: 90");
+    expect(screen.getByRole("button", { name: "Fix Corner" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Set Angle" })).toBeDisabled();
+  });
+
+  it("deletes a selected rectangle as one dependency-safe object", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    const workbench = screen.getByTestId("sketchmath-workbench-panel");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled());
+    await userEvent.click(within(screen.getByTestId("sketchmath-selection-inspector")).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(screen.queryByTestId(/^entity-rect_/)).toBeNull());
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Nothing selected.");
+    expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Underdefined");
+  });
+
+  it("clears the sketch and removes stale geometry from the normal UI", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    clickCanvasAt(canvas, 160, 120);
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByTestId(/^entity-point_.*_start$/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Rectangle"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear sketch" }));
+
+    await waitFor(() => expect(screen.queryByTestId(/^entity-rect_/)).toBeNull());
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Nothing selected.");
+    expect(screen.getByRole("button", { name: "Create CAD Feature" })).toBeDisabled();
+  });
+
+  it("rolls back line endpoint points when line creation fails", async () => {
+    const { fetchMock } = createSketchmathMock({ failDefineLine: true });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 380, 120);
+
+    await waitFor(() => expect(screen.queryByTestId(/^entity-point_.*_start$/)).toBeNull());
+    expect(screen.queryByTestId(/^entity-point_.*_end$/)).toBeNull();
+    expect(screen.queryByTestId(/^entity-line_/)).toBeNull();
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Nothing selected.");
+    expect(screen.queryByText(/HTTP 500|selection_resolution_error/)).toBeNull();
+  });
+
+  it("does not show contradictory CAD helper text when a closed profile is valid", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    const workbench = screen.getByTestId("sketchmath-workbench-panel");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(within(workbench).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled());
+    expect(workbench).toHaveTextContent("Closed profile: valid");
+    expect(workbench).toHaveTextContent("Ready for CAD feature");
+    expect(workbench).not.toHaveTextContent("Requires a closed sketch profile before extrusion.");
+  });
+
+  it("reveals advanced command JSON only when requested", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Show Advanced \/ Debug/ }));
+    expect(screen.getByTestId("sketchmath-command-panel")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: /Show Advanced \/ Debug DSL/ }));
+    expect(screen.getByTestId("sketchmath-command-box")).toBeVisible();
+  });
+
+  it("enables CAD feature creation only once a closed profile exists", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const convertButton = within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Create CAD Feature" });
+
+    expect(convertButton).toBeDisabled();
+
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 120, 120);
+    clickCanvasAt(canvas, 320, 240);
+
+    await waitFor(() =>
+      expect(within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Create CAD Feature" })).toBeEnabled(),
+    );
+  });
+});

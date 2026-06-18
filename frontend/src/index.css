@@ -2,22 +2,381 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --friday-aqua: #00ffff;
+  --friday-bg: #ffffff;
+  --friday-bg-alt: #f8fbff;
+  --friday-panel: rgba(255, 255, 255, 0.9);
+  --friday-panel-strong: rgba(255, 255, 255, 0.98);
+  --friday-border: #000000;
+  --friday-text: #000000;
+  --friday-muted: rgba(0, 0, 0, 0.7);
+  --friday-accent: var(--friday-aqua);
+  --friday-title-fill: #000000;
+  --friday-accent-soft: rgba(0, 255, 255, 0.1);
+  --friday-accent-glow: rgba(0, 255, 255, 0.3);
+  --friday-grid-major: rgba(31, 90, 255, 0.18);
+  --friday-grid-minor: rgba(31, 90, 255, 0.08);
+  --friday-surface-shadow: 0 18px 60px rgba(0, 0, 0, 0.12);
+  --friday-title-shadow-low: 0 0 2px rgba(0, 0, 0, 0.55), 0 0 8px rgba(0, 0, 0, 0.28), 0 0 18px rgba(0, 255, 255, 0.34);
+  --friday-title-shadow-high: 0 0 3px rgba(0, 0, 0, 0.7), 0 0 10px rgba(0, 0, 0, 0.38), 0 0 22px rgba(0, 255, 255, 0.5);
+  --friday-title-shadow: var(--friday-title-shadow-low);
+  --friday-control-text: #000000;
+  --friday-control-shadow: 0 10px 24px rgba(0, 0, 0, 0.18), 0 0 12px rgba(0, 255, 255, 0.08);
+  --friday-control-hover-shadow: 0 14px 30px rgba(0, 0, 0, 0.22), 0 0 14px rgba(0, 255, 255, 0.12);
+  --friday-focus-ring: 0 0 0 2px rgba(0, 0, 0, 0.24);
+  --friday-pulse-shadow-low: 0 0 12px rgba(0, 0, 0, 0.12), 0 0 18px rgba(0, 255, 255, 0.08);
+  --friday-pulse-shadow-high: 0 0 16px rgba(0, 0, 0, 0.18), 0 0 24px rgba(0, 255, 255, 0.12);
+  --friday-control-hover-bg: rgba(0, 0, 0, 0.04);
+  --friday-placeholder: rgba(0, 0, 0, 0.55);
+}
+
+[data-friday-theme="dark"] {
+  --friday-bg: #000000;
+  --friday-bg-alt: #050505;
+  --friday-panel: rgba(4, 10, 14, 0.86);
+  --friday-panel-strong: rgba(2, 8, 12, 0.96);
+  --friday-border: #00ffff;
+  --friday-text: #00ffff;
+  --friday-muted: rgba(0, 255, 255, 0.72);
+  --friday-accent: #00ffff;
+  --friday-title-fill: #00ffff;
+  --friday-accent-soft: rgba(0, 255, 255, 0.14);
+  --friday-accent-glow: rgba(0, 255, 255, 0.58);
+  --friday-grid-major: rgba(0, 255, 255, 0.24);
+  --friday-grid-minor: rgba(0, 255, 255, 0.1);
+  --friday-surface-shadow: 0 24px 90px rgba(0, 0, 0, 0.58);
+  --friday-title-shadow-low: 0 0 4px rgba(0, 255, 255, 0.7), 0 0 14px rgba(0, 255, 255, 0.35), 0 0 28px rgba(0, 255, 255, 0.18);
+  --friday-title-shadow-high: 0 0 6px rgba(0, 255, 255, 0.92), 0 0 18px rgba(0, 255, 255, 0.5), 0 0 36px rgba(0, 255, 255, 0.26);
+  --friday-title-shadow: var(--friday-title-shadow-low);
+  --friday-control-text: #00ffff;
+  --friday-control-shadow: 0 0 12px rgba(0, 255, 255, 0.34), 0 0 24px rgba(0, 255, 255, 0.18);
+  --friday-control-hover-shadow: 0 0 18px rgba(0, 255, 255, 0.55), 0 0 34px rgba(0, 255, 255, 0.28);
+  --friday-focus-ring: 0 0 0 2px rgba(0, 255, 255, 0.32);
+  --friday-pulse-shadow-low: 0 0 12px rgba(0, 255, 255, 0.32), 0 0 24px rgba(0, 255, 255, 0.16);
+  --friday-pulse-shadow-high: 0 0 16px rgba(0, 255, 255, 0.5), 0 0 32px rgba(0, 255, 255, 0.24);
+  --friday-control-hover-bg: rgba(0, 255, 255, 0.08);
+  --friday-placeholder: rgba(0, 255, 255, 0.58);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--friday-text);
+  background:
+    radial-gradient(circle at top left, var(--friday-accent-soft), transparent 38%),
+    radial-gradient(circle at bottom right, rgba(0, 255, 255, 0.06), transparent 32%),
+    linear-gradient(160deg, var(--friday-bg), var(--friday-bg-alt));
+}
+
 @layer utilities {
   .drop-shadow-glow {
-    filter: drop-shadow(0 0 8px #00FFAA);
+    filter: drop-shadow(0 0 8px var(--friday-accent-glow));
   }
 }
 
-/* Global animation keyframes (if not defined via Tailwind keyframes) */
+.sketchmath-shell {
+  min-height: 100vh;
+  padding: 28px;
+  color: var(--friday-text);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 24%),
+    radial-gradient(circle at 10% 10%, rgba(0, 255, 255, 0.12), transparent 22%),
+    radial-gradient(circle at 90% 0%, rgba(0, 255, 255, 0.18), transparent 24%);
+}
+
+.sketchmath-shell-header,
+.sketchmath-toolbar,
+.sketchmath-panel,
+.sketchmath-canvas-panel {
+  border: 1px solid var(--friday-border);
+  background: var(--friday-panel);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--friday-surface-shadow);
+}
+
+.sketchmath-shell-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  margin-bottom: 18px;
+}
+
+.sketchmath-title,
+.sketchmath-panel-title {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sketchmath-link {
+  color: var(--friday-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.sketchmath-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.sketchmath-canvas-panel {
+  padding: 12px;
+  border-radius: 24px;
+}
+
+.sketchmath-canvas {
+  width: 100%;
+  min-height: 720px;
+  display: block;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.sketchmath-toolbar {
+  padding: 14px 18px;
+  border-radius: 18px;
+  margin-bottom: 18px;
+}
+
+.sketchmath-sidebar {
+  min-width: 0;
+}
+
+.sketchmath-panel {
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.sketchmath-command-box {
+  min-height: 220px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  border-color: var(--friday-border) !important;
+  background: var(--friday-panel-strong) !important;
+  color: var(--friday-text) !important;
+}
+
+.sketchmath-command-preview,
+.sketchmath-history-row,
+.sketchmath-error,
+.sketchmath-disabled {
+  color: var(--friday-text);
+}
+
+.sketchmath-button {
+  border-color: var(--friday-border) !important;
+}
+
+.sketchmath-button-strong {
+  background: linear-gradient(135deg, var(--friday-accent), var(--friday-accent-glow)) !important;
+  color: white !important;
+}
+
+.sketchmath-error {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 65, 80, 0.08);
+  border: 1px solid rgba(255, 65, 80, 0.26);
+}
+
+.sketchmath-grid-minor {
+  stroke: var(--friday-grid-minor);
+  stroke-width: 1;
+}
+
+.sketchmath-grid {
+  pointer-events: none;
+}
+
+.sketchmath-grid-major {
+  stroke: var(--friday-grid-major);
+  stroke-width: 1.4;
+}
+
+.sketchmath-line {
+  stroke: var(--friday-accent);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 8px var(--friday-accent-glow));
+}
+
+.sketchmath-line-hit-target {
+  stroke: transparent;
+  stroke-width: 18;
+  stroke-linecap: round;
+  pointer-events: stroke;
+}
+
+.sketchmath-line-selected {
+  stroke-width: 5;
+}
+
+.sketchmath-line-focus {
+  stroke: #ffcf5a;
+  stroke-width: 7;
+}
+
+.sketchmath-point {
+  fill: var(--friday-accent);
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-width: 1.2;
+  filter: drop-shadow(0 0 8px var(--friday-accent-glow));
+  pointer-events: all;
+}
+
+.sketchmath-point-selected,
+.sketchmath-draft-point {
+  fill: transparent;
+  stroke: #74bbff;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 10px var(--friday-accent-glow));
+}
+
+.sketchmath-point-focus {
+  stroke: #ffcf5a;
+  stroke-width: 4;
+}
+
+.sketchmath-rectangle-corner-handle {
+  fill: rgba(255, 207, 90, 0.28);
+  stroke: #ffcf5a;
+  stroke-width: 2.5;
+  cursor: pointer;
+  pointer-events: all;
+  filter: drop-shadow(0 0 8px rgba(255, 207, 90, 0.45));
+}
+
+.sketchmath-preview-line {
+  stroke: rgba(120, 205, 255, 0.72);
+  stroke-width: 3;
+  stroke-dasharray: 10 8;
+  pointer-events: none;
+}
+
+.sketchmath-preview-point {
+  fill: rgba(120, 205, 255, 0.2);
+  stroke: rgba(120, 205, 255, 0.94);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  pointer-events: none;
+}
+
+.sketchmath-preview-profile {
+  fill: rgba(90, 160, 255, 0.12);
+  stroke: rgba(120, 205, 255, 0.92);
+  stroke-width: 2;
+  stroke-dasharray: 10 7;
+  pointer-events: none;
+}
+
+.sketchmath-rectangle-selection-outline {
+  fill: rgba(116, 187, 255, 0.08);
+  stroke: #74bbff;
+  stroke-width: 2.5;
+  stroke-dasharray: 12 8;
+  pointer-events: none;
+}
+
+.sketchmath-label {
+  fill: var(--friday-text);
+  font-size: 16px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: rgba(5, 10, 24, 0.45);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.sketchmath-dimension-label {
+  fill: var(--friday-accent);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  paint-order: stroke;
+  stroke: rgba(5, 10, 24, 0.72);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 1200px) {
+  .sketchmath-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sketchmath-canvas {
+    min-height: 540px;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(13, 19, 33, 0.14);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--friday-accent);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--friday-accent-glow);
+}
+
+/* Smooth transitions */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+input:focus,
+textarea:focus {
+  box-shadow: var(--friday-focus-ring);
+}
+
+button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: var(--friday-control-hover-shadow);
+}
+
 @keyframes fridayPulse {
   0% {
-    box-shadow: 0 0 12px #00FFFF, 0 0 24px #00FFFF55;
+    box-shadow: var(--friday-pulse-shadow-low);
   }
   50% {
-    box-shadow: 0 0 16px #00FFFF, 0 0 32px #00FFFF99;
+    box-shadow: var(--friday-pulse-shadow-high);
   }
   100% {
-    box-shadow: 0 0 12px #00FFFF, 0 0 24px #00FFFF55;
+    box-shadow: var(--friday-pulse-shadow-low);
   }
 }
 
+@keyframes fridayTitlePulse {
+  0% {
+    text-shadow: var(--friday-title-shadow-low);
+    transform: translateY(0);
+  }
+  50% {
+    text-shadow: var(--friday-title-shadow-high);
+    transform: translateY(-0.5px);
+  }
+  100% {
+    text-shadow: var(--friday-title-shadow-low);
+    transform: translateY(0);
+  }
+}

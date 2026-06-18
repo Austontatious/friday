@@ -1,8 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ChakraProvider } from '@chakra-ui/react';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import './index.css';
 import App from './App';
+import SketchMathWorkspace from './components/sketchmath/SketchMathWorkspace';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(
@@ -11,7 +13,12 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <ChakraProvider>                            {/* ← wrap here */}
-      <App />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/tools/sketchmath" element={<SketchMathWorkspace />} />
+          <Route path="*" element={<App />} />
+        </Routes>
+      </BrowserRouter>
     </ChakraProvider>
   </React.StrictMode>
 );

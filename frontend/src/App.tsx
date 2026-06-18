@@ -3,6 +3,7 @@ import {
   Box,
   Textarea,
   IconButton,
+  Badge,
   useColorMode,
   VStack,
   HStack,
@@ -11,7 +12,10 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { MoonIcon, SunIcon } from "@chakra-ui/icons";
-import { confirmMemory, sendPrompt } from "./services/api";
+import { useNavigate } from "react-router-dom";
+import type { ChatMode } from "./services/api";
+import { confirmMemory, getStoredChatMode, sendPrompt, setStoredChatMode } from "./services/api";
+import { isSketchMathEnabled } from "./services/sketchmath";
 
 
 type Message = {
@@ -21,12 +25,19 @@ type Message = {
 
 const App = () => {
   const { colorMode, toggleColorMode } = useColorMode();
+  const navigate = useNavigate();
   const toast = useToast();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [mode, setMode] = useState<ChatMode>(() => getStoredChatMode());
   const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
+  const sketchMathEnabled = isSketchMathEnabled();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    document.documentElement.dataset.fridayTheme = colorMode;
+  }, [colorMode]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -38,7 +49,7 @@ const App = () => {
     setMessages((prev) => [...prev, userMessage]);
 
     try {
-      const response = await sendPrompt({ prompt: currentInput });
+      const response = await sendPrompt({ prompt: currentInput }, mode);
       const cleaned = response.assistant_text || response.text || "[FRIDAY gave no valid reply]";
 
       const aiMessage: Message = {
@@ -54,7 +65,13 @@ const App = () => {
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { sender: "ai", content: "[Error fetching response]" },
+        {
+          sender: "ai",
+          content:
+            mode === "althing"
+              ? "[Althing mode request failed. Switch to Direct Friday or verify Althing bridge availability.]"
+              : "[Direct Friday request failed.]",
+        },
       ]);
     }
 
@@ -93,35 +110,80 @@ const App = () => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const setActiveMode = (nextMode: ChatMode) => {
+    setMode(nextMode);
+    setStoredChatMode(nextMode);
+  };
+
   return (
     <Box
-      bg={colorMode === "light" ? "#ffffff" : "#000000"}
-      color={colorMode === "light" ? "#000000" : "#00FFFF"}
+      bg="var(--friday-bg)"
+      color="var(--friday-text)"
       fontFamily="friday"
       letterSpacing="wide"
       minH="100vh"
       p={6}
+      data-friday-shell-ui-version="2026-06-13-sketchmath-theme-tokens-v1"
     >
       {/* HEADER */}
-      <HStack justify="center" mb={6} position="relative">
+      <HStack justify="center" mb={6} position="relative" align="start">
         <Text
           fontSize="6xl"
           fontWeight="bold"
           textTransform="uppercase"
           sx={{
             fontFamily: "friday",
-            color: colorMode === "light" ? "#000000" : "#00FFFF",
-            textShadow: "0 0 14px #00FFFF",
+            color: "var(--friday-title-fill)",
+            textShadow: "var(--friday-title-shadow)",
+            animation: "fridayTitlePulse 6s ease-in-out infinite",
           }}
         >
           FRIDAY
         </Text>
+        <Box position="absolute" left="0" top="8px">
+          <VStack align="start" spacing={2}>
+            <HStack spacing={2}>
+              <Text fontSize="sm" opacity={0.8}>
+                Mode:
+              </Text>
+              <Badge colorScheme="gray">Direct Friday</Badge>
+            </HStack>
+            <HStack spacing={2}>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setActiveMode("direct_friday")}
+                borderColor="var(--friday-border)"
+                color="var(--friday-control-text)"
+                boxShadow="var(--friday-control-shadow)"
+                _hover={{ bg: "var(--friday-control-hover-bg)" }}
+              >
+                Direct Friday
+              </Button>
+            </HStack>
+          </VStack>
+        </Box>
         <Box position="absolute" right="0">
           <IconButton
             aria-label="Toggle color mode"
             icon={colorMode === "light" ? <MoonIcon /> : <SunIcon />}
             onClick={toggleColorMode}
           />
+          {sketchMathEnabled && (
+            <Button
+              size="sm"
+              ml={2}
+              title="AI-assisted geometry workspace"
+              variant="outline"
+              onClick={() => navigate("/tools/sketchmath")}
+              borderColor="var(--friday-border)"
+              color="var(--friday-control-text)"
+              boxShadow="var(--friday-control-shadow)"
+              _hover={{ bg: "var(--friday-control-hover-bg)" }}
+            >
+              SketchMath
+            </Button>
+          )}
         </Box>
       </HStack>
 
@@ -129,8 +191,8 @@ const App = () => {
       <Box
         borderRadius="lg"
         border="2px solid"
-        borderColor={colorMode === "light" ? "#000000" : "#00FFFF"}
-        boxShadow="0 0 14px #00FFFF, 0 0 28px #00FFFF66"
+        borderColor="var(--friday-border)"
+        boxShadow="var(--friday-control-shadow)"
         fontFamily="friday"
         letterSpacing="wide"
         fontSize="md"
@@ -140,7 +202,7 @@ const App = () => {
         mb={4}
         sx={{
           animation: "fridayPulse 6s ease-in-out infinite",
-          backgroundColor: colorMode === "light" ? "#ffffff" : "#000000",
+          backgroundColor: "var(--friday-bg)",
         }}
       >
         <VStack align="stretch" spacing={3}>
@@ -149,7 +211,7 @@ const App = () => {
               key={idx}
               alignSelf={msg.sender === "user" ? "flex-end" : "flex-start"}
               bg="transparent"
-              color={colorMode === "light" ? "#000000" : "#00FFFF"}
+              color="var(--friday-control-text)"
               px={4}
               py={2}
               borderRadius="md"
@@ -166,14 +228,14 @@ const App = () => {
       {pendingIds.length > 0 && (
         <Box
           border="2px solid"
-          borderColor={colorMode === "light" ? "#000000" : "#00FFFF"}
+          borderColor="var(--friday-border)"
           borderRadius="md"
           p={3}
           mb={4}
-          boxShadow="0 0 10px #00FFFF66"
+          boxShadow="var(--friday-control-shadow)"
         >
           <HStack justify="space-between" flexWrap="wrap" gap={3}>
-            <Text>
+          <Text>
               {pendingIds.length} memories need confirmation
             </Text>
             <HStack>
@@ -206,18 +268,18 @@ const App = () => {
           resize="vertical"
           minH="60px"
           maxH="180px"
-          bg={colorMode === "light" ? "#ffffff" : "#000000"}
-          color={colorMode === "light" ? "#000000" : "#00FFFF"}
+          bg="var(--friday-bg)"
+          color="var(--friday-control-text)"
           border="2px solid"
-          borderColor={colorMode === "light" ? "#000000" : "#00FFFF"}
+          borderColor="var(--friday-border)"
           borderRadius="md"
-          boxShadow="0px 0px 12px #00FFFF"
+          boxShadow="var(--friday-control-shadow)"
           _placeholder={{
-            color: colorMode === "light" ? "#00000088" : "#00FFFF66",
+            color: "var(--friday-placeholder)",
           }}
           _focus={{
-            borderColor: colorMode === "light" ? "#000000" : "#00FFFF",
-            boxShadow: "0px 0px 14px #00FFFF",
+            borderColor: "var(--friday-border)",
+            boxShadow: "var(--friday-focus-ring)",
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -237,12 +299,12 @@ const App = () => {
           onClick={handleSend}
           bg="transparent"
           border="2px solid"
-          borderColor={colorMode === "light" ? "#000000" : "#00FFFF"}
+          borderColor="var(--friday-border)"
           borderRadius="md"
-          color={colorMode === "light" ? "#000000" : "#00FFFF"}
-          textShadow="0 0 12px #00FFFF"
-          boxShadow="0px 0px 12px #00FFFF"
-          _hover={{ bg: "#00FFFF22" }}
+          color="var(--friday-control-text)"
+          textShadow="var(--friday-title-shadow)"
+          boxShadow="var(--friday-control-shadow)"
+          _hover={{ bg: "var(--friday-control-hover-bg)" }}
           sx={{
             animation: "fridayPulse 5s ease-in-out infinite",
           }}
