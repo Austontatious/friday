@@ -38,7 +38,6 @@ const rectangleBaseIdFromEntityId = (entityId: string): string | null => {
 
 const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
   const linesById = new Map(entities.filter(isLine).map((entity) => [entity.id, entity] as const));
-  const rectangleBaseIds = Array.from(new Set(entities.filter(isPoint).map((entity) => rectangleBaseIdFromPointId(entity.id)).filter((value): value is string => Boolean(value))));
   const selectedRectangleBaseIds = new Set(
     selectedEntityIds.map(rectangleBaseIdFromEntityId).filter((value): value is string => Boolean(value)),
   );
@@ -172,7 +171,7 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, onEntityCli
         </g>
       );
     })}
-    {rectangleBaseIds.map((baseId) => {
+    {Array.from(selectedRectangleBaseIds).map((baseId) => {
       const top = linesById.get(`${baseId}_ab`);
       const left = linesById.get(`${baseId}_da`);
       if (!top || !left) {

@@ -57,6 +57,12 @@ const clickSvgViewBoxPoint = async (page: Page, x: number, y: number) => {
   await page.mouse.click(point.x, point.y);
 };
 
+const commitDimensionPreview = async (page: Page) => {
+  await expect(page.getByTestId("sketchmath-preview-controls")).toBeVisible();
+  await expect(page.getByTestId("sketchmath-preview")).toBeVisible();
+  await page.getByRole("button", { name: "Commit Preview" }).click();
+};
+
 test.describe("SketchMath workspace", () => {
   test("loads canvas-first with the sketch toolbar visible and JSON hidden", async ({ page }) => {
     await openSketchMath(page);
@@ -130,22 +136,22 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByRole("button", { name: "Edit dimension" })).toBeVisible();
     await page.screenshot({ path: screenshotPath("sketchmath-edge-selected-width.png"), fullPage: true });
 
-    await page.getByRole("button", { name: "Dimension" }).first().click();
-    await clickSvgPrimitiveCenter(page, '[data-testid^="entity-rect_"][data-testid$="_ab"] line');
+    await widthLabel.click();
     await expect(page.getByRole("heading", { name: "Edit width dimension" })).toBeVisible();
     await page.getByLabel("Width dimension value").fill("40");
     await page.screenshot({ path: screenshotPath("sketchmath-dimension-edit-width.png"), fullPage: true });
     await page.getByRole("button", { name: "Apply dimension" }).click();
+    await commitDimensionPreview(page);
     await expect(widthLabel).toContainText("40 mm", { timeout: 20000 });
     await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Underdefined: width and height set, position is free");
 
-    await page.getByRole("button", { name: "Dimension" }).first().click();
-    await clickSvgViewBoxPoint(page, 180, 160);
+    await heightLabel.click();
     await expect(page.getByTestId("sketchmath-selection-inspector")).toContainText("Selected edge: Height edge");
     await expect(page.getByRole("heading", { name: "Edit height dimension" })).toBeVisible();
     await page.getByLabel("Height dimension value").fill("25");
     await page.screenshot({ path: screenshotPath("sketchmath-dimension-edit-height.png"), fullPage: true });
     await page.getByRole("button", { name: "Apply dimension" }).click();
+    await commitDimensionPreview(page);
     await expect(page.getByTestId("sketchmath-canvas")).toContainText("40 mm", { timeout: 20000 });
     await expect(page.getByTestId("sketchmath-canvas")).toContainText("25 mm", { timeout: 20000 });
 
@@ -218,6 +224,7 @@ test.describe("SketchMath workspace", () => {
     await page.getByLabel("Width dimension value").fill("40");
     await page.screenshot({ path: screenshotPath("sketchmath-context-width-edge.png"), fullPage: true });
     await page.getByRole("button", { name: "Apply dimension" }).click();
+    await commitDimensionPreview(page);
     await expect(page.getByTestId("sketchmath-canvas")).toContainText("40 mm", { timeout: 20000 });
 
     await clickSvgPrimitiveCenter(page, '[data-testid^="entity-rect_"][data-testid$="_bc"] line');
@@ -226,6 +233,7 @@ test.describe("SketchMath workspace", () => {
     await page.getByRole("button", { name: "Edit Height" }).click();
     await page.getByLabel("Height dimension value").fill("25");
     await page.getByRole("button", { name: "Apply dimension" }).click();
+    await commitDimensionPreview(page);
     await expect(page.getByTestId("sketchmath-canvas")).toContainText("25 mm", { timeout: 20000 });
 
     await clickSvgPrimitiveCenter(page, '[data-testid^="entity-rect_"][data-testid$="_ab"] line', { shift: true });

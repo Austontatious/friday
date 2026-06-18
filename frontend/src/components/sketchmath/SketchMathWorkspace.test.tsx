@@ -364,6 +364,67 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
     return setSnapshot(nextItems as Entity[], [], command, mutate);
   };
 
+  const setRectangleDimension = (command: any, mutate: boolean) => {
+    const baseId = (command.selection as string[])
+      .map((entityId) => {
+        if (entityId.startsWith("profile_rect_")) {
+          return entityId.replace(/^profile_/, "");
+        }
+        const match = /^(rect_.+)_(a|b|c|d|ab|bc|cd|da)$/.exec(entityId);
+        return match ? match[1] : null;
+      })
+      .find(Boolean);
+    if (!baseId) {
+      throw new Error("set_rectangle_dimension requires rectangle selection");
+    }
+    const pointById = new Map(
+      snapshot.selection_context.items.filter((item): item is Extract<Entity, { type: "point_2d" }> => item.type === "point_2d").map((item) => [item.id, item] as const),
+    );
+    const lineById = new Map(
+      snapshot.selection_context.items.filter((item): item is Extract<Entity, { type: "line_2d" }> => item.type === "line_2d").map((item) => [item.id, item] as const),
+    );
+    const a = pointById.get(`${baseId}_a`);
+    const top = lineById.get(`${baseId}_ab`);
+    const left = lineById.get(`${baseId}_da`);
+    if (!a || !top || !left) {
+      throw new Error("Rectangle geometry is incomplete");
+    }
+    const currentWidth = Math.abs(top.end[0] - top.start[0]);
+    const currentHeight = Math.abs(left.start[1] - left.end[1]);
+    const width = command.parameters.dimension === "width" ? Number(command.parameters.value) : currentWidth;
+    const height = command.parameters.dimension === "height" ? Number(command.parameters.value) : currentHeight;
+    const signX = top.end[0] >= top.start[0] ? 1 : -1;
+    const signY = left.start[1] >= left.end[1] ? 1 : -1;
+    const topLeft: [number, number] = [a.coords[0], a.coords[1]];
+    const topRight: [number, number] = [Number((a.coords[0] + signX * width).toFixed(2)), a.coords[1]];
+    const bottomLeft: [number, number] = [a.coords[0], Number((a.coords[1] + signY * height).toFixed(2))];
+    const bottomRight: [number, number] = [topRight[0], bottomLeft[1]];
+    const replacements: Record<string, Entity> = {
+      [`${baseId}_a`]: { ...pointById.get(`${baseId}_a`)!, coords: topLeft },
+      [`${baseId}_b`]: { ...pointById.get(`${baseId}_b`)!, coords: topRight },
+      [`${baseId}_c`]: { ...pointById.get(`${baseId}_c`)!, coords: bottomRight },
+      [`${baseId}_d`]: { ...pointById.get(`${baseId}_d`)!, coords: bottomLeft },
+      [`${baseId}_ab`]: { ...lineById.get(`${baseId}_ab`)!, start: topLeft, end: topRight },
+      [`${baseId}_bc`]: { ...lineById.get(`${baseId}_bc`)!, start: topRight, end: bottomRight },
+      [`${baseId}_cd`]: { ...lineById.get(`${baseId}_cd`)!, start: bottomRight, end: bottomLeft },
+      [`${baseId}_da`]: { ...lineById.get(`${baseId}_da`)!, start: bottomLeft, end: topLeft },
+      [`profile_${baseId}`]: {
+        id: `profile_${baseId}`,
+        type: "profile_2d",
+        vertices: [topLeft, topRight, bottomRight, bottomLeft, topLeft],
+        area: Number((width * height).toFixed(2)),
+        winding: "counterclockwise",
+        warnings: [],
+        closed: true,
+        locked: false,
+        label: `profile_${baseId}`,
+      },
+    };
+    const changed = Object.keys(replacements);
+    const nextItems = snapshot.selection_context.items.map((item) => replacements[item.id] || item);
+    return setSnapshot(nextItems, changed, command, mutate);
+  };
+
   async function fetchMockImpl(input: RequestInfo | URL, init?: RequestInit): Promise<any> {
     const url = String(input);
     const method = (init?.method || "GET").toUpperCase();
@@ -432,6 +493,9 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
       }
       if (command.command_type === "set_distance") {
         return makeResponse(constraintHandler(command, mutate, "distance_constraint", command.selection.slice(0, 2)));
+      }
+      if (command.command_type === "set_rectangle_dimension") {
+        return makeResponse(setRectangleDimension(command, mutate));
       }
       if (command.command_type === "set_angle") {
         return makeResponse(constraintHandler(command, mutate, "angle_constraint", command.selection.slice(0, 3)));
@@ -597,10 +661,21 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId(`rectangle-selection-outline-${baseId}`)).toBeVisible();
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
-    fireEvent.change(screen.getByLabelText("Rectangle height"), { target: { value: "25" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    expect(screen.getByTestId("sketchmath-preview")).toBeVisible();
+    expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("240 mm");
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
 
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
+    expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("100 mm");
+    await waitFor(() => expect(screen.getByLabelText("Rectangle width")).toHaveValue(40));
+    await waitFor(() => expect(screen.getByLabelText("Rectangle height")).toHaveValue(100));
+
+    fireEvent.change(screen.getByLabelText("Rectangle height"), { target: { value: "25" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
     expect(topEdge.querySelector("line")).toHaveAttribute("x1", "160");
     expect(topEdge.querySelector("line")).toHaveAttribute("x2", "200");
@@ -617,7 +692,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(`profile_${baseId}`);
   });
 
-  it("opens edge-specific rectangle dimension editors from the dimension tool and canvas labels", async () => {
+  it("opens edge-specific rectangle dimension editors from direct label clicks", async () => {
     const { fetchMock } = createSketchmathMock();
     global.fetch = fetchMock as unknown as typeof fetch;
     renderWorkspace();
@@ -630,23 +705,53 @@ describe("SketchMath workspace", () => {
     clickCanvasAt(canvas, 400, 220);
 
     const baseId = `rect_${firstStamp.toString(36)}`;
-    const topEdge = await screen.findByTestId(`entity-${baseId}_ab`);
     const rightEdge = await screen.findByTestId(`entity-${baseId}_bc`);
-    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
-    await userEvent.click(topEdge);
+    const widthLabel = await screen.findByTestId(`dimension-${baseId}-width`);
+    await userEvent.click(widthLabel);
 
     await screen.findByRole("heading", { name: "Edit width dimension" });
     fireEvent.change(screen.getByLabelText("Width dimension value"), { target: { value: "40" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    const previewCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("set_rectangle_dimension"));
+    expect(previewCall).toBeTruthy();
+    const previewBody = JSON.parse(String(previewCall?.[1]?.body || "{}"));
+    expect(previewBody.command).toMatchObject({
+      mode: "preview",
+      command_type: "set_rectangle_dimension",
+      selection: [
+        `${baseId}_a`,
+        `${baseId}_b`,
+        `${baseId}_c`,
+        `${baseId}_d`,
+        `${baseId}_ab`,
+        `${baseId}_bc`,
+        `${baseId}_cd`,
+        `${baseId}_da`,
+        `profile_${baseId}`,
+      ],
+      parameters: { dimension: "width", value: 40, unit: "mm" },
+    });
+    expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("240 mm");
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Width edge");
+    await userEvent.click(screen.getByRole("button", { name: "Revert Preview" }));
+    await waitFor(() => expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull());
+    expect(screen.queryByTestId("sketchmath-preview")).toBeNull();
+    expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("240 mm");
+    await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
     await waitFor(() =>
       expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Underdefined: width and height set, position is free"),
     );
 
-    await userEvent.dblClick(screen.getByTestId(`dimension-${baseId}-height`));
+    await userEvent.click(screen.getByTestId(`dimension-${baseId}-height`));
     await screen.findByRole("heading", { name: "Edit height dimension" });
     fireEvent.change(screen.getByLabelText("Height dimension value"), { target: { value: "25" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
 
     await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
@@ -742,6 +847,8 @@ describe("SketchMath workspace", () => {
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
 
     await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
@@ -749,6 +856,8 @@ describe("SketchMath workspace", () => {
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Height edge"));
     fireEvent.change(screen.getByLabelText("Height dimension value"), { target: { value: "25" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
 
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Closed profile: valid");
