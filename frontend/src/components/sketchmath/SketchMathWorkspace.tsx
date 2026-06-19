@@ -1682,7 +1682,7 @@ const SketchMathWorkspace = () => {
           </div>
           <div className="friday-status-grid" aria-label="SketchMath runtime status">
             <span><b>Mode</b> CAD workspace</span>
-            <span><b>Route</b> Deterministic CAD executor</span>
+            <span><b>Route / Model</b> Deterministic CAD executor</span>
             <span><b>Context</b> {committedEntities.length} entities / {committedContext.constraints.length} constraints</span>
             <span><b>Health</b> {error ? "Degraded" : "Ready"}</span>
           </div>
@@ -1693,9 +1693,9 @@ const SketchMathWorkspace = () => {
 
         <Box className="friday-workbench sketchmath-workbench-layout">
           <Box className="friday-workspace-pane sketchmath-main-pane">
-            <Box className="sketchmath-shell-header">
+            <Box className="sketchmath-shell-header sketchmath-workspace-summary">
               <VStack align="start" spacing={1}>
-                <Text opacity={0.8}>Deterministic 2D drawing pad mounted inside FRIDAY.</Text>
+                <Text opacity={0.8}>Canvas-first deterministic sketching inside FRIDAY.</Text>
                 <Text fontSize="sm" opacity={0.6}>
                   Session: {sessionId || "loading"} {sessionMetadata.storage_path ? `• ${String(sessionMetadata.storage_path)}` : ""}
                 </Text>
@@ -1742,11 +1742,11 @@ const SketchMathWorkspace = () => {
             <section className="friday-session-map" data-testid="friday-session-map">
               <h2>Session Map</h2>
               <dl>
-                <div><dt>Objective</dt><dd>Model a 2D sketch and produce CAD-ready geometry.</dd></div>
+                <div><dt>Objective</dt><dd>Build a constrained sketch and export CAD-ready geometry.</dd></div>
                 <div><dt>Workspace</dt><dd>SketchMath canvas</dd></div>
-                <div><dt>Recent decisions</dt><dd>{history.length ? history.slice(-3).map((entry) => entry.command.command_type).join(" / ") : "No commands yet"}</dd></div>
+                <div><dt>Recent decisions</dt><dd>{history.length ? history.slice(-3).map((entry) => entry.command.command_type).join(" / ") : "No geometry commands yet"}</dd></div>
                 <div><dt>Attached context</dt><dd>{selectionRef.summary}</dd></div>
-                <div><dt>Artifacts</dt><dd>{cadExportPath || "No export artifact"}</dd></div>
+                <div><dt>Artifacts</dt><dd>{cadExportPath || "No STEP export yet"}</dd></div>
               </dl>
             </section>
           <Box className="sketchmath-panel" data-testid="sketchmath-workbench-panel">

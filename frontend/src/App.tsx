@@ -130,6 +130,15 @@ const MarkdownDocument = ({ content }: { content: string }) => {
           return <h1 key={index}>{renderInlineMarkdown(block.slice(2))}</h1>;
         }
         const lines = block.split("\n");
+        if (lines.every((line) => /^>\s?/.test(line))) {
+          return (
+            <blockquote key={index}>
+              {lines.map((line, lineIndex) => (
+                <p key={lineIndex}>{renderInlineMarkdown(line.replace(/^>\s?/, ""))}</p>
+              ))}
+            </blockquote>
+          );
+        }
         if (lines.every((line) => /^[-*]\s+/.test(line))) {
           return (
             <ul key={index}>
@@ -168,8 +177,8 @@ const App = () => {
   ]);
   const [routeHistory, setRouteHistory] = useState<RouteEntry[]>([]);
   const [artifacts, setArtifacts] = useState<ArtifactEntry[]>([]);
-  const [contextUsage, setContextUsage] = useState("Context unavailable");
-  const [healthLabel, setHealthLabel] = useState("UI ready");
+  const [contextUsage, setContextUsage] = useState("Awaiting response");
+  const [healthLabel, setHealthLabel] = useState("Idle");
   const [sessionMapOpen, setSessionMapOpen] = useState(true);
   const sketchMathEnabled = isSketchMathEnabled();
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -310,7 +319,7 @@ const App = () => {
           </div>
           <div className="friday-status-grid" aria-label="Runtime status">
             <span><b>Mode</b> Direct Friday</span>
-            <span><b>Route</b> {routeHistory[0]?.label || "Direct Friday / default"}</span>
+            <span><b>Route / Model</b> {routeHistory[0]?.label || "Direct Friday standby"}</span>
             <span><b>Context</b> {contextUsage}</span>
             <span className={`friday-health friday-health-${healthLabel.toLowerCase().replace(/\s+/g, "-")}`}><b>Health</b> {healthLabel}</span>
           </div>
@@ -324,8 +333,14 @@ const App = () => {
             <div className="friday-chat-history" data-testid="friday-chat-history">
               {messages.length === 0 ? (
                 <div className="friday-empty-state">
+                  <span className="friday-empty-eyebrow">Ready workspace</span>
                   <h2>Direct Friday</h2>
-                  <p>Ask for planning, coding support, operational checks, or a concise readout. Responses render as documents here; operational failures are tracked in system events.</p>
+                  <p>Ask for planning, coding support, operational checks, or a concise readout. Assistant replies render as clean documents; transport and tool failures stay in the sidecar.</p>
+                  <div className="friday-empty-hints" aria-label="Direct Friday empty state capabilities">
+                    <span>Markdown output</span>
+                    <span>Event-aware failures</span>
+                    <span>Quiet telemetry</span>
+                  </div>
                 </div>
               ) : (
                 messages.map((message, index) => (
@@ -391,11 +406,11 @@ const App = () => {
             {sessionMapOpen ? (
               <section className="friday-session-map" data-testid="friday-session-map">
                 <dl>
-                  <div><dt>Objective</dt><dd>{messages[0]?.content || "Awaiting first prompt"}</dd></div>
+                  <div><dt>Objective</dt><dd>{messages[0]?.content || "No active objective yet"}</dd></div>
                   <div><dt>Workspace</dt><dd>Direct Friday chat</dd></div>
-                  <div><dt>Recent decisions</dt><dd>{recentDecisions.length ? recentDecisions.join(" / ") : "None yet"}</dd></div>
-                  <div><dt>Attached context</dt><dd>{pendingIds.length ? `${pendingIds.length} memory confirmations` : "No pending context"}</dd></div>
-                  <div><dt>Artifacts</dt><dd>{artifacts.length ? `${artifacts.length} tracked` : "None"}</dd></div>
+                  <div><dt>Recent decisions</dt><dd>{recentDecisions.length ? recentDecisions.join(" / ") : "No assistant decisions captured"}</dd></div>
+                  <div><dt>Attached context</dt><dd>{pendingIds.length ? `${pendingIds.length} memory confirmations pending` : "No pending context attachments"}</dd></div>
+                  <div><dt>Artifacts</dt><dd>{artifacts.length ? `${artifacts.length} tracked` : "No response artifacts"}</dd></div>
                 </dl>
               </section>
             ) : null}
@@ -421,7 +436,7 @@ const App = () => {
                     <strong>{entry.label}</strong>
                     <span>{entry.detail}</span>
                   </article>
-                )) : <p>No requests yet.</p>}
+                )) : <p className="friday-quiet-empty">No route decisions yet. The active model path will appear after the first response.</p>}
               </div>
             </section>
 
@@ -433,7 +448,7 @@ const App = () => {
                     <strong>{artifact.label}</strong>
                     <span>{artifact.detail}</span>
                   </article>
-                )) : <p>No artifacts attached.</p>}
+                )) : <p className="friday-quiet-empty">No generated artifacts for this session.</p>}
               </div>
             </section>
           </aside>

@@ -152,7 +152,7 @@ describe("FRIDAY shell", () => {
 
   it("renders assistant markdown as document content", async () => {
     mockSendPrompt.mockResolvedValue({
-      assistant_text: "## Plan\n\n- Inspect shell\n- Ship `telemetry`\n\n```ts\nconst ok = true;\n```",
+      assistant_text: "## Plan\n\n- Inspect shell\n- Ship `telemetry`\n\n> Keep the sidecar quiet.\n\n```ts\nconst ok = true;\n```",
     });
 
     renderApp();
@@ -163,6 +163,7 @@ describe("FRIDAY shell", () => {
     expect(await screen.findByRole("heading", { name: "Plan" })).toBeVisible();
     expect(await screen.findByText("Inspect shell")).toBeVisible();
     expect(await screen.findByText("telemetry")).toBeVisible();
+    expect(await screen.findByText("Keep the sidecar quiet.")).toBeVisible();
     expect(await screen.findByText("const ok = true;")).toBeVisible();
   });
 
