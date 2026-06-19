@@ -572,6 +572,11 @@ input {
   background: rgba(255, 255, 255, 0.018);
 }
 
+.friday-event-header {
+  display: grid;
+  gap: 2px;
+}
+
 .friday-event span,
 .friday-telemetry-list span {
   display: block;
@@ -612,6 +617,39 @@ input {
 
 .friday-event-success {
   border-color: rgba(111, 255, 194, 0.28);
+}
+
+.friday-raw-details {
+  margin-top: 8px;
+  border-top: 1px solid rgba(174, 194, 211, 0.1);
+  color: var(--friday-muted-2);
+  font-size: 11px;
+}
+
+.friday-raw-details summary {
+  width: max-content;
+  padding-top: 7px;
+  color: var(--friday-muted-2);
+  cursor: pointer;
+}
+
+.friday-raw-details summary:hover {
+  color: var(--friday-accent);
+}
+
+.friday-raw-details pre {
+  max-height: 220px;
+  margin: 8px 0 0;
+  overflow: auto;
+  padding: 9px;
+  border: 1px solid rgba(174, 194, 211, 0.12);
+  border-radius: 7px;
+  background: rgba(3, 7, 11, 0.55);
+  color: var(--friday-muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 @layer utilities {

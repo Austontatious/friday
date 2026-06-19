@@ -644,6 +644,9 @@ describe("SketchMath workspace", () => {
 
     await screen.findByText("SketchMath");
     expect(screen.getByTestId("sketchmath-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("friday-telemetry-panel")).toBeInTheDocument();
+    expect(screen.getByText("Workspace initialized")).toBeVisible();
+    expect(screen.getAllByText("Raw details").length).toBeGreaterThan(0);
     expect(screen.getByTestId("sketchmath-canvas")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Select" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Line" })).toBeVisible();

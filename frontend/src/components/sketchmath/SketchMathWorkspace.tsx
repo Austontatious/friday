@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Button, Heading, HStack, Input, Link, Spinner, Text, useColorMode, useToast, VStack } from "@chakra-ui/react";
 import SketchCanvas2D from "./SketchCanvas2D";
 import SketchMathToolbar from "./SketchMathToolbar";
@@ -6,6 +6,9 @@ import SelectionInspector from "./SelectionInspector";
 import CommandPanel from "./CommandPanel";
 import OperationHistoryPanel from "./OperationHistoryPanel";
 import MeasurementPanel from "./MeasurementPanel";
+import TelemetryEventList from "../telemetry/TelemetryEventList";
+import type { TelemetryEvent } from "../../telemetry/sessionTelemetry";
+import { makeTelemetryEvent } from "../../telemetry/sessionTelemetry";
 import type {
   SketchMathCommand,
   SketchMathEntity,
@@ -249,13 +252,19 @@ const SketchMathWorkspace = () => {
   const [cadExportPath, setCadExportPath] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [systemEvents, setSystemEvents] = useState<TelemetryEvent[]>([]);
   const canvasDragRef = useRef<{ start: Point; moved: boolean; forceSquare: boolean } | null>(null);
   const pointDragRef = useRef<{ entityId: string; start: Point; current: Point; moved: boolean } | null>(null);
   const ignoreNextCanvasClickRef = useRef(false);
+  const notifiedArtifactPathsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     document.documentElement.dataset.fridayTheme = colorMode;
   }, [colorMode]);
+
+  const appendEvents = useCallback((events: TelemetryEvent[]) => {
+    setSystemEvents((previous) => [...[...events].reverse(), ...previous].slice(0, 16));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -276,6 +285,18 @@ const SketchMathWorkspace = () => {
         setSessionMetadata(snapshot.session_metadata || {});
         setHistory(snapshot.history);
         setPendingCommandText("");
+        appendEvents([
+          makeTelemetryEvent("workspace_initialized", {
+            detail: `SketchMath session ${snapshot.session_id} ready.`,
+            raw: {
+              session_id: snapshot.session_id,
+              storage_path: snapshot.session_metadata?.storage_path,
+              entities: snapshot.selection_context.items.length,
+              constraints: snapshot.selection_context.constraints.length,
+              history_length: snapshot.history_length,
+            },
+          }),
+        ]);
       } catch (initialError) {
         try {
           const snapshot = await createSketchMathSession();
@@ -288,9 +309,32 @@ const SketchMathWorkspace = () => {
           setSessionMetadata(snapshot.session_metadata || {});
           setHistory(snapshot.history);
           setPendingCommandText("");
+          appendEvents([
+            makeTelemetryEvent("fallback_attempted", {
+              detail: "Stored SketchMath session could not be restored; a new session was created.",
+              raw: initialError instanceof Error ? { message: initialError.message, stack: initialError.stack } : initialError,
+            }),
+            makeTelemetryEvent("workspace_initialized", {
+              detail: `SketchMath session ${snapshot.session_id} ready.`,
+              raw: {
+                session_id: snapshot.session_id,
+                storage_path: snapshot.session_metadata?.storage_path,
+                entities: snapshot.selection_context.items.length,
+                constraints: snapshot.selection_context.constraints.length,
+                history_length: snapshot.history_length,
+              },
+            }),
+          ]);
         } catch (err) {
           if (!cancelled) {
-            setError(err instanceof Error ? err.message : "Failed to initialize SketchMath");
+            const detail = err instanceof Error ? err.message : "Failed to initialize SketchMath";
+            setError(detail);
+            appendEvents([
+              makeTelemetryEvent("request_failed", {
+                detail,
+                raw: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+              }),
+            ]);
           }
         }
       } finally {
@@ -303,7 +347,20 @@ const SketchMathWorkspace = () => {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [appendEvents, enabled]);
+
+  useEffect(() => {
+    if (!cadExportPath || notifiedArtifactPathsRef.current.has(cadExportPath)) {
+      return;
+    }
+    notifiedArtifactPathsRef.current.add(cadExportPath);
+    appendEvents([
+      makeTelemetryEvent("artifact_created", {
+        detail: `STEP export available: ${cadExportPath}`,
+        raw: { path: cadExportPath, workspace: "sketchmath" },
+      }),
+    ]);
+  }, [appendEvents, cadExportPath]);
 
   const committedEntities = committedContext.items;
   const selectedEntities = useMemo(
@@ -1748,6 +1805,10 @@ const SketchMathWorkspace = () => {
                 <div><dt>Attached context</dt><dd>{selectionRef.summary}</dd></div>
                 <div><dt>Artifacts</dt><dd>{cadExportPath || "No STEP export yet"}</dd></div>
               </dl>
+            </section>
+            <section>
+              <h2>System Events</h2>
+              <TelemetryEventList events={systemEvents} emptyMessage="SketchMath lifecycle events will appear here." />
             </section>
           <Box className="sketchmath-panel" data-testid="sketchmath-workbench-panel">
             <Heading size="sm" mb={3} className="sketchmath-panel-title">

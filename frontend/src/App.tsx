@@ -5,84 +5,23 @@ import { useNavigate } from "react-router-dom";
 import type { ChatMode } from "./services/api";
 import { confirmMemory, getStoredChatMode, sendPrompt, setStoredChatMode } from "./services/api";
 import { isSketchMathEnabled } from "./services/sketchmath";
-import type { ModelResponse } from "./types";
+import TelemetryEventList from "./components/telemetry/TelemetryEventList";
+import type { TelemetryArtifact, TelemetryEvent, TelemetryRouteEntry } from "./telemetry/sessionTelemetry";
+import {
+  buildResponseTelemetryEvents,
+  extractArtifacts,
+  extractContextUsage,
+  extractRouteLabel,
+  makeTelemetryEvent,
+  nowLabel,
+} from "./telemetry/sessionTelemetry";
 
 type Message = {
   sender: "user" | "ai";
   content: string;
 };
 
-type SystemEvent = {
-  id: string;
-  level: "info" | "success" | "warning" | "danger";
-  title: string;
-  detail: string;
-  timestamp: string;
-};
-
-type RouteEntry = {
-  label: string;
-  detail: string;
-  timestamp: string;
-};
-
-type ArtifactEntry = {
-  label: string;
-  detail: string;
-};
-
 const shellVersion = "2026-06-18-command-center-shell-v1";
-
-const nowLabel = () =>
-  new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(new Date());
-
-const makeEvent = (
-  level: SystemEvent["level"],
-  title: string,
-  detail: string,
-): SystemEvent => ({
-  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-  level,
-  title,
-  detail,
-  timestamp: nowLabel(),
-});
-
-const extractRouteLabel = (response: ModelResponse, mode: ChatMode): string => {
-  const meta = response.meta || {};
-  const route = meta.route || meta.router || meta.routing_path || meta.profile || meta.alias;
-  const model = meta.model || meta.model_name || meta.route_model || meta.provider_model;
-  return [route, model].filter(Boolean).join(" / ") || (mode === "direct_friday" ? "Direct Friday / default" : "Legacy route");
-};
-
-const extractContextUsage = (response: ModelResponse): string => {
-  const meta = response.meta || {};
-  const usage = meta.context_usage || meta.token_usage || meta.usage || meta.tokens;
-  if (!usage) return "Context unavailable";
-  if (typeof usage === "string") return usage;
-  if (typeof usage === "number") return `${usage} tokens`;
-  const used = usage.used || usage.prompt_tokens || usage.input_tokens || usage.total_tokens;
-  const limit = usage.limit || usage.max || usage.context_limit;
-  return used && limit ? `${used}/${limit}` : used ? `${used} tokens` : "Context reported";
-};
-
-const extractArtifacts = (response: ModelResponse): ArtifactEntry[] => {
-  const metaArtifacts = response.meta?.artifacts;
-  if (!Array.isArray(metaArtifacts)) return [];
-  return metaArtifacts.slice(0, 6).map((artifact, index) => {
-    if (typeof artifact === "string") {
-      return { label: `Artifact ${index + 1}`, detail: artifact };
-    }
-    return {
-      label: String(artifact.name || artifact.label || artifact.type || `Artifact ${index + 1}`),
-      detail: String(artifact.path || artifact.url || artifact.detail || artifact.id || "Attached to response"),
-    };
-  });
-};
 
 const renderInlineMarkdown = (text: string) => {
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g);
@@ -172,11 +111,14 @@ const App = () => {
   const [mode, setMode] = useState<ChatMode>(() => getStoredChatMode());
   const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
-  const [systemEvents, setSystemEvents] = useState<SystemEvent[]>([
-    makeEvent("success", "Shell ready", "Direct Friday workspace initialized."),
+  const [systemEvents, setSystemEvents] = useState<TelemetryEvent[]>([
+    makeTelemetryEvent("session_started", {
+      detail: "Direct Friday workspace initialized.",
+      raw: { workspace: "direct_friday" },
+    }),
   ]);
-  const [routeHistory, setRouteHistory] = useState<RouteEntry[]>([]);
-  const [artifacts, setArtifacts] = useState<ArtifactEntry[]>([]);
+  const [routeHistory, setRouteHistory] = useState<TelemetryRouteEntry[]>([]);
+  const [artifacts, setArtifacts] = useState<TelemetryArtifact[]>([]);
   const [contextUsage, setContextUsage] = useState("Awaiting response");
   const [healthLabel, setHealthLabel] = useState("Idle");
   const [sessionMapOpen, setSessionMapOpen] = useState(true);
@@ -200,8 +142,8 @@ const App = () => {
     return firstLine.replace(/^#+\s*/, "").slice(0, 96);
   });
 
-  const appendEvent = (event: SystemEvent) => {
-    setSystemEvents((previous) => [event, ...previous].slice(0, 12));
+  const appendEvents = (events: TelemetryEvent[]) => {
+    setSystemEvents((previous) => [...[...events].reverse(), ...previous].slice(0, 16));
   };
 
   const handleSend = async () => {
@@ -211,35 +153,46 @@ const App = () => {
     setInput("");
     setMessages((prev) => [...prev, { sender: "user", content: currentInput }]);
     setHealthLabel("Requesting");
-    appendEvent(makeEvent("info", "Prompt sent", `Direct Friday request queued: ${currentInput.slice(0, 90)}`));
+    appendEvents([
+      makeTelemetryEvent("prompt_queued", {
+        detail: `Direct Friday prompt queued: ${currentInput.slice(0, 90)}`,
+        raw: { mode, prompt: currentInput },
+      }),
+      makeTelemetryEvent("request_sent", {
+        detail: "POST /chat request sent from the command shell.",
+        raw: { mode, endpoint: mode === "direct_friday" ? "/chat" : "/althing/chat" },
+      }),
+    ]);
 
     try {
       const response = await sendPrompt({ prompt: currentInput }, mode);
       const cleaned = response.assistant_text || response.text || "FRIDAY gave no valid reply.";
       const routeLabel = extractRouteLabel(response, mode);
+      const responseArtifacts = extractArtifacts(response);
+      const responsePending = Array.isArray(response.memory?.pending_ids)
+        ? response.memory?.pending_ids ?? []
+        : [];
 
       setMessages((prev) => [...prev, { sender: "ai", content: cleaned }]);
       setContextUsage(extractContextUsage(response));
       setHealthLabel("Healthy");
       setRouteHistory((previous) => [
-        { label: routeLabel, detail: response.meta?.fallback ? `Fallback: ${String(response.meta.fallback)}` : "Primary path", timestamp: nowLabel() },
+        { label: routeLabel, detail: response.meta?.fallback && response.meta.fallback !== "none" ? `Fallback: ${String(response.meta.fallback)}` : "Primary path", timestamp: nowLabel() },
         ...previous,
       ].slice(0, 8));
-      setArtifacts((previous) => [...extractArtifacts(response), ...previous].slice(0, 8));
+      setArtifacts((previous) => [...responseArtifacts, ...previous].slice(0, 8));
 
-      const responsePending = Array.isArray(response.memory?.pending_ids)
-        ? response.memory?.pending_ids ?? []
-        : [];
       setPendingIds(responsePending);
-      appendEvent(makeEvent("success", "Assistant response", `${routeLabel}; ${responsePending.length} memory confirmations pending.`));
-
-      if (Array.isArray(response.tools) && response.tools.length > 0) {
-        appendEvent(makeEvent("info", "Tool calls", `${response.tools.length} tool call${response.tools.length === 1 ? "" : "s"} reported by response.`));
-      }
+      appendEvents(buildResponseTelemetryEvents(response, mode, routeLabel, responseArtifacts));
     } catch (err) {
       const detail = err instanceof Error ? err.message : "Unknown request failure";
       setHealthLabel("Degraded");
-      appendEvent(makeEvent("danger", "Request failed", detail));
+      appendEvents([
+        makeTelemetryEvent("request_failed", {
+          detail,
+          raw: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+        }),
+      ]);
     }
 
     if (document.activeElement instanceof HTMLElement) {
@@ -253,7 +206,13 @@ const App = () => {
     setConfirming(true);
     try {
       await confirmMemory({ pending_ids: pendingIds, decision });
-      appendEvent(makeEvent("success", decision === "accept" ? "Memory saved" : "Memory discarded", `${pendingIds.length} pending item${pendingIds.length === 1 ? "" : "s"} processed.`));
+      appendEvents([
+        makeTelemetryEvent("artifact_created", {
+          title: decision === "accept" ? "Memory saved" : "Memory discarded",
+          detail: `${pendingIds.length} pending item${pendingIds.length === 1 ? "" : "s"} processed.`,
+          raw: { pending_ids: pendingIds, decision },
+        }),
+      ]);
       setPendingIds([]);
       toast({
         title: decision === "accept" ? "Saved" : "Discarded",
@@ -263,7 +222,13 @@ const App = () => {
       });
     } catch (err) {
       const detail = err instanceof Error ? err.message : "Memory confirmation failed";
-      appendEvent(makeEvent("danger", "Memory confirmation failed", detail));
+      appendEvents([
+        makeTelemetryEvent("request_failed", {
+          title: "Memory confirmation failed",
+          detail,
+          raw: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+        }),
+      ]);
       toast({
         title: "Memory confirmation failed",
         status: "error",
@@ -278,7 +243,13 @@ const App = () => {
   const setActiveMode = (nextMode: ChatMode) => {
     setMode(nextMode);
     setStoredChatMode(nextMode);
-    appendEvent(makeEvent("info", "Workspace changed", "Direct Friday mode selected."));
+    appendEvents([
+      makeTelemetryEvent("workspace_initialized", {
+        title: "Workspace changed",
+        detail: "Direct Friday mode selected.",
+        raw: { mode: nextMode },
+      }),
+    ]);
   };
 
   return (
@@ -417,15 +388,7 @@ const App = () => {
 
             <section>
               <h2>System Events</h2>
-              <div className="friday-event-list">
-                {systemEvents.map((event) => (
-                  <article key={event.id} className={`friday-event friday-event-${event.level}`}>
-                    <span>{event.timestamp}</span>
-                    <strong>{event.title}</strong>
-                    <p>{event.detail}</p>
-                  </article>
-                ))}
-              </div>
+              <TelemetryEventList events={systemEvents} emptyMessage="Lifecycle events will appear after the first action." />
             </section>
 
             <section>

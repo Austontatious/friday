@@ -133,9 +133,13 @@ describe("FRIDAY shell", () => {
     process.env.REACT_APP_SKETCHMATH_ENABLED = "1";
     mockSendPrompt.mockResolvedValue({
       text: "Direct Friday reply",
+      tools: [{ name: "repo_search", status: "completed", duration_ms: 42 }],
       meta: {
+        route: "direct",
         model: "local-test-model",
         context_usage: { used: 1200, limit: 4096 },
+        fallback: "none",
+        artifacts: [{ name: "Run summary", path: "artifacts/session/run-summary.md" }],
       },
     });
 
@@ -147,6 +151,13 @@ describe("FRIDAY shell", () => {
     expect((await screen.findAllByText("hello friday"))[0]).toBeVisible();
     expect((await screen.findAllByText("Direct Friday reply"))[0]).toBeVisible();
     expect((await screen.findAllByText(/local-test-model/))[0]).toBeVisible();
+    expect(await screen.findByText("Prompt queued")).toBeVisible();
+    expect(await screen.findByText("Request sent")).toBeVisible();
+    expect(await screen.findByText("Route selected")).toBeVisible();
+    expect(await screen.findByText("Response completed")).toBeVisible();
+    expect(await screen.findByText("Tool call completed")).toBeVisible();
+    expect(await screen.findByText("Artifact created")).toBeVisible();
+    expect(screen.getAllByText("Raw details").length).toBeGreaterThan(0);
     expect(mockSendPrompt).toHaveBeenCalled();
   });
 
@@ -177,6 +188,9 @@ describe("FRIDAY shell", () => {
 
     expect(await screen.findByText("Request failed")).toBeVisible();
     expect(await screen.findByText("HTTP 503: backend offline")).toBeVisible();
+    expect(await screen.findByText("Prompt queued")).toBeVisible();
+    expect(await screen.findByText("Request sent")).toBeVisible();
+    expect(screen.getAllByText("Raw details").length).toBeGreaterThan(0);
     expect(screen.queryByText("[Direct Friday request failed.]")).toBeNull();
   });
 });
