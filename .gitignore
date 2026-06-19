@@ -39,6 +39,12 @@ chromadb/
 dist/
 build/
 
+# Android local SDK/build caches
+android/.android-sdk/
+android/.jdk/
+android/.gradle/
+android/**/build/
+
 # Prevent accidentally committing large files
 *.bak
 *.old
@@ -59,6 +65,13 @@ results/
 # Ignore local test artifacts
 fix_log.txt
 friday.log
+frontend/test-results/
+playwright-report/
+
+# Local runtime markers
+*.pid
+docs/local_gateway/*latest*.json
+docs/local_gateway/*latest*.pid
 
 /workspace/ai-lab/friday/tmp/
 /workspace/ai-lab/friday/NOT Frday App Stuff/
