@@ -13,6 +13,7 @@ from backend.api.health import router as health_router
 from backend.api.jobs import router as jobs_router
 from backend.api.memory_debug import router as memory_debug_router
 from backend.api.memory_provider import router as memory_provider_router
+from backend.api.sketchmath import router as sketchmath_router
 from backend.api.stubs import router as stubs_router
 from backend.middleware.identity import IdentityMiddleware
 from backend.tools import builtins as _tool_builtins  # register built-in tools
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router, prefix="/api")
     app.include_router(memory_debug_router, prefix="/api")
     app.include_router(memory_provider_router, prefix="/api")
+    app.include_router(sketchmath_router, prefix="/api")
     app.include_router(stubs_router, prefix="/api")
     app.include_router(health_router)
 

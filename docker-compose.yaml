@@ -34,10 +34,10 @@ services:
       friday-backend:
         condition: service_healthy
 
-  friday-coder:
+  llm:
     extends:
       file: docker-compose.models.yml
-      service: friday-coder
+      service: llm
 
 networks:
   friday_net:
