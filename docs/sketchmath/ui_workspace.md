@@ -27,6 +27,8 @@ The workspace keeps these local UI concerns separate:
 - `theme`
 - `tool`
 - `viewBoxState`
+- `workspaceViewMode`
+- `solidPreviewMesh`
 - `showDebugLabels`
 
 The backend remains the source of truth for committed geometry and history replay. Session IDs are stored locally so a reload can reopen the same persisted session.
@@ -64,10 +66,21 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 ## View Controls
 
+- `2D sketch` shows the existing SVG sketch canvas.
+- `3D solid` shows the last valid extrusion preview mesh returned by `extrude_profile`.
 - `Pan / view` mode lets the user drag the 2D canvas view.
 - `Zoom in`, `Zoom out`, `Fit sketch`, and `Reset view` manipulate the SVG viewBox only; committed geometry remains session-backed.
-- The view widget labels the current surface as `2D sketch plane`.
-- `3D orbit coming soon` is disabled because browser 3D preview/orbit is not implemented in this MVP.
+- The view widget labels the current surface as `2D sketch plane` or `3D solid preview`.
+- In `3D solid`, drag orbits/tilts the preview, shift-drag or right-drag pans, the wheel zooms, and Fit/Reset/Top/Iso/Front controls adjust the camera.
+- Before a valid extrusion exists, `3D solid` shows `Extrude a valid profile to preview the 3D solid.`
+
+## 3D Solid Preview
+
+- `extrude_profile` returns a browser-friendly `preview_mesh` payload alongside `cad_export` metadata.
+- The mesh contains vertices and indexed triangles for top face, bottom face, outer side walls, and through-hole wall geometry.
+- The preview is generated from the same selected profile, stored/profile-requested holes, and extrusion depth used by STEP export.
+- The preview is deterministic confidence/orbit geometry, not a STEP parser and not a full CAD feature tree.
+- Editing rectangle dimensions or hole diameter/center clears the prior solid preview until the user extrudes again.
 
 ## STEP Export
 
@@ -75,11 +88,13 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - The browser downloads STEP files through `GET /api/sketchmath/artifacts/step?path=...`.
 - The API only serves `.step`/`.stp` files under the configured export root.
 - The export card shows filename, size when reported, created time when reported, a friendly selected-profile label, extrusion depth, Download STEP, Export again, and Clear export result.
+- The export card states that the 3D solid preview uses the same profile, holes, and extrusion depth as the STEP export.
 - Failed FreeCAD subprocess exports remove a partial `export.step` if one exists. Broader generated STEP cleanup is manual for this MVP; generated artifacts are runtime output and should not be committed.
 
 ## Runtime Dependencies
 
 - The backend runtime must include `shapely>=2.0.0` for profile-hole validation. Missing Shapely is surfaced in the UI as a dependency/configuration message, with the raw backend payload only available under Advanced / Debug.
+- The canonical app backend currently runs SketchMath with `FRIDAY_WEB_CONCURRENCY=1` because sessions are cached in the backend process. Multi-worker deployment needs a shared session-store invalidation/pass-through pass before it is safe for this workflow.
 
 ## Visual System
 
@@ -92,7 +107,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 ## Non-Goals
 
 - No FreeCAD GUI or broad CAD kernel wrapper.
-- No 3D preview in the browser. The export card states this explicitly instead of presenting a fake viewer.
+- No STEP viewer or full 3D CAD workbench in the browser. The browser preview is a deterministic mesh for the current rectangle/profile/hole extrusion MVP only.
 - No MCP wrapper.
 - No arbitrary Python execution.
 - No direct geometry mutation from React state.

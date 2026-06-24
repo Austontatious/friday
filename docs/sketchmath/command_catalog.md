@@ -83,6 +83,7 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
   - If `parameters.holes` is omitted, stored `profile.holes` are used.
   - The adapter first tries face-with-holes construction, then falls back to boolean subtraction if construction, extrusion, export, validation, bbox, or volume sanity checks fail.
   - The export metadata records the strategy used plus profile winding information so hole orientation is not dependent on user-created polygon order.
+  - The result metadata also includes `preview_mesh`, a deterministic browser mesh for the same selected profile, holes, and extrusion depth. The mesh contains vertices and indexed triangles labelled as `top`, `bottom`, `outer_wall`, and `hole_wall`, plus metadata for profile id, extrusion depth, hole count, units, triangle count, vertex count, and bbox.
 
 ## Constraint Primitives
 
@@ -195,7 +196,7 @@ The browser workspace exposes this when an existing hole is selected. It is used
 
 Extrude payload:
 
-The browser workspace exposes Extrude only for a selected closed profile. It sends a typed `extrude_profile` preview command, shows a textual success state for the accepted profile/hole count, and exposes Export STEP after Commit Preview returns a STEP artifact path.
+The browser workspace exposes Extrude only for a selected closed profile. It sends a typed `extrude_profile` preview command, shows a textual success state for the accepted profile/hole count, renders the returned `preview_mesh` in the `3D solid` view, and exposes Export STEP after Commit Preview returns a STEP artifact path.
 
 ```json
 {

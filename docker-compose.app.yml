@@ -53,6 +53,7 @@ services:
         required: false
     environment:
       - FRIDAY_API_PORT=9001
+      - FRIDAY_WEB_CONCURRENCY=1
       - FRIDAY_DATA_DIR=/data
       - FRIDAY_LOG_DIR=/logs
       - FRIDAY_CODER_AUTO_ROUTE=${FRIDAY_CODER_AUTO_ROUTE:-0}

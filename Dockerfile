@@ -22,6 +22,8 @@ RUN python -m pip install --upgrade pip \
 
 # Copy app code
 COPY backend/ /app/backend/
+COPY core/ /app/core/
+COPY sketchmath/ /app/sketchmath/
 COPY scripts/ /app/scripts/
 COPY start.sh /app/start.sh
 COPY pytest.ini /app/pytest.ini

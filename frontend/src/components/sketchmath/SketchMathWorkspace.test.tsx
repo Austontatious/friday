@@ -90,6 +90,50 @@ const baseSnapshot = (): Snapshot => ({
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
+const makePreviewMesh = (profileId: string, depth: number, holeCount: number) => ({
+  version: "0.1",
+  units: "mm",
+  profile_id: profileId,
+  depth,
+  vertices: [
+    [0, 0, 0],
+    [40, 0, 0],
+    [40, 25, 0],
+    [0, 25, 0],
+    [0, 0, depth],
+    [40, 0, depth],
+    [40, 25, depth],
+    [0, 25, depth],
+    [18, 10, 0],
+    [22, 10, 0],
+    [22, 15, 0],
+    [18, 15, 0],
+    [18, 10, depth],
+    [22, 10, depth],
+    [22, 15, depth],
+    [18, 15, depth],
+  ],
+  triangles: [
+    { indices: [4, 5, 6], surface: "top" },
+    { indices: [4, 6, 7], surface: "top" },
+    { indices: [0, 2, 1], surface: "bottom" },
+    { indices: [0, 3, 2], surface: "bottom" },
+    { indices: [0, 1, 5], surface: "outer_wall" },
+    { indices: [0, 5, 4], surface: "outer_wall" },
+    { indices: [8, 13, 9], surface: "hole_wall", ring_id: "hole" },
+    { indices: [8, 12, 13], surface: "hole_wall", ring_id: "hole" },
+  ],
+  metadata: {
+    profile_id: profileId,
+    extrusion_depth: depth,
+    extrusion_depth_unit: "mm",
+    hole_count: holeCount,
+    triangle_count: 8,
+    vertex_count: 16,
+    bbox: { xmin: 0, xmax: 40, ymin: 0, ymax: 25, zmin: 0, zmax: depth },
+  },
+});
+
 const makeResponse = (payload: any) => ({
   ok: true,
   status: 200,
@@ -533,6 +577,7 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
           hole_profile_ids: holeIds,
         },
       },
+      preview_mesh: makePreviewMesh(profileId, Number(command.parameters.depth), holeIds.length),
     };
     return response;
   };
@@ -689,6 +734,30 @@ describe("SketchMath workspace", () => {
     process.env.REACT_APP_SKETCHMATH_ENABLED = "1";
     stamp.value = 1710000000000;
     jest.spyOn(Date, "now").mockImplementation(() => stamp.value);
+    if (!HTMLCanvasElement.prototype.setPointerCapture) {
+      HTMLCanvasElement.prototype.setPointerCapture = jest.fn();
+    }
+    if (!HTMLCanvasElement.prototype.releasePointerCapture) {
+      HTMLCanvasElement.prototype.releasePointerCapture = jest.fn();
+    }
+    jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      setTransform: jest.fn(),
+      clearRect: jest.fn(),
+      fillRect: jest.fn(),
+      save: jest.fn(),
+      restore: jest.fn(),
+      translate: jest.fn(),
+      scale: jest.fn(),
+      beginPath: jest.fn(),
+      moveTo: jest.fn(),
+      lineTo: jest.fn(),
+      closePath: jest.fn(),
+      fill: jest.fn(),
+      stroke: jest.fn(),
+      fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 1,
+    } as unknown as CanvasRenderingContext2D);
   });
 
   afterEach(() => {
@@ -717,7 +786,13 @@ describe("SketchMath workspace", () => {
     expect(screen.getByRole("button", { name: "Extrude" })).toBeDisabled();
     expect(screen.getByTestId("sketchmath-view-controls")).toBeInTheDocument();
     expect(screen.getByTestId("sketchmath-plane-widget")).toHaveTextContent("2D sketch plane");
-    expect(screen.getByRole("button", { name: "3D orbit coming soon" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "2D sketch" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "3D solid" })).toBeVisible();
+    expect(screen.queryByText("3D orbit coming soon")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "3D solid" }));
+    expect(screen.getByTestId("sketchmath-solid-preview")).toBeInTheDocument();
+    expect(screen.getByTestId("sketchmath-solid-preview-status")).toHaveTextContent("Extrude a valid profile to preview the 3D solid.");
+    await userEvent.click(screen.getByRole("button", { name: "2D sketch" }));
     expect(screen.queryByTestId("friday-session-map")).toBeNull();
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
     expect(screen.queryByTestId("sketchmath-command-box")).toBeNull();
@@ -1197,6 +1272,13 @@ describe("SketchMath workspace", () => {
       },
     });
     await waitFor(() => expect(workbench).toHaveTextContent("Extrude preview ready: profile accepted with 1 hole"));
+    expect(screen.getByTestId("sketchmath-plane-widget")).toHaveTextContent("3D solid preview");
+    expect(screen.getByTestId("sketchmath-solid-preview")).toBeVisible();
+    expect(screen.getByTestId("sketchmath-solid-preview-status")).toHaveTextContent("10 mm extrusion with 1 through-hole");
+    expect(screen.getByRole("button", { name: "Iso" })).toBeEnabled();
+    fireEvent.pointerDown(screen.getByTestId("sketchmath-solid-preview-canvas"), { clientX: 220, clientY: 180, pointerId: 1 });
+    fireEvent.pointerMove(screen.getByTestId("sketchmath-solid-preview-canvas"), { clientX: 270, clientY: 210, pointerId: 1 });
+    fireEvent.pointerUp(screen.getByTestId("sketchmath-solid-preview-canvas"), { clientX: 270, clientY: 210, pointerId: 1 });
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
@@ -1494,7 +1576,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("Download is served through FRIDAY");
     expect(screen.getByTestId("sketchmath-export-metadata")).toHaveTextContent("2048 bytes");
     expect(screen.getByTestId("sketchmath-export-metadata")).toHaveTextContent("10 mm");
-    expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("3D preview is not implemented");
+    expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("The 3D solid preview uses the same profile, holes, and extrusion depth.");
     expect(screen.getByRole("link", { name: "Download STEP" })).toHaveAttribute(
       "href",
       expect.stringMatching(/^\/api\/sketchmath\/artifacts\/step\?path=%2Ftmp%2Fsketchmath%2Fextrude_profile_.+%2Fexport\.step$/),
@@ -1543,6 +1625,10 @@ describe("SketchMath workspace", () => {
     fireEvent.change(screen.getByLabelText("Extrusion depth"), { target: { value: "15" } });
     await userEvent.click(within(workbench).getByRole("button", { name: "Extrude" }));
     await waitFor(() => expect(screen.getByTestId("sketchmath-cad-feature-summary")).toHaveTextContent("Extrude preview ready: profile accepted with 1 hole"));
+    expect(screen.getByTestId("sketchmath-solid-preview")).toBeVisible();
+    expect(screen.getByTestId("sketchmath-solid-preview-status")).toHaveTextContent("15 mm extrusion with 1 through-hole");
+    expect(screen.getByRole("button", { name: "Top" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Front" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("Export succeeded"));

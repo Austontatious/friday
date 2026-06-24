@@ -28,6 +28,7 @@ from sketchmath.models.constraints import (
 )
 from sketchmath.cad.adapter import CadAdapter
 from sketchmath.cad.profile_holes import validate_profile_holes
+from sketchmath.cad.preview_mesh import build_preview_mesh
 from sketchmath.models.entities import (
     Axis2DEntity,
     ConstructionLine2DEntity,
@@ -767,9 +768,17 @@ def _handle_extrude_profile(command: GeometryCommand, state: SelectionContext) -
         selection_set_id=state.selection_set_id,
         command_id=command.command_id,
     )
+    preview_mesh = build_preview_mesh(
+        profile,
+        holes=holes,
+        depth=depth,
+        depth_unit=depth_unit,
+        validation=validation,
+    )
     metadata = {
         "cad_export": export.model_dump(mode="json"),
         "profile_hole_validation": validation.to_dict(),
+        "preview_mesh": preview_mesh,
     }
     value = export.measurements.volume_mm3 if export.measurements is not None else None
     return state, [], value, "mm^3" if value is not None else None, metadata

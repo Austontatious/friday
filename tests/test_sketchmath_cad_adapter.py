@@ -124,6 +124,11 @@ def test_extrude_profile_preview_does_not_mutate_state() -> None:
     assert [tuple(vertex) for vertex in session.state.items[0].vertices] == [tuple(vertex) for vertex in _profile()["vertices"]]
     assert session.history.records == []
     assert result.metadata["cad_export"]["status"] == "export_ready"
+    mesh = result.metadata["preview_mesh"]
+    assert mesh["profile_id"] == "profile_box"
+    assert mesh["metadata"]["hole_count"] == 0
+    assert mesh["metadata"]["bbox"]["zmax"] == pytest.approx(7.5)
+    assert any(triangle["surface"] == "outer_wall" for triangle in mesh["triangles"])
 
 
 def test_validate_profile_holes_rejects_tangent_hole() -> None:
@@ -175,6 +180,10 @@ def test_extrude_profile_commit_with_holes_records_strategy() -> None:
     assert export["measurements"]["bbox"]["zmax"] == pytest.approx(7.5)
     assert export["measurements"]["volume_mm3"] == pytest.approx((200.0 - 72.0) * 7.5, abs=1e-3)
     assert result.metadata["profile_hole_validation"]["ok"] is True
+    mesh = result.metadata["preview_mesh"]
+    assert mesh["metadata"]["hole_count"] == 1
+    assert mesh["metadata"]["triangle_count"] > 0
+    assert any(triangle["surface"] == "hole_wall" and triangle["ring_id"] == "profile_inner" for triangle in mesh["triangles"])
 
 
 def test_boolean_fallback_triggers_on_construction_failure(monkeypatch, tmp_path) -> None:

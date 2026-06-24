@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Button, Heading, HStack, Input, Link, Spinner, Text, useColorMode, useToast, VStack } from "@chakra-ui/react";
 import SketchCanvas2D from "./SketchCanvas2D";
+import SolidPreview3D from "./SolidPreview3D";
 import SketchMathToolbar from "./SketchMathToolbar";
 import SelectionInspector from "./SelectionInspector";
 import CommandPanel from "./CommandPanel";
@@ -16,6 +17,7 @@ import type {
   SketchMathHistoryEntry,
   SketchMathMode,
   SketchMathOperationResult,
+  SketchMathPreviewMesh,
   SketchMathSelectionContext,
   SketchMathSessionSnapshot,
   SketchMathTranslationOutcome,
@@ -69,6 +71,7 @@ type DimensionEditorState = { baseId: string; dimension: "width" | "height"; val
 type DeletePromptState = { kind: "rectangle"; baseId: string; message: string } | null;
 type HolePlacementState = { profileId: string; baseId: string | null; center: Point; message: string } | null;
 type HoleSelectionSummary = { holeId: string; profileId: string; diameter: number; center: Point };
+type WorkspaceViewMode = "sketch" | "solid";
 type CadExportArtifact = {
   stepPath: string;
   filename: string;
@@ -157,6 +160,19 @@ const profileDiameterAndCenter = (profile: Extract<SketchMathEntity, { type: "pr
 };
 
 const fileNameFromPath = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() || "export.step";
+
+const isPreviewMesh = (value: unknown): value is SketchMathPreviewMesh => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<SketchMathPreviewMesh>;
+  return candidate.version === "0.1" && Array.isArray(candidate.vertices) && Array.isArray(candidate.triangles);
+};
+
+const previewMeshFromResult = (result: SketchMathOperationResult | null): SketchMathPreviewMesh | null => {
+  const mesh = result?.metadata?.preview_mesh;
+  return isPreviewMesh(mesh) ? mesh : null;
+};
 
 const pointInsideProfile = (point: Point, profile: Extract<SketchMathEntity, { type: "profile_2d" }>): boolean => {
   const vertices = profile.vertices;
@@ -269,6 +285,7 @@ const SketchMathWorkspace = () => {
   const [rectangleDraft, setRectangleDraft] = useState<RectangleDraft | null>(null);
   const [dragPreviewPoint, setDragPreviewPoint] = useState<{ id: string; point: Point } | null>(null);
   const [tool, setTool] = useState<SketchMathMode>("select");
+  const [workspaceViewMode, setWorkspaceViewMode] = useState<WorkspaceViewMode>("sketch");
   const [viewBoxState, setViewBoxState] = useState<ViewBoxState>({ x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
   const [showDebugLabels, setShowDebugLabels] = useState(false);
   const [pendingCommandText, setPendingCommandText] = useState("");
@@ -290,6 +307,7 @@ const SketchMathWorkspace = () => {
   const [holeEditorMessage, setHoleEditorMessage] = useState<string | null>(null);
   const [holePlacement, setHolePlacement] = useState<HolePlacementState>(null);
   const [cadFeatureSummary, setCadFeatureSummary] = useState<string | null>(null);
+  const [solidPreviewMesh, setSolidPreviewMesh] = useState<SketchMathPreviewMesh | null>(null);
   const [cadExportPath, setCadExportPath] = useState<string | null>(null);
   const [cadExportArtifact, setCadExportArtifact] = useState<CadExportArtifact | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -912,6 +930,11 @@ const SketchMathWorkspace = () => {
     clearErrorState();
   };
 
+  const clearSolidPreview = () => {
+    setSolidPreviewMesh(null);
+    setWorkspaceViewMode("sketch");
+  };
+
   const previewCommand = async (command: SketchMathCommand): Promise<SketchMathOperationResult | null> => {
     if (!sessionId) {
       return null;
@@ -952,6 +975,7 @@ const SketchMathWorkspace = () => {
       syncSnapshot(snapshot);
       setSelectedEntityIds([]);
       setPreviewResult(null);
+      clearSolidPreview();
       setDraftPoint(null);
       clearRectangleInteraction();
       setTranslationOutcome(null);
@@ -973,6 +997,7 @@ const SketchMathWorkspace = () => {
     setPreviewResult(null);
     setPendingCommandText("");
     setHolePlacement(null);
+    clearSolidPreview();
     clearErrorState();
   };
 
@@ -996,6 +1021,7 @@ const SketchMathWorkspace = () => {
     setTranslationOutcome(null);
     setPendingCommandText("");
     setCadFeatureSummary(null);
+    setSolidPreviewMesh(null);
     setCadExportPath(null);
     setCadExportArtifact(null);
     setHoleEditorMessage(null);
@@ -1031,6 +1057,10 @@ const SketchMathWorkspace = () => {
     if (!result) {
       return;
     }
+    clearSolidPreview();
+    setCadExportPath(null);
+    setCadExportArtifact(null);
+    setCadFeatureSummary(null);
     setSelectedEntityIds([ids.profileId]);
     setRectangleSelectionDetail({ kind: "profile", baseId });
     setTranslationOutcome(null);
@@ -1505,6 +1535,7 @@ const SketchMathWorkspace = () => {
     }
     setDimensionEditor(null);
     setPreviewResult(null);
+    clearSolidPreview();
     setPendingCommandText(asCommandText({ ...command, mode: "commit" }));
     setDimensionEditedRectangleIds((current) => Array.from(new Set([...current, baseId])));
     restoreRectangleSelection(baseId, activeRectangleDetail);
@@ -1587,6 +1618,7 @@ const SketchMathWorkspace = () => {
       const profileBaseId = profileId ? rectangleBaseIdFromEntityId(profileId) : null;
       setRectangleSelectionDetail(profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
       setHolePlacement(null);
+      clearSolidPreview();
       return;
     }
     if (previewCommandPayload.command_type === "extrude_profile") {
@@ -1598,6 +1630,8 @@ const SketchMathWorkspace = () => {
       const { artifact } = cadExportMetadata(result);
       setCadExportArtifact(artifact);
       setCadExportPath(artifact?.stepPath || null);
+      setSolidPreviewMesh(previewMeshFromResult(result));
+      setWorkspaceViewMode("solid");
     }
   };
 
@@ -1697,6 +1731,8 @@ const SketchMathWorkspace = () => {
     const result = await previewCommand(command);
     if (result) {
       setCadFeatureSummary(summarizeExtrudeResult(result));
+      setSolidPreviewMesh(previewMeshFromResult(result));
+      setWorkspaceViewMode("solid");
     }
   };
 
@@ -1787,6 +1823,7 @@ const SketchMathWorkspace = () => {
     setRectangleSelectionDetail(nextHoleId ? null : profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
     setHolePlacement(null);
     setPreviewResult(null);
+    clearSolidPreview();
     setPendingCommandText(asCommandText({ ...command, mode: "commit" }));
   };
 
@@ -1835,6 +1872,7 @@ const SketchMathWorkspace = () => {
     setRectangleSelectionDetail(null);
     setHoleEditorMessage("Hole updated.");
     setPreviewResult(null);
+    clearSolidPreview();
     setPendingCommandText(asCommandText({ ...command, mode: "commit" }));
   };
 
@@ -1850,9 +1888,11 @@ const SketchMathWorkspace = () => {
     setDeletePrompt(null);
     setHolePlacement(null);
     setCadFeatureSummary(null);
+    setSolidPreviewMesh(null);
     setTranslationOutcome(null);
     setPendingCommandText("");
     setPreviewResult(null);
+    clearSolidPreview();
     clearErrorState();
   };
 
@@ -1893,6 +1933,10 @@ const SketchMathWorkspace = () => {
     setPendingCommandText("");
     setTranslationOutcome(null);
     setPreviewResult(null);
+    clearSolidPreview();
+    setCadExportPath(null);
+    setCadExportArtifact(null);
+    setCadFeatureSummary(null);
     setDraftPoint(null);
     setDeletePrompt(null);
     clearRectangleInteraction();
@@ -2161,57 +2205,64 @@ const SketchMathWorkspace = () => {
                 {canvasHelperText}
               </Text>
               <HStack className="sketchmath-view-controls" spacing={2} flexWrap="wrap" mb={3} data-testid="sketchmath-view-controls">
+                <Button size="sm" variant={workspaceViewMode === "sketch" ? "solid" : "outline"} onClick={() => setWorkspaceViewMode("sketch")}>
+                  2D sketch
+                </Button>
+                <Button size="sm" variant={workspaceViewMode === "solid" ? "solid" : "outline"} onClick={() => setWorkspaceViewMode("solid")}>
+                  3D solid
+                </Button>
                 <Button size="sm" variant={tool === "pan" ? "solid" : "outline"} onClick={() => handleToolChange("pan")}>
                   Pan / view
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => zoomView(0.8)}>
+                <Button size="sm" variant="outline" onClick={() => zoomView(0.8)} isDisabled={workspaceViewMode !== "sketch"}>
                   Zoom in
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => zoomView(1.25)}>
+                <Button size="sm" variant="outline" onClick={() => zoomView(1.25)} isDisabled={workspaceViewMode !== "sketch"}>
                   Zoom out
                 </Button>
-                <Button size="sm" variant="outline" onClick={fitSketchToView}>
+                <Button size="sm" variant="outline" onClick={fitSketchToView} isDisabled={workspaceViewMode !== "sketch"}>
                   Fit sketch
                 </Button>
-                <Button size="sm" variant="outline" onClick={resetView}>
+                <Button size="sm" variant="outline" onClick={resetView} isDisabled={workspaceViewMode !== "sketch"}>
                   Reset view
                 </Button>
                 <Text className="sketchmath-plane-chip" data-testid="sketchmath-plane-widget">
-                  2D sketch plane
+                  {workspaceViewMode === "solid" ? "3D solid preview" : "2D sketch plane"}
                 </Text>
-                <Button size="sm" variant="outline" isDisabled>
-                  3D orbit coming soon
-                </Button>
               </HStack>
-              <SketchCanvas2D
-                width={CANVAS_WIDTH}
-                height={CANVAS_HEIGHT}
-                viewBox={viewBoxState}
-                entities={committedEntities}
-                previewResult={previewResult}
-                selectedEntityIds={selectedEntityIds}
-                focusedEntityId={
-                  rectangleSelectionDetail?.kind === "edge"
-                    ? rectangleIdsFromBaseId(rectangleSelectionDetail.baseId).lineIds[rectangleSelectionDetail.edgeId]
-                    : rectangleSelectionDetail?.kind === "corner"
-                      ? rectangleIdsFromBaseId(rectangleSelectionDetail.baseId).pointIds[rectangleSelectionDetail.cornerId]
-                      : null
-                }
-                draftPoint={draftPoint}
-                rectangleDraft={rectangleDraft}
-                dragPreviewPoint={dragPreviewPoint}
-                holePlacementPreview={holePlacementPreview}
-                holePlacementActive={Boolean(holePlacement)}
-                showDebugLabels={showDebugLabels}
-                onCanvasClick={handleCanvasClick}
-                onCanvasMouseDown={handleCanvasMouseDown}
-                onCanvasMouseMove={handleCanvasMouseMove}
-                onCanvasMouseUp={handleCanvasMouseUp}
-                onCanvasContextMenu={handleCanvasContextMenu}
-                onEntityClick={handleEntityClick}
-                onEntityMouseDown={handleEntityMouseDown}
-                onDimensionLabelEdit={handleDimensionLabelEdit}
-              />
+              {workspaceViewMode === "solid" ? (
+                <SolidPreview3D mesh={solidPreviewMesh} />
+              ) : (
+                <SketchCanvas2D
+                  width={CANVAS_WIDTH}
+                  height={CANVAS_HEIGHT}
+                  viewBox={viewBoxState}
+                  entities={committedEntities}
+                  previewResult={previewResult}
+                  selectedEntityIds={selectedEntityIds}
+                  focusedEntityId={
+                    rectangleSelectionDetail?.kind === "edge"
+                      ? rectangleIdsFromBaseId(rectangleSelectionDetail.baseId).lineIds[rectangleSelectionDetail.edgeId]
+                      : rectangleSelectionDetail?.kind === "corner"
+                        ? rectangleIdsFromBaseId(rectangleSelectionDetail.baseId).pointIds[rectangleSelectionDetail.cornerId]
+                        : null
+                  }
+                  draftPoint={draftPoint}
+                  rectangleDraft={rectangleDraft}
+                  dragPreviewPoint={dragPreviewPoint}
+                  holePlacementPreview={holePlacementPreview}
+                  holePlacementActive={Boolean(holePlacement)}
+                  showDebugLabels={showDebugLabels}
+                  onCanvasClick={handleCanvasClick}
+                  onCanvasMouseDown={handleCanvasMouseDown}
+                  onCanvasMouseMove={handleCanvasMouseMove}
+                  onCanvasMouseUp={handleCanvasMouseUp}
+                  onCanvasContextMenu={handleCanvasContextMenu}
+                  onEntityClick={handleEntityClick}
+                  onEntityMouseDown={handleEntityMouseDown}
+                  onDimensionLabelEdit={handleDimensionLabelEdit}
+                />
+              )}
             </Box>
           </Box>
 
@@ -2493,7 +2544,7 @@ const SketchMathWorkspace = () => {
                       <div><dt>Depth</dt><dd>{cadExportArtifact?.extrusionDepth != null ? `${cadExportArtifact.extrusionDepth} ${cadExportArtifact.extrusionDepthUnit || "mm"}` : `${extrudeDepthValue} mm`}</dd></div>
                     </dl>
                     <Text fontSize="sm" opacity={0.75}>
-                      Download is served through FRIDAY. 3D preview is not implemented in this MVP.
+                      Download is served through FRIDAY. The 3D solid preview uses the same profile, holes, and extrusion depth.
                     </Text>
                     <HStack spacing={2} flexWrap="wrap" mt={2}>
                       <Button as="a" href={cadExportDownloadUrl} size="sm" variant="outline" download={cadExportFileName || "export.step"}>

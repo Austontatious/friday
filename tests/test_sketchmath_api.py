@@ -420,6 +420,12 @@ def test_sketchmath_extrude_profile_with_holes_preview_commit(monkeypatch):
     assert preview.status_code == 200
     assert preview.json()["result"]["metadata"]["cad_export"]["metadata"]["adapter_strategy"] in {"face_with_holes", "boolean_subtraction"}
     assert preview.json()["result"]["metadata"]["profile_hole_validation"]["ok"] is True
+    preview_mesh = preview.json()["result"]["metadata"]["preview_mesh"]
+    assert preview_mesh["profile_id"] == "profile_box"
+    assert preview_mesh["depth"] == 7.5
+    assert preview_mesh["metadata"]["hole_count"] == 1
+    assert any(triangle["surface"] == "hole_wall" for triangle in preview_mesh["triangles"])
+    assert preview_mesh["metadata"]["bbox"]["zmax"] == 7.5
 
     commit = client.post(
         f"/api/sketchmath/sessions/{session_id}/commands/commit",
@@ -441,7 +447,80 @@ def test_sketchmath_extrude_profile_with_holes_preview_commit(monkeypatch):
     )
     assert commit.status_code == 200
     assert commit.json()["result"]["metadata"]["cad_export"]["metadata"]["hole_count"] == 1
+    assert commit.json()["result"]["metadata"]["preview_mesh"]["metadata"]["hole_count"] == 1
     assert commit.json()["history_length"] == 1
+    client.close()
+
+
+def test_sketchmath_extrude_profile_preview_mesh_changes_after_hole_update(monkeypatch):
+    client = _client(monkeypatch)
+    context = _profile_selection_context_with_hole()
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": context})
+    session_id = created.json()["session_id"]
+
+    first = client.post(
+        f"/api/sketchmath/sessions/{session_id}/commands/preview",
+        json={
+            "command": _command(
+                "extrude_profile",
+                "cmd_extrude_preview_hole_small",
+                selection=["profile_box"],
+                parameters={"depth": 7.5, "depth_unit": "mm", "direction": "positive_normal", "output_format": "step", "holes": ["profile_inner"]},
+            )
+        },
+    )
+    assert first.status_code == 200
+
+    updated_context = _profile_selection_context_with_hole()
+    for item in updated_context["items"]:
+        if isinstance(item, dict) and item.get("id") == "profile_inner":
+            item["vertices"] = [[6, 3], [14, 3], [14, 7], [6, 7], [6, 3]]
+            item["area"] = 32.0
+    second_session = client.post("/api/sketchmath/sessions", json={"selection_context": updated_context})
+    second_session_id = second_session.json()["session_id"]
+    second = client.post(
+        f"/api/sketchmath/sessions/{second_session_id}/commands/preview",
+        json={
+            "command": _command(
+                "extrude_profile",
+                "cmd_extrude_preview_hole_large",
+                selection=["profile_box"],
+                parameters={"depth": 7.5, "depth_unit": "mm", "direction": "positive_normal", "output_format": "step", "holes": ["profile_inner"]},
+            )
+        },
+    )
+    assert second.status_code == 200
+
+    assert first.json()["result"]["metadata"]["preview_mesh"]["vertices"] != second.json()["result"]["metadata"]["preview_mesh"]["vertices"]
+    client.close()
+
+
+def test_sketchmath_extrude_profile_invalid_hole_returns_structured_error(monkeypatch):
+    client = _client(monkeypatch)
+    context = _profile_selection_context_with_hole()
+    for item in context["items"]:
+        if isinstance(item, dict) and item.get("id") == "profile_inner":
+            item["vertices"] = [[18, 8], [24, 8], [24, 12], [18, 12], [18, 8]]
+            item["area"] = 24.0
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": context})
+    session_id = created.json()["session_id"]
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/commands/preview",
+        json={
+            "command": _command(
+                "extrude_profile",
+                "cmd_extrude_preview_invalid_hole",
+                selection=["profile_box"],
+                parameters={"depth": 7.5, "depth_unit": "mm", "direction": "positive_normal", "output_format": "step", "holes": ["profile_inner"]},
+            )
+        },
+    )
+
+    assert response.status_code == 422
+    error = response.json()["detail"]["error"]
+    assert error["code"] == "selection_resolution_error"
+    assert error["detail"]["error_code"] in {"hole_outside_outer", "profile_intersection"}
     client.close()
 
 

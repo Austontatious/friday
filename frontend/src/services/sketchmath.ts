@@ -74,6 +74,38 @@ export type SketchMathCommand = {
   parameters: Record<string, unknown>;
 };
 
+export type SketchMathPreviewTriangle = {
+  indices: [number, number, number];
+  surface: "top" | "bottom" | "outer_wall" | "hole_wall" | string;
+  ring_id?: string;
+};
+
+export type SketchMathPreviewMesh = {
+  version: "0.1";
+  units: string;
+  profile_id: string;
+  depth: number;
+  vertices: [number, number, number][];
+  triangles: SketchMathPreviewTriangle[];
+  loops?: Record<string, unknown>;
+  metadata?: {
+    profile_id?: string;
+    extrusion_depth?: number;
+    extrusion_depth_unit?: string;
+    hole_count?: number;
+    triangle_count?: number;
+    vertex_count?: number;
+    bbox?: {
+      xmin: number;
+      xmax: number;
+      ymin: number;
+      ymax: number;
+      zmin: number;
+      zmax: number;
+    };
+  };
+};
+
 export type SketchMathOperationResult = {
   command: SketchMathCommand;
   status: "preview" | "committed";
