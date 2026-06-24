@@ -757,7 +757,7 @@ input {
 .sketchmath-solid-preview {
   min-height: min(760px, calc(100vh - 310px));
   display: grid;
-  grid-template-rows: auto auto minmax(420px, 1fr);
+  grid-template-rows: auto auto auto minmax(420px, 1fr);
   gap: 10px;
   border: 1px solid rgba(116, 187, 255, 0.18);
   border-radius: 8px;
@@ -774,6 +774,40 @@ input {
   color: var(--friday-text);
   opacity: 0.82;
   font-size: 0.88rem;
+}
+
+.sketchmath-solid-preview-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  margin: 0 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(116, 187, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(9, 21, 31, 0.78);
+  color: rgba(237, 247, 251, 0.88);
+  font-size: 0.78rem;
+}
+
+.sketchmath-solid-preview-hud div {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  min-width: max-content;
+}
+
+.sketchmath-solid-preview-hud dt {
+  color: rgba(154, 177, 196, 0.88);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.sketchmath-solid-preview-hud dd {
+  margin: 0;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-weight: 700;
 }
 
 .sketchmath-solid-preview-canvas {

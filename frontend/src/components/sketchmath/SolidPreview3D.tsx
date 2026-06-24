@@ -8,6 +8,8 @@ type CameraState = { yaw: number; pitch: number; zoom: number; panX: number; pan
 type DragState = { x: number; y: number; mode: "orbit" | "pan" };
 
 const DEFAULT_CAMERA: CameraState = { yaw: -0.72, pitch: -0.54, zoom: 1, panX: 0, panY: 0 };
+const TOP_CAMERA: CameraState = { yaw: 0, pitch: -Math.PI / 2, zoom: 1, panX: 0, panY: 0 };
+const FRONT_CAMERA: CameraState = { yaw: 0, pitch: 0, zoom: 1, panX: 0, panY: 0 };
 
 const SURFACE_COLORS: Record<string, string> = {
   top: "#8fd3ff",
@@ -17,6 +19,10 @@ const SURFACE_COLORS: Record<string, string> = {
 };
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+const degrees = (radians: number): number => Math.round((radians * 180) / Math.PI);
+const formatCameraValue = (value: number): string => (Number.isInteger(value) ? String(value) : value.toFixed(2));
+const isPanGesture = (event: Pick<React.PointerEvent<HTMLCanvasElement>, "button" | "buttons" | "shiftKey">): boolean =>
+  event.shiftKey || event.button === 1 || event.button === 2 || Boolean(event.buttons & 4) || Boolean(event.buttons & 2);
 
 const meshCenter = (mesh: SketchMathPreviewMesh): Vec3 => {
   const bbox = mesh.metadata?.bbox;
@@ -148,6 +154,16 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
     }
     return `${depth} ${mesh.units} extrusion with ${holeCount === 1 ? "1 through-hole" : `${holeCount} through-holes`}.`;
   }, [depth, holeCount, mesh]);
+  const cameraHud = useMemo(
+    () => ({
+      azimuth: degrees(camera.yaw),
+      elevation: degrees(camera.pitch),
+      zoom: Number(camera.zoom.toFixed(2)),
+      panX: Math.round(camera.panX),
+      panY: Math.round(camera.panY),
+    }),
+    [camera],
+  );
 
   const redraw = useCallback(() => {
     if (mesh && canvasRef.current) {
@@ -161,13 +177,29 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
     return () => window.removeEventListener("resize", redraw);
   }, [redraw]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return undefined;
+    }
+    const handleWheel = (event: WheelEvent) => {
+      if (!mesh) {
+        return;
+      }
+      event.preventDefault();
+      setCamera((current) => ({ ...current, zoom: clamp(current.zoom * (event.deltaY < 0 ? 1.12 : 0.88), 0.35, 4) }));
+    };
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", handleWheel);
+  }, [mesh]);
+
   const setPreset = (preset: "iso" | "top" | "front" | "reset" | "fit") => {
     setCamera((current) => {
       if (preset === "top") {
-        return { ...current, yaw: 0, pitch: -Math.PI / 2, panX: 0, panY: 0 };
+        return TOP_CAMERA;
       }
       if (preset === "front") {
-        return { ...current, yaw: 0, pitch: 0, panX: 0, panY: 0 };
+        return FRONT_CAMERA;
       }
       if (preset === "fit") {
         return { ...current, zoom: 1, panX: 0, panY: 0 };
@@ -183,8 +215,9 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
     if (!mesh) {
       return;
     }
+    event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    dragRef.current = { x: event.clientX, y: event.clientY, mode: event.shiftKey || event.button === 2 ? "pan" : "orbit" };
+    dragRef.current = { x: event.clientX, y: event.clientY, mode: isPanGesture(event) ? "pan" : "orbit" };
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -192,27 +225,24 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
     if (!drag) {
       return;
     }
+    event.preventDefault();
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
-    dragRef.current = { ...drag, x: event.clientX, y: event.clientY };
+    const mode = isPanGesture(event) ? "pan" : drag.mode;
+    dragRef.current = { ...drag, x: event.clientX, y: event.clientY, mode };
     setCamera((current) =>
-      drag.mode === "pan"
+      mode === "pan"
         ? { ...current, panX: current.panX + dx, panY: current.panY + dy }
         : { ...current, yaw: current.yaw + dx * 0.01, pitch: clamp(current.pitch + dy * 0.01, -1.45, 1.45) },
     );
   };
 
   const onPointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    dragRef.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-  };
-
-  const onWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
-    if (!mesh) {
-      return;
-    }
     event.preventDefault();
-    setCamera((current) => ({ ...current, zoom: clamp(current.zoom * (event.deltaY < 0 ? 1.12 : 0.88), 0.35, 4) }));
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   };
 
   return (
@@ -237,6 +267,13 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
       <Text className="sketchmath-solid-preview-status" data-testid="sketchmath-solid-preview-status">
         {summary}
       </Text>
+      <dl className="sketchmath-solid-preview-hud" data-testid="sketchmath-solid-camera-hud" aria-label="3D camera state">
+        <div><dt>view</dt><dd>3D solid</dd></div>
+        <div><dt>azimuth</dt><dd data-testid="sketchmath-camera-azimuth">{cameraHud.azimuth} deg</dd></div>
+        <div><dt>elevation</dt><dd data-testid="sketchmath-camera-elevation">{cameraHud.elevation} deg</dd></div>
+        <div><dt>zoom</dt><dd data-testid="sketchmath-camera-zoom">{formatCameraValue(cameraHud.zoom)}x</dd></div>
+        <div><dt>pan</dt><dd data-testid="sketchmath-camera-pan">{cameraHud.panX}, {cameraHud.panY}</dd></div>
+      </dl>
       <canvas
         ref={canvasRef}
         className="sketchmath-solid-preview-canvas"
@@ -247,7 +284,6 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onContextMenu={(event) => event.preventDefault()}
-        onWheel={onWheel}
       />
     </Box>
   );

@@ -71,7 +71,8 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - `Pan / view` mode lets the user drag the 2D canvas view.
 - `Zoom in`, `Zoom out`, `Fit sketch`, and `Reset view` manipulate the SVG viewBox only; committed geometry remains session-backed.
 - The view widget labels the current surface as `2D sketch plane` or `3D solid preview`.
-- In `3D solid`, drag orbits/tilts the preview, shift-drag or right-drag pans, the wheel zooms, and Fit/Reset/Top/Iso/Front controls adjust the camera.
+- In `3D solid`, left-drag orbits/tilts the preview, shift-drag, middle-drag, or right-drag pans, the wheel zooms, and Fit/Reset/Top/Iso/Front controls adjust the camera.
+- The 3D preview includes a compact camera HUD with view, azimuth, elevation, zoom, and pan values so manual smoke and tests can confirm camera movement.
 - Before a valid extrusion exists, `3D solid` shows `Extrude a valid profile to preview the 3D solid.`
 
 ## 3D Solid Preview
