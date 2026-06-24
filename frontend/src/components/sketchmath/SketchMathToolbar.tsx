@@ -18,8 +18,6 @@ const SketchMathToolbar = ({ mode, onModeChange, theme, onToggleTheme }: SketchM
           ["point", "Point"],
           ["line", "Line"],
           ["rectangle", "Rectangle"],
-          ["circle", "Circle"],
-          ["arc", "Arc"],
           ["dimension", "Dimension"],
           ["horizontal", "Horizontal"],
           ["vertical", "Vertical"],
@@ -38,6 +36,12 @@ const SketchMathToolbar = ({ mode, onModeChange, theme, onToggleTheme }: SketchM
             {label}
           </Button>
         ))}
+        <Text className="sketchmath-tool-unavailable" fontSize="sm">
+          Circle: coming soon
+        </Text>
+        <Text className="sketchmath-tool-unavailable" fontSize="sm">
+          Arc: coming soon
+        </Text>
       </HStack>
       <HStack spacing={3}>
         <Text fontSize="sm" opacity={0.8}>

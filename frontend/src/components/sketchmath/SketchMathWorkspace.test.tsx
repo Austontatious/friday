@@ -1089,7 +1089,7 @@ describe("SketchMath workspace", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
     await waitFor(() => expect(workbench).toHaveTextContent("STEP export ready"));
-    expect(screen.getByRole("link", { name: "Export STEP" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Download STEP" })).toBeVisible();
 
     await userEvent.click(screen.getByRole("button", { name: /Show Advanced \/ Debug/ }));
     expect(screen.getByTestId("sketchmath-command-panel")).toBeVisible();
@@ -1342,6 +1342,45 @@ describe("SketchMath workspace", () => {
 
     await waitFor(() =>
       expect(within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Extrude" })).toBeEnabled(),
+    );
+  });
+
+  it("labels unsupported circle and arc tools instead of advertising them as active tools", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+
+    expect(screen.queryByRole("button", { name: "Circle" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Arc" })).toBeNull();
+    expect(screen.getByText("Circle: coming soon")).toBeVisible();
+    expect(screen.getByText("Arc: coming soon")).toBeVisible();
+  });
+
+  it("shows a productized STEP export card with browser download href after extrusion commit", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Extrude" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Extrude" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-cad-feature-summary")).toHaveTextContent("Extrude preview ready"));
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-export-card")).toBeVisible());
+    expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("Export succeeded");
+    expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("export.step");
+    expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("Download is served through FRIDAY");
+    expect(screen.getByRole("link", { name: "Download STEP" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/api\/sketchmath\/artifacts\/step\?path=%2Ftmp%2Fsketchmath%2Fextrude_profile_.+%2Fexport\.step$/),
     );
   });
 });

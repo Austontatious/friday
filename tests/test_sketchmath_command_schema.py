@@ -59,6 +59,21 @@ def test_geometry_command_accepts_extrude_profile_holes() -> None:
     assert command.parameters["holes"] == ["profile_inner"]
 
 
+def test_geometry_command_schema_lists_supported_mvp_commands() -> None:
+    import json
+    from pathlib import Path
+
+    schema = json.loads(Path("sketchmath/schemas/geometry_command.schema.json").read_text(encoding="utf-8"))
+    command_types = set(schema["properties"]["command_type"]["enum"])
+
+    assert "delete_entity" in command_types
+    assert "set_rectangle_dimension" in command_types
+    assert "add_profile_hole" in command_types
+    assert "extrude_profile" in command_types
+    assert "define_circle" not in command_types
+    assert "define_arc" not in command_types
+
+
 def test_selection_context_recognizes_2d_point_and_line_entities() -> None:
     from sketchmath.models.selection_context import SelectionContext
 

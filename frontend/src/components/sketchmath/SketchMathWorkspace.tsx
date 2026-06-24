@@ -26,6 +26,7 @@ import {
   isSketchMathEnabled,
   previewSketchMathCommand,
   revertSketchMathSession,
+  sketchMathStepDownloadUrl,
   translateSketchMathUtterance,
   upsertSketchMathEntity,
 } from "../../services/sketchmath";
@@ -122,6 +123,8 @@ const profileCenter = (profile: Extract<SketchMathEntity, { type: "profile_2d" }
     y: Number(((Math.min(...ys) + Math.max(...ys)) / 2).toFixed(2)),
   };
 };
+
+const fileNameFromPath = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() || "export.step";
 
 const pointInsideProfile = (point: Point, profile: Extract<SketchMathEntity, { type: "profile_2d" }>): boolean => {
   const vertices = profile.vertices;
@@ -391,6 +394,8 @@ const SketchMathWorkspace = () => {
   const activeProfileForHole = selectedRectangleProfile || selectedClosedProfile;
   const activeProfileHoleCount = activeProfileForHole ? activeProfileForHole.holes?.length || 0 : null;
   const activeProfileForCad = selectedRectangleProfile || selectedClosedProfile;
+  const cadExportFileName = cadExportPath ? fileNameFromPath(cadExportPath) : null;
+  const cadExportDownloadUrl = cadExportPath ? sketchMathStepDownloadUrl(cadExportPath) : null;
   const rectangleAnchorPoint = useMemo(() => {
     if (!selectedRectangleBaseId) {
       return null;
@@ -1959,10 +1964,19 @@ const SketchMathWorkspace = () => {
                     {cadFeatureSummary}
                   </Text>
                 ) : null}
-                {cadExportPath ? (
-                  <Button as="a" href={cadExportPath} size="sm" variant="outline" mt={2}>
-                    Export STEP
-                  </Button>
+                {cadExportPath && cadExportDownloadUrl ? (
+                  <Box className="sketchmath-export-card" data-testid="sketchmath-export-card" mt={3}>
+                    <Text fontWeight="600">Export succeeded</Text>
+                    <Text fontSize="sm" opacity={0.85}>
+                      {cadExportFileName || "export.step"} is stored at {cadExportPath}.
+                    </Text>
+                    <Text fontSize="sm" opacity={0.75}>
+                      Download is served through FRIDAY. Generated artifact cleanup is manual for this MVP.
+                    </Text>
+                    <Button as="a" href={cadExportDownloadUrl} size="sm" variant="outline" mt={2} download={cadExportFileName || "export.step"}>
+                      Download STEP
+                    </Button>
+                  </Box>
                 ) : null}
                 <Text fontSize="sm" opacity={0.75} mt={2}>
                   {canExtrudeSelection

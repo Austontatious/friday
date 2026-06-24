@@ -37,3 +37,9 @@ The export metadata records:
 - outer and hole winding information
 - expected bbox and volume
 - hole count
+
+## Browser Download
+
+Committed exports expose a STEP artifact path in `cad_export.artifacts.step_path`.
+The browser downloads that artifact through `GET /api/sketchmath/artifacts/step?path=...`.
+The API rejects non-STEP files and paths outside the configured SketchMath CAD export root.

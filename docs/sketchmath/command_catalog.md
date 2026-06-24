@@ -17,6 +17,7 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 - Open the browser workspace at `/tools/sketchmath`.
 - The frontend uses an SVG drawing surface and a local draft state for point creation and line selection.
 - The UI talks to the backend session API under `/api/sketchmath/sessions/...`.
+- STEP downloads are served through `/api/sketchmath/artifacts/step?path=...`; the API only serves `.step`/`.stp` files inside the configured SketchMath CAD export root.
 - Preview and commit remain distinct: preview updates only the overlay, commit mutates the persisted session, and revert rebuilds from history.
 - The frontend never mutates geometry directly outside typed `GeometryCommand` submission.
 
@@ -203,6 +204,7 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 
 - No general nonlinear CAD solving yet.
 - No full CAD feature tree, trimming workflow, or sketch solver beyond the supported closed-form cases.
+- No first-class free-standing circle or arc entities yet. The UI labels those tools as coming soon; circular holes are represented as inner `profile_2d` geometry through `add_profile_hole`.
 - No arbitrary Python execution.
 - No hidden geometry mutation outside typed commands.
 - Ambiguous or under-constrained input returns `clarification_required`.

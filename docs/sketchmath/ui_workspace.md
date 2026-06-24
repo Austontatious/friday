@@ -45,6 +45,19 @@ The backend remains the source of truth for committed geometry and history repla
 
 The default workspace is canvas-first and hides raw command JSON, proposed command JSON, and other DSL internals unless the advanced view is opened explicitly.
 
+## Supported Tools
+
+- Active canvas tools: Select, Point, Line, Rectangle, Dimension.
+- Active workbench actions: Set Length, Edit Width, Edit Height, Parallel, Perpendicular, Equal Length, Add Hole, Extrude, Commit Preview, Revert Preview, Download STEP.
+- Circle and Arc are intentionally labeled `coming soon` instead of being exposed as active tools. Circular holes are supported through `add_profile_hole`; free-standing circles and arcs are not first-class SketchMath entities in this MVP.
+
+## STEP Export
+
+- `extrude_profile` writes STEP artifacts under the configured SketchMath CAD export directory.
+- The browser downloads STEP files through `GET /api/sketchmath/artifacts/step?path=...`.
+- The API only serves `.step`/`.stp` files under the configured export root.
+- Generated STEP cleanup is manual for this MVP; generated artifacts are runtime output and should not be committed.
+
 ## Visual System
 
 - SVG canvas with a technical grid.
@@ -55,8 +68,8 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 ## Non-Goals
 
-- No FreeCAD integration.
-- No 3D CAD.
+- No FreeCAD GUI or broad CAD kernel wrapper.
+- No 3D preview in the browser.
 - No MCP wrapper.
 - No arbitrary Python execution.
 - No direct geometry mutation from React state.

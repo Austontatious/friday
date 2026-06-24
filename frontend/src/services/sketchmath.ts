@@ -173,6 +173,9 @@ export const isSketchMathEnabled = (): boolean => {
   return true;
 };
 
+export const sketchMathStepDownloadUrl = (stepPath: string): string =>
+  `${API_URL}/sketchmath/artifacts/step?path=${encodeURIComponent(stepPath)}`;
+
 export const createSketchMathSession = async (
   selectionContext?: Partial<SketchMathSelectionContext>,
 ): Promise<SketchMathSessionSnapshot> =>

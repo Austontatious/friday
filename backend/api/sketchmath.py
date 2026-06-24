@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from core.config import SketchMathConfig
 from backend.sketchmath.service import SESSION_STORE, SketchMathSessionStore, _error_status
@@ -51,11 +53,53 @@ def _require_enabled() -> None:
         )
 
 
+def _cad_export_root() -> Path:
+    root = Path(SketchMathConfig.from_env().cad_export_dir)
+    if not root.is_absolute():
+        root = Path.cwd() / root
+    return root.resolve()
+
+
+def _resolve_step_artifact(path: str) -> Path:
+    requested = Path(path)
+    if not requested.is_absolute():
+        requested = _cad_export_root() / requested
+    resolved = requested.resolve()
+    root = _cad_export_root()
+    if resolved.suffix.lower() not in {".step", ".stp"}:
+        raise HTTPException(
+            status_code=400,
+            detail=_error_payload("artifact_not_step", "Only STEP artifacts can be downloaded", {"path": path}, False),
+        )
+    if root != resolved and root not in resolved.parents:
+        raise HTTPException(
+            status_code=403,
+            detail=_error_payload("artifact_outside_export_root", "Artifact path is outside the SketchMath export root", {"path": path}, False),
+        )
+    if not resolved.exists() or not resolved.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=_error_payload("artifact_not_found", "STEP artifact was not found", {"path": path}, False),
+        )
+    return resolved
+
+
 @router.post("/sketchmath/sessions", summary="Create a SketchMath session")
 def create_session(payload: Dict[str, Any] | None = None):
     _require_enabled()
     session_id, session = _store().create_session(payload)
     return _store().snapshot(session_id, session)
+
+
+@router.get("/sketchmath/artifacts/step", summary="Download a SketchMath STEP artifact")
+def download_step_artifact(path: str = Query(..., min_length=1)):
+    _require_enabled()
+    artifact = _resolve_step_artifact(path)
+    return FileResponse(
+        artifact,
+        media_type="model/step",
+        filename=artifact.name,
+    )
 
 
 @router.get("/sketchmath/sessions/{session_id}", summary="Get a SketchMath session")

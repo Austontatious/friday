@@ -443,3 +443,32 @@ def test_sketchmath_extrude_profile_with_holes_preview_commit(monkeypatch):
     assert commit.json()["result"]["metadata"]["cad_export"]["metadata"]["hole_count"] == 1
     assert commit.json()["history_length"] == 1
     client.close()
+
+
+def test_sketchmath_step_artifact_download_is_browser_reachable(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_CAD_EXPORT_DIR", str(tmp_path))
+    client = _client(monkeypatch)
+    step_path = tmp_path / "sel_download" / "cmd_export" / "export.step"
+    step_path.parent.mkdir(parents=True)
+    step_path.write_text("ISO-10303-21;\nEND-ISO-10303-21;\n", encoding="utf-8")
+
+    response = client.get("/api/sketchmath/artifacts/step", params={"path": str(step_path)})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("model/step")
+    assert response.headers["content-disposition"].endswith('filename="export.step"')
+    assert b"ISO-10303-21" in response.content
+    client.close()
+
+
+def test_sketchmath_step_artifact_download_rejects_outside_export_root(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_CAD_EXPORT_DIR", str(tmp_path / "exports"))
+    client = _client(monkeypatch)
+    outside_path = tmp_path / "outside.step"
+    outside_path.write_text("not allowed", encoding="utf-8")
+
+    response = client.get("/api/sketchmath/artifacts/step", params={"path": str(outside_path)})
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["error"]["code"] == "artifact_outside_export_root"
+    client.close()

@@ -739,6 +739,17 @@ input {
   opacity: 1 !important;
 }
 
+.sketchmath-tool-unavailable {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px dashed rgba(154, 177, 196, 0.28);
+  border-radius: 8px;
+  color: rgba(237, 247, 251, 0.58);
+  background: rgba(255, 255, 255, 0.025);
+}
+
 .sketchmath-sidebar {
   min-width: 0;
 }
@@ -778,6 +789,13 @@ input {
   border-radius: 12px;
   background: rgba(255, 65, 80, 0.08);
   border: 1px solid rgba(255, 65, 80, 0.26);
+}
+
+.sketchmath-export-card {
+  padding: 12px;
+  border: 1px solid rgba(116, 187, 255, 0.26);
+  border-radius: 8px;
+  background: rgba(116, 187, 255, 0.08);
 }
 
 .sketchmath-grid-minor {
