@@ -1298,12 +1298,18 @@ describe("SketchMath workspace", () => {
     const elevation = screen.getByTestId("sketchmath-camera-elevation");
     const zoom = screen.getByTestId("sketchmath-camera-zoom");
     const pan = screen.getByTestId("sketchmath-camera-pan");
+    const target = screen.getByTestId("sketchmath-camera-target");
     const solidCanvas = screen.getByTestId("sketchmath-solid-preview-canvas");
     expect(cameraHud).toHaveTextContent("3D solid");
-    expect(azimuth).toHaveTextContent("-41 deg");
-    expect(elevation).toHaveTextContent("-31 deg");
+    expect(azimuth).toHaveTextContent("0 deg");
+    expect(elevation).toHaveTextContent("-90 deg");
     expect(zoom).toHaveTextContent("1x");
     expect(pan).toHaveTextContent("0, 0");
+    expect(target).toHaveTextContent("280, 170");
+
+    await userEvent.click(screen.getByRole("button", { name: "Tilt to 3D" }));
+    expect(elevation).toHaveTextContent("-35 deg");
+    expect(target).toHaveTextContent("280, 170");
 
     const initialAzimuth = azimuth.textContent;
     const initialElevation = elevation.textContent;
@@ -1323,19 +1329,33 @@ describe("SketchMath workspace", () => {
     pointerCanvasAt(solidCanvas, "pointerup", { clientX: 300, clientY: 235, pointerId: 2, button: 1 });
     await waitFor(() => expect(pan.textContent).not.toEqual(panBeforeDrag));
 
+    await userEvent.click(screen.getByRole("button", { name: "Fit" }));
+    expect(zoom).toHaveTextContent("1x");
+    expect(pan).toHaveTextContent("0, 0");
+    expect(target).toHaveTextContent("280, 170");
+
     await userEvent.click(screen.getByRole("button", { name: "Top" }));
     expect(elevation).toHaveTextContent("-90 deg");
     await userEvent.click(screen.getByRole("button", { name: "Front" }));
     expect(azimuth).toHaveTextContent("0 deg");
     expect(elevation).toHaveTextContent("0 deg");
     await userEvent.click(screen.getByRole("button", { name: "Reset" }));
-    expect(azimuth).toHaveTextContent("-41 deg");
-    expect(elevation).toHaveTextContent("-31 deg");
+    expect(azimuth).toHaveTextContent("0 deg");
+    expect(elevation).toHaveTextContent("-90 deg");
     expect(zoom).toHaveTextContent("1x");
     expect(pan).toHaveTextContent("0, 0");
     await userEvent.click(screen.getByRole("button", { name: "Iso" }));
     expect(azimuth).toHaveTextContent("-41 deg");
     expect(elevation).toHaveTextContent("-31 deg");
+    expect(target).toHaveTextContent("280, 170");
+
+    await userEvent.click(screen.getByRole("button", { name: "2D sketch" }));
+    expect(screen.getByTestId("sketchmath-plane-widget")).toHaveTextContent("2D sketch plane");
+    await userEvent.click(screen.getByRole("button", { name: "3D solid" }));
+    expect(screen.getByTestId("sketchmath-plane-widget")).toHaveTextContent("3D solid preview");
+    expect(screen.getByTestId("sketchmath-camera-azimuth")).toHaveTextContent("0 deg");
+    expect(screen.getByTestId("sketchmath-camera-elevation")).toHaveTextContent("-90 deg");
+    expect(screen.getByTestId("sketchmath-camera-target")).toHaveTextContent("280, 170");
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));

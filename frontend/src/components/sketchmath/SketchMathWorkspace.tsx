@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Button, Heading, HStack, Input, Link, Spinner, Text, useColorMode, useToast, VStack } from "@chakra-ui/react";
 import SketchCanvas2D from "./SketchCanvas2D";
-import SolidPreview3D from "./SolidPreview3D";
+import SolidPreview3D, { DEFAULT_SOLID_CAMERA } from "./SolidPreview3D";
+import type { SolidCameraState } from "./SolidPreview3D";
 import SketchMathToolbar from "./SketchMathToolbar";
 import SelectionInspector from "./SelectionInspector";
 import CommandPanel from "./CommandPanel";
@@ -56,6 +57,8 @@ import {
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 800;
 const SESSION_STORAGE_KEY = "friday_sketchmath_session_id";
+const ISO_CAMERA_ANGLES = { yaw: -0.72, pitch: -0.54 };
+const TILT_CAMERA_ANGLES = { yaw: 0, pitch: -0.61 };
 
 type Point = { x: number; y: number };
 type ViewBoxState = { x: number; y: number; width: number; height: number };
@@ -138,6 +141,43 @@ const profileCenter = (profile: Extract<SketchMathEntity, { type: "profile_2d" }
   return {
     x: Number(((Math.min(...xs) + Math.max(...xs)) / 2).toFixed(2)),
     y: Number(((Math.min(...ys) + Math.max(...ys)) / 2).toFixed(2)),
+  };
+};
+
+const profileBounds = (profile: Extract<SketchMathEntity, { type: "profile_2d" }>): ViewBoxState | null => {
+  const vertices = profile.vertices.filter((vertex, index) => index === 0 || vertex[0] !== profile.vertices[0][0] || vertex[1] !== profile.vertices[0][1]);
+  if (vertices.length === 0) {
+    return null;
+  }
+  const xs = vertices.map((vertex) => vertex[0]);
+  const ys = vertices.map((vertex) => vertex[1]);
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  };
+};
+
+const fittedViewBoxFromBounds = (bounds: ViewBoxState | null): ViewBoxState => {
+  if (!bounds) {
+    return { x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
+  }
+  const padding = 80;
+  const minX = bounds.x - padding;
+  const maxX = bounds.x + bounds.width + padding;
+  const minY = bounds.y - padding;
+  const maxY = bounds.y + bounds.height + padding;
+  const width = Math.max(180, maxX - minX);
+  const height = Math.max(140, maxY - minY);
+  const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
+  const fittedWidth = width / height > aspect ? width : height * aspect;
+  const fittedHeight = fittedWidth / aspect;
+  return {
+    x: minX - (fittedWidth - width) / 2,
+    y: minY - (fittedHeight - height) / 2,
+    width: fittedWidth,
+    height: fittedHeight,
   };
 };
 
@@ -287,6 +327,11 @@ const SketchMathWorkspace = () => {
   const [tool, setTool] = useState<SketchMathMode>("select");
   const [workspaceViewMode, setWorkspaceViewMode] = useState<WorkspaceViewMode>("sketch");
   const [viewBoxState, setViewBoxState] = useState<ViewBoxState>({ x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+  const [solidCamera, setSolidCamera] = useState<SolidCameraState>({
+    ...DEFAULT_SOLID_CAMERA,
+    targetX: CANVAS_WIDTH / 2,
+    targetY: CANVAS_HEIGHT / 2,
+  });
   const [showDebugLabels, setShowDebugLabels] = useState(false);
   const [pendingCommandText, setPendingCommandText] = useState("");
   const [translationOutcome, setTranslationOutcome] = useState<SketchMathTranslationOutcome | null>(null);
@@ -514,6 +559,113 @@ const SketchMathWorkspace = () => {
   const activeProfileForHole = selectedRectangleProfile || selectedClosedProfile || selectedHoleParentProfile;
   const activeProfileHoleCount = activeProfileForHole ? activeProfileForHole.holes?.length || 0 : null;
   const activeProfileForCad = selectedRectangleProfile || selectedClosedProfile || selectedHoleParentProfile;
+  const allGeometryBounds = useMemo<ViewBoxState | null>(() => {
+    const points = committedEntities.flatMap((entity) => {
+      if (isPointEntity(entity)) {
+        return [{ x: entity.coords[0], y: entity.coords[1] }];
+      }
+      if (isLineEntity(entity)) {
+        return [
+          { x: entity.start[0], y: entity.start[1] },
+          { x: entity.end[0], y: entity.end[1] },
+        ];
+      }
+      if (isClosedProfileEntity(entity)) {
+        return entity.vertices.map((vertex) => ({ x: vertex[0], y: vertex[1] }));
+      }
+      return [];
+    });
+    if (points.length === 0) {
+      return null;
+    }
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    return {
+      x: Math.min(...xs),
+      y: Math.min(...ys),
+      width: Math.max(...xs) - Math.min(...xs),
+      height: Math.max(...ys) - Math.min(...ys),
+    };
+  }, [committedEntities]);
+  const cameraProfile = activeProfileForCad || activeProfileForHole || closedProfileEntity;
+  const cameraTarget = cameraProfile ? profileCenter(cameraProfile) : null;
+  const cameraFitViewBox = fittedViewBoxFromBounds((cameraProfile && profileBounds(cameraProfile)) || allGeometryBounds);
+  const solidTargetZ = (mesh: SketchMathPreviewMesh | null): number => {
+    const bbox = mesh?.metadata?.bbox;
+    return bbox ? Number(((bbox.zmin + bbox.zmax) / 2).toFixed(2)) : 0;
+  };
+  const cameraFromSketchView = useCallback(
+    (angles: { yaw: number; pitch: number } = { yaw: 0, pitch: -Math.PI / 2 }): SolidCameraState => {
+      const target = cameraTarget || {
+        x: Number((viewBoxState.x + viewBoxState.width / 2).toFixed(2)),
+        y: Number((viewBoxState.y + viewBoxState.height / 2).toFixed(2)),
+      };
+      const carriedZoom = Math.max(1, Math.min(4, cameraFitViewBox.width / viewBoxState.width));
+      return {
+        ...DEFAULT_SOLID_CAMERA,
+        ...angles,
+        zoom: Number(carriedZoom.toFixed(2)),
+        targetX: target.x,
+        targetY: target.y,
+        targetZ: solidTargetZ(solidPreviewMesh),
+      };
+    },
+    [cameraFitViewBox.width, cameraTarget, solidPreviewMesh, viewBoxState],
+  );
+  const viewBoxFromCamera = useCallback(
+    (camera: SolidCameraState): ViewBoxState => {
+      const zoom = Math.max(0.35, camera.zoom);
+      const width = Math.max(120, Math.min(CANVAS_WIDTH * 2, cameraFitViewBox.width / zoom));
+      const height = width / (CANVAS_WIDTH / CANVAS_HEIGHT);
+      return {
+        x: camera.targetX - width / 2,
+        y: camera.targetY - height / 2,
+        width,
+        height,
+      };
+    },
+    [cameraFitViewBox.width],
+  );
+  const switchWorkspaceView = useCallback(
+    (mode: WorkspaceViewMode) => {
+      if (mode === "solid") {
+        setSolidCamera(cameraFromSketchView());
+      } else {
+        setViewBoxState(viewBoxFromCamera(solidCamera));
+      }
+      setWorkspaceViewMode(mode);
+    },
+    [cameraFromSketchView, solidCamera, viewBoxFromCamera],
+  );
+  const applySolidCameraPreset = useCallback(
+    (preset: "fit" | "reset" | "top" | "iso" | "front" | "tilt") => {
+      const fromSketch = cameraFromSketchView();
+      setSolidCamera((current) => {
+        const targetState = {
+          targetX: fromSketch.targetX,
+          targetY: fromSketch.targetY,
+          targetZ: fromSketch.targetZ,
+        };
+        if (preset === "fit") {
+          return { ...current, ...targetState, zoom: 1, panX: 0, panY: 0 };
+        }
+        if (preset === "reset") {
+          return { ...fromSketch, zoom: 1, panX: 0, panY: 0 };
+        }
+        if (preset === "top") {
+          return { ...current, ...targetState, yaw: 0, pitch: -Math.PI / 2, panX: 0, panY: 0 };
+        }
+        if (preset === "front") {
+          return { ...current, ...targetState, yaw: 0, pitch: 0, panX: 0, panY: 0 };
+        }
+        if (preset === "tilt") {
+          return { ...current, ...targetState, ...TILT_CAMERA_ANGLES, panX: 0, panY: 0 };
+        }
+        return { ...current, ...targetState, ...ISO_CAMERA_ANGLES, panX: 0, panY: 0 };
+      });
+    },
+    [cameraFromSketchView],
+  );
   const cadExportFileName = cadExportArtifact?.filename || (cadExportPath ? fileNameFromPath(cadExportPath) : null);
   const cadExportDownloadUrl = cadExportPath ? sketchMathStepDownloadUrl(cadExportPath) : null;
   const rectangleAnchorPoint = useMemo(() => {
@@ -1160,7 +1312,16 @@ const SketchMathWorkspace = () => {
       const deltaX = viewPanRef.current.last.x - point.x;
       const deltaY = viewPanRef.current.last.y - point.y;
       viewPanRef.current = { last: point };
-      setViewBoxState((current) => ({ ...current, x: current.x + deltaX, y: current.y + deltaY }));
+      setViewBoxState((current) => {
+        const nextViewBox = { ...current, x: current.x + deltaX, y: current.y + deltaY };
+        setSolidCamera((currentCamera) => ({
+          ...currentCamera,
+          targetX: cameraTarget?.x ?? Number((nextViewBox.x + nextViewBox.width / 2).toFixed(2)),
+          targetY: cameraTarget?.y ?? Number((nextViewBox.y + nextViewBox.height / 2).toFixed(2)),
+          targetZ: solidTargetZ(solidPreviewMesh),
+        }));
+        return nextViewBox;
+      });
       return;
     }
     if (pointDragRef.current) {
@@ -1289,60 +1450,48 @@ const SketchMathWorkspace = () => {
   };
 
   const resetView = () => {
-    setViewBoxState({ x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+    const nextViewBox = cameraProfile ? cameraFitViewBox : { x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
+    setViewBoxState(nextViewBox);
+    setSolidCamera({ ...cameraFromSketchView(), zoom: 1, panX: 0, panY: 0 });
   };
 
   const zoomView = (factor: number) => {
     setViewBoxState((current) => {
       const nextWidth = Math.max(120, Math.min(CANVAS_WIDTH * 2, current.width * factor));
       const nextHeight = Math.max(80, Math.min(CANVAS_HEIGHT * 2, current.height * factor));
-      return {
+      const nextViewBox = {
         x: current.x + (current.width - nextWidth) / 2,
         y: current.y + (current.height - nextHeight) / 2,
         width: nextWidth,
         height: nextHeight,
       };
+      const target = cameraTarget || {
+        x: Number((nextViewBox.x + nextViewBox.width / 2).toFixed(2)),
+        y: Number((nextViewBox.y + nextViewBox.height / 2).toFixed(2)),
+      };
+      setSolidCamera((currentCamera) => ({
+        ...currentCamera,
+        zoom: Number(Math.max(1, Math.min(4, cameraFitViewBox.width / nextViewBox.width)).toFixed(2)),
+        targetX: target.x,
+        targetY: target.y,
+        targetZ: solidTargetZ(solidPreviewMesh),
+      }));
+      return nextViewBox;
     });
   };
 
   const fitSketchToView = () => {
-    const points = committedEntities.flatMap((entity) => {
-      if (isPointEntity(entity)) {
-        return [{ x: entity.coords[0], y: entity.coords[1] }];
-      }
-      if (isLineEntity(entity)) {
-        return [
-          { x: entity.start[0], y: entity.start[1] },
-          { x: entity.end[0], y: entity.end[1] },
-        ];
-      }
-      if (isClosedProfileEntity(entity)) {
-        return entity.vertices.map((vertex) => ({ x: vertex[0], y: vertex[1] }));
-      }
-      return [];
-    });
-    if (points.length === 0) {
-      resetView();
-      return;
-    }
-    const xs = points.map((point) => point.x);
-    const ys = points.map((point) => point.y);
-    const padding = 80;
-    const minX = Math.min(...xs) - padding;
-    const maxX = Math.max(...xs) + padding;
-    const minY = Math.min(...ys) - padding;
-    const maxY = Math.max(...ys) + padding;
-    const width = Math.max(180, maxX - minX);
-    const height = Math.max(140, maxY - minY);
-    const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
-    const fittedWidth = width / height > aspect ? width : height * aspect;
-    const fittedHeight = fittedWidth / aspect;
-    setViewBoxState({
-      x: minX - (fittedWidth - width) / 2,
-      y: minY - (fittedHeight - height) / 2,
-      width: fittedWidth,
-      height: fittedHeight,
-    });
+    const nextViewBox = cameraFitViewBox;
+    setViewBoxState(nextViewBox);
+    setSolidCamera((current) => ({
+      ...current,
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+      targetX: cameraTarget?.x ?? nextViewBox.x + nextViewBox.width / 2,
+      targetY: cameraTarget?.y ?? nextViewBox.y + nextViewBox.height / 2,
+      targetZ: solidTargetZ(solidPreviewMesh),
+    }));
   };
 
   const openDimensionEditor = (baseId: string, dimension: "width" | "height") => {
@@ -1731,7 +1880,12 @@ const SketchMathWorkspace = () => {
     const result = await previewCommand(command);
     if (result) {
       setCadFeatureSummary(summarizeExtrudeResult(result));
-      setSolidPreviewMesh(previewMeshFromResult(result));
+      const nextMesh = previewMeshFromResult(result);
+      setSolidPreviewMesh(nextMesh);
+      setSolidCamera({
+        ...cameraFromSketchView(),
+        targetZ: solidTargetZ(nextMesh),
+      });
       setWorkspaceViewMode("solid");
     }
   };
@@ -2205,10 +2359,10 @@ const SketchMathWorkspace = () => {
                 {canvasHelperText}
               </Text>
               <HStack className="sketchmath-view-controls" spacing={2} flexWrap="wrap" mb={3} data-testid="sketchmath-view-controls">
-                <Button size="sm" variant={workspaceViewMode === "sketch" ? "solid" : "outline"} onClick={() => setWorkspaceViewMode("sketch")}>
+                <Button size="sm" variant={workspaceViewMode === "sketch" ? "solid" : "outline"} onClick={() => switchWorkspaceView("sketch")}>
                   2D sketch
                 </Button>
-                <Button size="sm" variant={workspaceViewMode === "solid" ? "solid" : "outline"} onClick={() => setWorkspaceViewMode("solid")}>
+                <Button size="sm" variant={workspaceViewMode === "solid" ? "solid" : "outline"} onClick={() => switchWorkspaceView("solid")}>
                   3D solid
                 </Button>
                 <Button size="sm" variant={tool === "pan" ? "solid" : "outline"} onClick={() => handleToolChange("pan")}>
@@ -2231,7 +2385,7 @@ const SketchMathWorkspace = () => {
                 </Text>
               </HStack>
               {workspaceViewMode === "solid" ? (
-                <SolidPreview3D mesh={solidPreviewMesh} />
+                <SolidPreview3D mesh={solidPreviewMesh} camera={solidCamera} onCameraChange={setSolidCamera} onPreset={applySolidCameraPreset} />
               ) : (
                 <SketchCanvas2D
                   width={CANVAS_WIDTH}

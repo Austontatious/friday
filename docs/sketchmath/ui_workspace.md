@@ -68,11 +68,13 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 - `2D sketch` shows the existing SVG sketch canvas.
 - `3D solid` shows the last valid extrusion preview mesh returned by `extrude_profile`.
+- `2D sketch` and `3D solid` share a workspace camera model. The 2D sketch plane is treated as the Top camera view, and switching to 3D carries the selected profile target, fit framing, and zoom where practical.
 - `Pan / view` mode lets the user drag the 2D canvas view.
 - `Zoom in`, `Zoom out`, `Fit sketch`, and `Reset view` manipulate the SVG viewBox only; committed geometry remains session-backed.
 - The view widget labels the current surface as `2D sketch plane` or `3D solid preview`.
 - In `3D solid`, left-drag orbits/tilts the preview, shift-drag, middle-drag, or right-drag pans, the wheel zooms, and Fit/Reset/Top/Iso/Front controls adjust the camera.
-- The 3D preview includes a compact camera HUD with view, azimuth, elevation, zoom, and pan values so manual smoke and tests can confirm camera movement.
+- The 3D preview includes a compact camera HUD with view, azimuth, elevation, zoom, pan, and target values so manual smoke and tests can confirm camera continuity and movement.
+- `Tilt to 3D` keeps the same target/framing and moves the camera out of the overhead Top view without changing geometry.
 - Before a valid extrusion exists, `3D solid` shows `Extrude a valid profile to preview the 3D solid.`
 
 ## 3D Solid Preview

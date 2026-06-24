@@ -1,16 +1,31 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import type { SketchMathPreviewMesh, SketchMathPreviewTriangle } from "../../services/sketchmath";
 
 type Vec3 = [number, number, number];
 type Vec2 = { x: number; y: number; z: number };
-type CameraState = { yaw: number; pitch: number; zoom: number; panX: number; panY: number };
+export type SolidCameraState = {
+  yaw: number;
+  pitch: number;
+  zoom: number;
+  panX: number;
+  panY: number;
+  targetX: number;
+  targetY: number;
+  targetZ: number;
+};
 type DragState = { x: number; y: number; mode: "orbit" | "pan" };
 
-const DEFAULT_CAMERA: CameraState = { yaw: -0.72, pitch: -0.54, zoom: 1, panX: 0, panY: 0 };
-const TOP_CAMERA: CameraState = { yaw: 0, pitch: -Math.PI / 2, zoom: 1, panX: 0, panY: 0 };
-const FRONT_CAMERA: CameraState = { yaw: 0, pitch: 0, zoom: 1, panX: 0, panY: 0 };
-
+export const DEFAULT_SOLID_CAMERA: SolidCameraState = {
+  yaw: 0,
+  pitch: -Math.PI / 2,
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+  targetX: 0,
+  targetY: 0,
+  targetZ: 0,
+};
 const SURFACE_COLORS: Record<string, string> = {
   top: "#8fd3ff",
   bottom: "#355268",
@@ -48,7 +63,7 @@ const meshSpan = (mesh: SketchMathPreviewMesh): number => {
   return 60;
 };
 
-const rotateProject = (vertex: Vec3, center: Vec3, camera: CameraState): Vec2 => {
+const rotateProject = (vertex: Vec3, center: Vec3, camera: SolidCameraState): Vec2 => {
   const x = vertex[0] - center[0];
   const y = vertex[1] - center[1];
   const z = vertex[2] - center[2];
@@ -81,7 +96,22 @@ const normalZ = (a: Vec2, b: Vec2, c: Vec2): number => {
   return ux * vy - uy * vx;
 };
 
-const drawMesh = (canvas: HTMLCanvasElement, mesh: SketchMathPreviewMesh, camera: CameraState) => {
+const drawCenter = (mesh: SketchMathPreviewMesh, camera: SolidCameraState): Vec3 => {
+  const center = meshCenter(mesh);
+  const bbox = mesh.metadata?.bbox;
+  if (!bbox) {
+    return center;
+  }
+  const span = meshSpan(mesh);
+  const targetNearMesh =
+    camera.targetX >= bbox.xmin - span * 2 &&
+    camera.targetX <= bbox.xmax + span * 2 &&
+    camera.targetY >= bbox.ymin - span * 2 &&
+    camera.targetY <= bbox.ymax + span * 2;
+  return targetNearMesh ? [camera.targetX, camera.targetY, camera.targetZ] : center;
+};
+
+const drawMesh = (canvas: HTMLCanvasElement, mesh: SketchMathPreviewMesh, camera: SolidCameraState) => {
   const context = canvas.getContext("2d");
   if (!context) {
     return;
@@ -99,7 +129,7 @@ const drawMesh = (canvas: HTMLCanvasElement, mesh: SketchMathPreviewMesh, camera
   context.fillStyle = "#071018";
   context.fillRect(0, 0, bounds.width, bounds.height);
 
-  const center = meshCenter(mesh);
+  const center = drawCenter(mesh, camera);
   const span = meshSpan(mesh);
   const scale = (Math.min(bounds.width, bounds.height) * 0.62 * camera.zoom) / span;
   const projected = mesh.vertices.map((vertex) => rotateProject(vertex, center, camera));
@@ -142,10 +172,16 @@ const drawMesh = (canvas: HTMLCanvasElement, mesh: SketchMathPreviewMesh, camera
   context.restore();
 };
 
-export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh | null }) {
+type SolidPreview3DProps = {
+  mesh: SketchMathPreviewMesh | null;
+  camera: SolidCameraState;
+  onCameraChange: (camera: SolidCameraState) => void;
+  onPreset: (preset: "fit" | "reset" | "top" | "iso" | "front" | "tilt") => void;
+};
+
+export default function SolidPreview3D({ mesh, camera, onCameraChange, onPreset }: SolidPreview3DProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
-  const [camera, setCamera] = useState<CameraState>(DEFAULT_CAMERA);
   const holeCount = mesh?.metadata?.hole_count ?? 0;
   const depth = mesh?.depth ?? 0;
   const summary = useMemo(() => {
@@ -161,6 +197,9 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
       zoom: Number(camera.zoom.toFixed(2)),
       panX: Math.round(camera.panX),
       panY: Math.round(camera.panY),
+      targetX: Math.round(camera.targetX),
+      targetY: Math.round(camera.targetY),
+      targetZ: Math.round(camera.targetZ),
     }),
     [camera],
   );
@@ -187,29 +226,11 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
         return;
       }
       event.preventDefault();
-      setCamera((current) => ({ ...current, zoom: clamp(current.zoom * (event.deltaY < 0 ? 1.12 : 0.88), 0.35, 4) }));
+      onCameraChange({ ...camera, zoom: clamp(camera.zoom * (event.deltaY < 0 ? 1.12 : 0.88), 0.35, 4) });
     };
     canvas.addEventListener("wheel", handleWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", handleWheel);
-  }, [mesh]);
-
-  const setPreset = (preset: "iso" | "top" | "front" | "reset" | "fit") => {
-    setCamera((current) => {
-      if (preset === "top") {
-        return TOP_CAMERA;
-      }
-      if (preset === "front") {
-        return FRONT_CAMERA;
-      }
-      if (preset === "fit") {
-        return { ...current, zoom: 1, panX: 0, panY: 0 };
-      }
-      if (preset === "reset") {
-        return DEFAULT_CAMERA;
-      }
-      return { ...DEFAULT_CAMERA };
-    });
-  };
+  }, [camera, mesh, onCameraChange]);
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!mesh) {
@@ -230,10 +251,10 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
     const dy = event.clientY - drag.y;
     const mode = isPanGesture(event) ? "pan" : drag.mode;
     dragRef.current = { ...drag, x: event.clientX, y: event.clientY, mode };
-    setCamera((current) =>
+    onCameraChange(
       mode === "pan"
-        ? { ...current, panX: current.panX + dx, panY: current.panY + dy }
-        : { ...current, yaw: current.yaw + dx * 0.01, pitch: clamp(current.pitch + dy * 0.01, -1.45, 1.45) },
+        ? { ...camera, panX: camera.panX + dx, panY: camera.panY + dy }
+        : { ...camera, yaw: camera.yaw + dx * 0.01, pitch: clamp(camera.pitch + dy * 0.01, -Math.PI / 2, 1.45) },
     );
   };
 
@@ -248,20 +269,23 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
   return (
     <Box className="sketchmath-solid-preview" data-testid="sketchmath-solid-preview">
       <HStack className="sketchmath-solid-preview-controls" spacing={2} flexWrap="wrap">
-        <Button size="sm" variant="outline" onClick={() => setPreset("fit")} isDisabled={!mesh}>
+        <Button size="sm" variant="outline" onClick={() => onPreset("fit")} isDisabled={!mesh}>
           Fit
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setPreset("reset")} isDisabled={!mesh}>
+        <Button size="sm" variant="outline" onClick={() => onPreset("reset")} isDisabled={!mesh}>
           Reset
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setPreset("top")} isDisabled={!mesh}>
+        <Button size="sm" variant="outline" onClick={() => onPreset("top")} isDisabled={!mesh}>
           Top
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setPreset("iso")} isDisabled={!mesh}>
+        <Button size="sm" variant="outline" onClick={() => onPreset("iso")} isDisabled={!mesh}>
           Iso
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setPreset("front")} isDisabled={!mesh}>
+        <Button size="sm" variant="outline" onClick={() => onPreset("front")} isDisabled={!mesh}>
           Front
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onPreset("tilt")} isDisabled={!mesh}>
+          Tilt to 3D
         </Button>
       </HStack>
       <Text className="sketchmath-solid-preview-status" data-testid="sketchmath-solid-preview-status">
@@ -273,6 +297,7 @@ export default function SolidPreview3D({ mesh }: { mesh: SketchMathPreviewMesh |
         <div><dt>elevation</dt><dd data-testid="sketchmath-camera-elevation">{cameraHud.elevation} deg</dd></div>
         <div><dt>zoom</dt><dd data-testid="sketchmath-camera-zoom">{formatCameraValue(cameraHud.zoom)}x</dd></div>
         <div><dt>pan</dt><dd data-testid="sketchmath-camera-pan">{cameraHud.panX}, {cameraHud.panY}</dd></div>
+        <div><dt>target</dt><dd data-testid="sketchmath-camera-target">{cameraHud.targetX}, {cameraHud.targetY}</dd></div>
       </dl>
       <canvas
         ref={canvasRef}
