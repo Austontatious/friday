@@ -465,6 +465,35 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
     return setSnapshot(nextItems, [profileId, holeId], command, mutate);
   };
 
+  const updateProfileHole = (command: any, mutate: boolean) => {
+    const [profileId, holeId] = command.selection as string[];
+    const profileEntity = snapshot.selection_context.items.find(
+      (item): item is Extract<Entity, { type: "profile_2d" }> => item.type === "profile_2d" && item.id === profileId,
+    );
+    const holeEntity = snapshot.selection_context.items.find(
+      (item): item is Extract<Entity, { type: "profile_2d" }> => item.type === "profile_2d" && item.id === holeId,
+    );
+    if (!profileEntity || !holeEntity || !(profileEntity.holes || []).includes(holeId)) {
+      throw new Error("update_profile_hole requires a parent profile and existing hole");
+    }
+    const center = command.parameters.center as [number, number];
+    const diameter = Number(command.parameters.diameter);
+    const radius = diameter / 2;
+    const updatedHole: Entity = {
+      ...holeEntity,
+      vertices: [
+        [center[0] - radius, center[1] - radius],
+        [center[0] - radius, center[1] + radius],
+        [center[0] + radius, center[1] + radius],
+        [center[0] + radius, center[1] - radius],
+        [center[0] - radius, center[1] - radius],
+      ],
+      area: diameter * diameter,
+    };
+    const nextItems = snapshot.selection_context.items.map((item) => (item.id === holeId ? updatedHole : item));
+    return setSnapshot(nextItems, [profileId, holeId], command, mutate);
+  };
+
   const extrudeProfile = (command: any, mutate: boolean) => {
     const profileId = command.selection[0];
     const profileEntity = snapshot.selection_context.items.find(
@@ -486,6 +515,12 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
         metadata: {
           adapter_strategy: holeIds.length ? "face_with_holes" : "plain_extrude",
           hole_count: holeIds.length,
+          artifact_filename: "export.step",
+          artifact_size_bytes: 2048,
+          artifact_created_at: "2026-06-24T12:00:00+00:00",
+          profile_id: profileId,
+          extrusion_depth: Number(command.parameters.depth),
+          extrusion_depth_unit: command.parameters.depth_unit || "mm",
         },
         measurements: {
           is_valid_solid: true,
@@ -576,6 +611,9 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
       }
       if (command.command_type === "add_profile_hole") {
         return makeResponse(addProfileHole(command, mutate));
+      }
+      if (command.command_type === "update_profile_hole") {
+        return makeResponse(updateProfileHole(command, mutate));
       }
       if (command.command_type === "extrude_profile") {
         return makeResponse(extrudeProfile(command, mutate));
@@ -924,6 +962,51 @@ describe("SketchMath workspace", () => {
 
     await waitFor(() => expect(screen.getByTestId(/^entity-hole_/)).toBeVisible());
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Profile holes: 1");
+  });
+
+  it("selects an existing hole, labels its diameter, and edits it after placement", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add Hole" })).toBeEnabled());
+    fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "12" } });
+    await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+    await screen.findByTestId("sketchmath-hole-placement");
+    await userEvent.click(screen.getByRole("button", { name: "Add Centered Hole" }));
+
+    const hole = await screen.findByTestId(/^entity-hole_/);
+    await userEvent.click(hole);
+
+    const holeId = hole.getAttribute("data-entity-id") || "";
+    await waitFor(() => expect(screen.getByTestId("selected-hole-editor")).toHaveTextContent("Selected hole"));
+    expect(screen.getByTestId(`dimension-${holeId}-diameter`)).toHaveTextContent("Dia 12 mm");
+    expect(screen.getByLabelText("Selected hole diameter")).toHaveValue(12);
+
+    fireEvent.change(screen.getByLabelText("Selected hole diameter"), { target: { value: "8" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply hole update" }));
+
+    const updateCall = await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/commit") && String(init?.body || "").includes("update_profile_hole"));
+      expect(call).toBeTruthy();
+      return call;
+    });
+    const updateBody = JSON.parse(String(updateCall?.[1]?.body || "{}"));
+    expect(updateBody.command).toMatchObject({
+      mode: "commit",
+      command_type: "update_profile_hole",
+      selection: expect.arrayContaining([holeId]),
+      parameters: { diameter: 8, unit: "mm", center: [280, 170] },
+    });
+    await waitFor(() => expect(screen.getByTestId(`dimension-${holeId}-diameter`)).toHaveTextContent("Dia 8 mm"));
+    expect(screen.getByTestId("selected-hole-editor-message")).toHaveTextContent("Hole updated.");
   });
 
   it("enters Add Hole placement mode and previews the clicked center", async () => {
@@ -1355,10 +1438,15 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("Export succeeded");
     expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("export.step");
     expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("Download is served through FRIDAY");
+    expect(screen.getByTestId("sketchmath-export-metadata")).toHaveTextContent("2048 bytes");
+    expect(screen.getByTestId("sketchmath-export-metadata")).toHaveTextContent("10 mm");
+    expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("3D preview is not implemented");
     expect(screen.getByRole("link", { name: "Download STEP" })).toHaveAttribute(
       "href",
       expect.stringMatching(/^\/api\/sketchmath\/artifacts\/step\?path=%2Ftmp%2Fsketchmath%2Fextrude_profile_.+%2Fexport\.step$/),
     );
+    await userEvent.click(screen.getByRole("button", { name: "Clear export result" }));
+    expect(screen.queryByTestId("sketchmath-export-card")).toBeNull();
   });
 
   it("completes the core browser workflow from rectangle to holed STEP download without JSON", async () => {
@@ -1389,13 +1477,19 @@ describe("SketchMath workspace", () => {
     await userEvent.click(within(screen.getByTestId("rectangle-semantic-summary")).getByRole("button", { name: "Select profile" }));
     await waitFor(() => expect(inspector).toHaveTextContent("Selected profile"));
 
-    fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "8" } });
+    fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "6" } });
     await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
     await waitFor(() => expect(screen.getByTestId("sketchmath-hole-placement")).toHaveTextContent("Click inside selected profile"));
     clickCanvasAt(canvas, 180, 132);
 
-    await waitFor(() => expect(screen.getByTestId(/^entity-hole_/)).toBeVisible());
+    const hole = await screen.findByTestId(/^entity-hole_/);
     await waitFor(() => expect(inspector).toHaveTextContent("Profile holes: 1"));
+    await userEvent.click(hole);
+    fireEvent.change(screen.getByLabelText("Selected hole diameter"), { target: { value: "8" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply hole update" }));
+    await waitFor(() => expect(screen.getByTestId("selected-hole-editor-message")).toHaveTextContent("Hole updated."));
+    await userEvent.click(await screen.findByTestId(`entity-${baseId}_ab`));
+    await userEvent.click(within(screen.getByTestId("rectangle-semantic-summary")).getByRole("button", { name: "Select profile" }));
 
     fireEvent.change(screen.getByLabelText("Extrusion depth"), { target: { value: "15" } });
     await userEvent.click(within(workbench).getByRole("button", { name: "Extrude" }));
@@ -1412,7 +1506,7 @@ describe("SketchMath workspace", () => {
     const commandTypes = fetchMock.mock.calls
       .filter(([url]) => String(url).includes("/commands/commit"))
       .map(([, init]) => JSON.parse(String(init?.body || "{}")).command?.command_type);
-    expect(commandTypes).toEqual(expect.arrayContaining(["batch", "set_rectangle_dimension", "add_profile_hole", "extrude_profile"]));
+    expect(commandTypes).toEqual(expect.arrayContaining(["batch", "set_rectangle_dimension", "add_profile_hole", "update_profile_hole", "extrude_profile"]));
     const rectangleBatchCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/commit") && String(init?.body || "").includes("\"command_type\":\"batch\""));
     const rectangleBatchBody = JSON.parse(String(rectangleBatchCall?.[1]?.body || "{}"));
     expect(rectangleBatchBody.command.parameters.commands).toEqual(

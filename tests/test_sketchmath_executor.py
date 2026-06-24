@@ -523,6 +523,70 @@ def test_add_profile_hole_commit_persists_hole_profile_and_replayable_history() 
     assert session.history.replay(session.initial_state).get_entity("profile_rect_test").holes == [hole_id]
 
 
+def test_update_profile_hole_commit_replaces_existing_hole_geometry() -> None:
+    session = _session([])
+    session.execute(_rectangle_batch_command())
+    session.execute(
+        _command(
+            "add_profile_hole",
+            "cmd_add_hole_commit",
+            mode="commit",
+            selection=["profile_rect_test"],
+            parameters={"diameter": 8.0, "unit": "mm", "center": [30.0, 32.5]},
+        )
+    )
+
+    hole_id = "hole_profile_rect_test_cmd_add_hole_commit"
+    result = session.execute(
+        _command(
+            "update_profile_hole",
+            "cmd_update_hole_commit",
+            mode="commit",
+            selection=["profile_rect_test", hole_id],
+            parameters={"diameter": 6.0, "unit": "mm", "center": [28.0, 32.5]},
+        )
+    )
+
+    updated_hole = session.state.get_entity(hole_id)
+    assert result.status == "committed"
+    assert result.changed_entity_ids == ["profile_rect_test", hole_id]
+    assert result.metadata["diameter"] == 6.0
+    assert result.metadata["center"] == [28.0, 32.5]
+    assert updated_hole.area == pytest.approx(28.274, rel=1e-2)
+    assert session.state.get_entity("profile_rect_test").holes == [hole_id]
+    assert session.history.records[-1].command.command_type == "update_profile_hole"
+    assert session.history.replay(session.initial_state).get_entity("profile_rect_test").holes == [hole_id]
+
+
+def test_update_profile_hole_invalid_diameter_is_structured() -> None:
+    session = _session([])
+    session.execute(_rectangle_batch_command())
+    session.execute(
+        _command(
+            "add_profile_hole",
+            "cmd_add_hole_commit",
+            mode="commit",
+            selection=["profile_rect_test"],
+            parameters={"diameter": 8.0, "unit": "mm", "center": [30.0, 32.5]},
+        )
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        session.execute(
+            _command(
+                "update_profile_hole",
+                "cmd_update_hole_invalid",
+                mode="commit",
+                selection=["profile_rect_test", "hole_profile_rect_test_cmd_add_hole_commit"],
+                parameters={"diameter": 0.0, "unit": "mm", "center": [30.0, 32.5]},
+            )
+        )
+
+    payload = exc_info.value.to_dict()
+    assert payload["code"] == "selection_resolution_error"
+    assert payload["detail"]["error_code"] == "invalid_hole_diameter"
+
+
 @pytest.mark.parametrize(
     ("selection", "parameters", "error_code", "detail_code"),
     [

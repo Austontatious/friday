@@ -24,6 +24,21 @@ const formatDimension = (value: number): string => Number(value.toFixed(2)).toSt
 const DIMENSION_GUIDE_OFFSET = 34;
 const DIMENSION_TICK = 9;
 
+const profileBounds = (entity: Extract<SketchMathEntity, { type: "profile_2d" }>) => {
+  const vertices = entity.vertices.filter((vertex, index) => index === 0 || vertex[0] !== entity.vertices[0][0] || vertex[1] !== entity.vertices[0][1]);
+  if (vertices.length === 0) {
+    return null;
+  }
+  const xs = vertices.map((vertex) => vertex[0]);
+  const ys = vertices.map((vertex) => vertex[1]);
+  return {
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys),
+  };
+};
+
 const rectangleBaseIdFromPointId = (pointId: string): string | null => {
   const match = /^rect_(.+)_[abcd]$/.exec(pointId);
   return match ? `rect_${match[1]}` : null;
@@ -77,21 +92,36 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
     {entities.filter((entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => isProfile(entity) && profileHoleIds.has(entity.id)).map((entity) => {
       const points = entity.vertices.map((vertex) => vertex.join(",")).join(" ");
       const selected = selectedEntityIds.includes(entity.id);
+      const bounds = profileBounds(entity);
+      const diameter = bounds ? Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) : 0;
+      const centerX = bounds ? (bounds.minX + bounds.maxX) / 2 : 0;
+      const centerY = bounds ? (bounds.minY + bounds.maxY) / 2 : 0;
       return (
-        <polygon
-          key={entity.id}
-          points={points}
-          className={selected ? "sketchmath-hole-profile sketchmath-hole-profile-selected" : "sketchmath-hole-profile"}
-          data-testid={`entity-${entity.id}`}
-          data-entity-id={entity.id}
-          data-entity-type={entity.type}
-          role="button"
-          tabIndex={0}
-          onClick={(event) => {
-            event.stopPropagation();
-            onEntityClick(entity.id, event);
-          }}
-        />
+        <g key={entity.id}>
+          <polygon
+            points={points}
+            className={selected ? "sketchmath-hole-profile sketchmath-hole-profile-selected" : "sketchmath-hole-profile"}
+            data-testid={`entity-${entity.id}`}
+            data-entity-id={entity.id}
+            data-entity-type={entity.type}
+            role="button"
+            tabIndex={0}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEntityClick(entity.id, event);
+            }}
+          />
+          {selected && bounds ? (
+            <text
+              x={centerX}
+              y={centerY - Math.max(12, diameter / 2 + 8)}
+              className="sketchmath-dimension-label"
+              data-testid={`dimension-${entity.id}-diameter`}
+            >
+              Dia {formatDimension(diameter)} mm
+            </text>
+          ) : null}
+        </g>
       );
     })}
     {entities.filter(isLine).map((entity) => {

@@ -124,6 +124,7 @@ def apply_geometry_command(
         "solve_constraints": _handle_solve_constraints,
         "make_profile": _handle_make_profile,
         "add_profile_hole": _handle_add_profile_hole,
+        "update_profile_hole": _handle_update_profile_hole,
         "extrude_profile": _handle_extrude_profile,
         "translate": _handle_translate,
         "rotate": _handle_rotate,
@@ -648,6 +649,73 @@ def _handle_add_profile_hole(command: GeometryCommand, state: SelectionContext) 
         {
             "profile_id": profile.id,
             "hole_id": hole.id,
+            "diameter": denormalize_length(diameter_mm, unit),
+            "unit": unit,
+            "center": [center[0], center[1]],
+            "segments": segments,
+            "profile_hole_validation": validation.to_dict(),
+        },
+    )
+
+
+def _handle_update_profile_hole(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    if len(command.selection) < 2:
+        raise SelectionResolutionError(
+            "update_profile_hole requires a selected profile and hole",
+            detail={"command_type": command.command_type, "error_code": "missing_profile_or_hole_selection"},
+        )
+    profile = _resolve_profile(state, command.selection[0])
+    hole = _resolve_profile(state, command.selection[1])
+    if hole.id not in profile.holes:
+        raise SelectionResolutionError(
+            "Selected hole does not belong to the selected profile",
+            detail={"command_type": command.command_type, "profile_id": profile.id, "hole_id": hole.id, "error_code": "hole_not_in_profile"},
+        )
+    _ensure_mutable(state, [profile.id, hole.id], command.command_type)
+    unit = str(_parameter(command, "unit", default=state.units))
+    try:
+        diameter_mm = normalize_length(float(_parameter(command, "diameter")), unit)
+    except ValueError as exc:
+        raise InvalidUnitsError(str(exc), detail={"command_type": command.command_type, "unit": unit}) from exc
+    if diameter_mm <= 0:
+        raise SelectionResolutionError(
+            "Hole diameter must be a positive number",
+            detail={"command_type": command.command_type, "error_code": "invalid_hole_diameter", "diameter": diameter_mm},
+        )
+    center = _point_tuple(_parameter(command, "center"))
+    segments = int(command.parameters.get("segments", max(12, len(hole.vertices) - 1)))
+    if segments < 12:
+        segments = 12
+    if segments > 96:
+        segments = 96
+    hole_vertices = _circle_profile_vertices(center, diameter_mm / 2.0, segments)
+    analysis = analyze_closed_polygon(hole_vertices)
+    updated_hole = Profile2DEntity(
+        **{
+            **hole.model_dump(),
+            "vertices": analysis.vertices,
+            "area": analysis.area,
+            "winding": "clockwise",
+            "warnings": analysis.warnings,
+            "closed": analysis.closed,
+        }
+    )
+    other_holes = [_resolve_profile(state, hole_ref) for hole_ref in profile.holes if hole_ref != hole.id]
+    validation = validate_profile_holes(profile, [*other_holes, updated_hole])
+    if not validation.ok:
+        raise SelectionResolutionError(
+            validation.message or "Invalid profile hole",
+            detail={"command_type": command.command_type, **validation.to_dict()},
+        )
+    state.replace_entity(updated_hole)
+    return (
+        state,
+        [profile.id, updated_hole.id],
+        denormalize_length(diameter_mm, unit),
+        unit,
+        {
+            "profile_id": profile.id,
+            "hole_id": updated_hole.id,
             "diameter": denormalize_length(diameter_mm, unit),
             "unit": unit,
             "center": [center[0], center[1]],

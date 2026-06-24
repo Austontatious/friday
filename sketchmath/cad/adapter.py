@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 import shutil
 import subprocess
@@ -155,6 +156,9 @@ class CadAdapter:
             check=False,
         )
         if completed.returncode != 0:
+            partial_step = export_dir / "export.step"
+            if partial_step.exists() and partial_step.is_file():
+                partial_step.unlink()
             raise CadExportError(
                 "FreeCAD extrusion worker failed",
                 detail={
@@ -174,6 +178,8 @@ class CadAdapter:
             )
         payload = json.loads(validation_path.read_text(encoding="utf-8"))
         result = CadExportResult.model_validate(payload)
+        step_path = Path(result.artifacts.step_path) if result.artifacts else export_dir / "export.step"
+        step_stat = step_path.stat() if step_path.exists() else None
         result.metadata.update(
             {
                 "freecad_cmd": str(freecad_cmd),
@@ -181,6 +187,12 @@ class CadAdapter:
                 "input_json": str(input_path),
                 "out_dir": str(export_dir),
                 "returncode": completed.returncode,
+                "artifact_filename": step_path.name,
+                "artifact_size_bytes": step_stat.st_size if step_stat else None,
+                "artifact_created_at": datetime.fromtimestamp(step_stat.st_mtime, timezone.utc).isoformat() if step_stat else None,
+                "profile_id": profile.id,
+                "extrusion_depth": depth,
+                "extrusion_depth_unit": depth_unit,
             }
         )
         return result

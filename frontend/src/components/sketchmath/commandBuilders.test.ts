@@ -5,6 +5,7 @@ import {
   buildSetLengthCommand,
   buildSetRectangleDimensionCommand,
   buildTranslateCommand,
+  buildUpdateProfileHoleCommand,
 } from "./commandBuilders";
 
 describe("SketchMath command builders", () => {
@@ -50,6 +51,14 @@ describe("SketchMath command builders", () => {
     expect(command.command_type).toBe("add_profile_hole");
     expect(command.selection).toEqual(["profile_rect_A"]);
     expect(command.parameters).toEqual({ diameter: 12, unit: "mm", center: [280, 170] });
+  });
+
+  it("generates a typed update profile hole command", () => {
+    const command = buildUpdateProfileHoleCommand("profile_rect_A", "hole_profile_rect_A_1", 8, { x: 280, y: 170 }, "mm");
+
+    expect(command.command_type).toBe("update_profile_hole");
+    expect(command.selection).toEqual(["profile_rect_A", "hole_profile_rect_A_1"]);
+    expect(command.parameters).toEqual({ diameter: 8, unit: "mm", center: [280, 170] });
   });
 
   it("generates a typed extrude profile command for STEP preview", () => {

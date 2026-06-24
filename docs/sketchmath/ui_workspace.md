@@ -51,6 +51,8 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Active workbench actions: Set Length, Edit Width, Edit Height, Parallel, Perpendicular, Equal Length, Add Hole, Extrude, Commit Preview, Revert Preview, Download STEP.
 - Rectangle width/height controls commit typed `set_rectangle_dimension` commands directly and keep the rectangle/profile selected.
 - Add Hole enters placement mode; `Add Centered Hole` or a click inside the selected profile commits a typed `add_profile_hole` command with the current diameter.
+- Existing holes can be selected on canvas. The selection inspector exposes diameter and center controls that commit a typed `update_profile_hole` command and immediately refresh the committed session state.
+- Selected rectangles show width/height dimension labels on canvas. Selected holes show a diameter label on canvas.
 - The rectangle inspector exposes `Select profile` so the core workflow does not require selecting hidden profile geometry on the canvas.
 - Circle and Arc are intentionally labeled `coming soon` instead of being exposed as active tools. Circular holes are supported through `add_profile_hole`; free-standing circles and arcs are not first-class SketchMath entities in this MVP.
 
@@ -59,7 +61,8 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - `extrude_profile` writes STEP artifacts under the configured SketchMath CAD export directory.
 - The browser downloads STEP files through `GET /api/sketchmath/artifacts/step?path=...`.
 - The API only serves `.step`/`.stp` files under the configured export root.
-- Generated STEP cleanup is manual for this MVP; generated artifacts are runtime output and should not be committed.
+- The export card shows filename, size when reported, created time when reported, profile id, extrusion depth, Download STEP, Export again, and Clear export result.
+- Failed FreeCAD subprocess exports remove a partial `export.step` if one exists. Broader generated STEP cleanup is manual for this MVP; generated artifacts are runtime output and should not be committed.
 
 ## Visual System
 
@@ -72,7 +75,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 ## Non-Goals
 
 - No FreeCAD GUI or broad CAD kernel wrapper.
-- No 3D preview in the browser.
+- No 3D preview in the browser. The export card states this explicitly instead of presenting a fake viewer.
 - No MCP wrapper.
 - No arbitrary Python execution.
 - No direct geometry mutation from React state.

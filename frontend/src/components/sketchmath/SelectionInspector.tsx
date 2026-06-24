@@ -17,6 +17,18 @@ type SelectionInspectorProps = {
   rectangleAnchorSummary: string | null;
   profileSummary: string;
   profileHoleCount: number | null;
+  selectedHole:
+    | {
+        holeId: string;
+        profileId: string;
+        diameter: number;
+        center: { x: number; y: number };
+      }
+    | null;
+  selectedHoleDiameterDraft: string;
+  selectedHoleCenterXDraft: string;
+  selectedHoleCenterYDraft: string;
+  holeEditorMessage: string | null;
   rectangleWidthDraft: string;
   rectangleHeightDraft: string;
   dimensionEditor: { baseId: string; dimension: "width" | "height"; value: string } | null;
@@ -34,6 +46,10 @@ type SelectionInspectorProps = {
   onApplyDimensionEditor: () => void;
   onSelectWholeRectangle: () => void;
   onSelectProfile: () => void;
+  onSelectedHoleDiameterDraftChange: (value: string) => void;
+  onSelectedHoleCenterXDraftChange: (value: string) => void;
+  onSelectedHoleCenterYDraftChange: (value: string) => void;
+  onApplySelectedHoleUpdate: () => void;
   onDeleteWholeRectangle: () => void;
   onCancelDeletePrompt: () => void;
   onFixRectangleCorner: () => void;
@@ -52,6 +68,11 @@ const SelectionInspector = ({
   rectangleAnchorSummary,
   profileSummary,
   profileHoleCount,
+  selectedHole,
+  selectedHoleDiameterDraft,
+  selectedHoleCenterXDraft,
+  selectedHoleCenterYDraft,
+  holeEditorMessage,
   rectangleWidthDraft,
   rectangleHeightDraft,
   dimensionEditor,
@@ -69,6 +90,10 @@ const SelectionInspector = ({
   onApplyDimensionEditor,
   onSelectWholeRectangle,
   onSelectProfile,
+  onSelectedHoleDiameterDraftChange,
+  onSelectedHoleCenterXDraftChange,
+  onSelectedHoleCenterYDraftChange,
+  onApplySelectedHoleUpdate,
   onDeleteWholeRectangle,
   onCancelDeletePrompt,
   onFixRectangleCorner,
@@ -91,6 +116,11 @@ const SelectionInspector = ({
         </Text>
       </Box>
       {selectedEntities.length === 0 ? <Text opacity={0.7}>Nothing selected.</Text> : null}
+      {selectedEntities.length === 0 ? (
+        <Text fontSize="sm" opacity={0.75}>
+          Draw a rectangle or select a profile to enable hole and extrusion controls.
+        </Text>
+      ) : null}
       {deletePrompt ? (
         <Box width="100%" data-testid="sketchmath-delete-prompt">
           <Text fontWeight="600" mb={1}>
@@ -181,6 +211,51 @@ const SelectionInspector = ({
             <Button size="sm" mt={2} onClick={onFixRectangleCorner}>
               Fix corner
             </Button>
+          ) : null}
+        </Box>
+      ) : null}
+      {selectedHole ? (
+        <Box width="100%" data-testid="selected-hole-editor">
+          <Text fontWeight="600" mb={1}>
+            Selected hole
+          </Text>
+          <Text fontSize="sm" opacity={0.8}>
+            {selectedHole.holeId} in {selectedHole.profileId}
+          </Text>
+          <Text fontSize="sm" opacity={0.8}>
+            Diameter: {selectedHole.diameter} mm at ({selectedHole.center.x}, {selectedHole.center.y})
+          </Text>
+          <HStack mt={2} flexWrap="wrap">
+            <Input
+              type="number"
+              value={selectedHoleDiameterDraft}
+              onChange={(event) => onSelectedHoleDiameterDraftChange(event.target.value)}
+              aria-label="Selected hole diameter"
+              data-testid="selected-hole-diameter-input"
+            />
+            <Input
+              type="number"
+              value={selectedHoleCenterXDraft}
+              onChange={(event) => onSelectedHoleCenterXDraftChange(event.target.value)}
+              aria-label="Selected hole center X"
+              data-testid="selected-hole-center-x-input"
+            />
+            <Input
+              type="number"
+              value={selectedHoleCenterYDraft}
+              onChange={(event) => onSelectedHoleCenterYDraftChange(event.target.value)}
+              aria-label="Selected hole center Y"
+              data-testid="selected-hole-center-y-input"
+            />
+            <Button onClick={onApplySelectedHoleUpdate}>Apply hole update</Button>
+          </HStack>
+          <Text fontSize="sm" opacity={0.75} mt={1}>
+            The hole center must remain inside the parent profile.
+          </Text>
+          {holeEditorMessage ? (
+            <Text fontSize="sm" opacity={0.85} data-testid="selected-hole-editor-message">
+              {holeEditorMessage}
+            </Text>
           ) : null}
         </Box>
       ) : null}

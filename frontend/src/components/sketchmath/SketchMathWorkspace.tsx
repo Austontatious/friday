@@ -47,6 +47,7 @@ import {
   buildSetAngleCommand,
   buildSetLengthCommand,
   buildSetRectangleDimensionCommand,
+  buildUpdateProfileHoleCommand,
 } from "./commandBuilders";
 
 const CANVAS_WIDTH = 1200;
@@ -65,8 +66,18 @@ type RectangleSelectionDetail =
 type DimensionEditorState = { baseId: string; dimension: "width" | "height"; value: string } | null;
 type DeletePromptState = { kind: "rectangle"; baseId: string; message: string } | null;
 type HolePlacementState = { profileId: string; baseId: string | null; center: Point; message: string } | null;
+type HoleSelectionSummary = { holeId: string; profileId: string; diameter: number; center: Point };
+type CadExportArtifact = {
+  stepPath: string;
+  filename: string;
+  sizeBytes: number | null;
+  createdAt: string | null;
+  profileId: string | null;
+  extrusionDepth: number | null;
+  extrusionDepthUnit: string | null;
+};
 type SelectionRef = {
-  kind: "none" | "rectangle_edge" | "rectangle_corner" | "rectangle_profile" | "rectangle" | "one_line" | "two_lines" | "one_point" | "two_points" | "mixed";
+  kind: "none" | "rectangle_edge" | "rectangle_corner" | "rectangle_profile" | "profile_hole" | "rectangle" | "one_line" | "two_lines" | "one_point" | "two_points" | "mixed";
   summary: string;
   parentSummary?: string;
   detail?: string;
@@ -122,6 +133,24 @@ const profileCenter = (profile: Extract<SketchMathEntity, { type: "profile_2d" }
   return {
     x: Number(((Math.min(...xs) + Math.max(...xs)) / 2).toFixed(2)),
     y: Number(((Math.min(...ys) + Math.max(...ys)) / 2).toFixed(2)),
+  };
+};
+
+const profileDiameterAndCenter = (profile: Extract<SketchMathEntity, { type: "profile_2d" }>): { diameter: number; center: Point } | null => {
+  const vertices = profile.vertices.filter((vertex, index) => index === 0 || vertex[0] !== profile.vertices[0][0] || vertex[1] !== profile.vertices[0][1]);
+  if (vertices.length === 0) {
+    return null;
+  }
+  const xs = vertices.map((vertex) => vertex[0]);
+  const ys = vertices.map((vertex) => vertex[1]);
+  const width = Math.max(...xs) - Math.min(...xs);
+  const height = Math.max(...ys) - Math.min(...ys);
+  return {
+    diameter: Number(Math.max(width, height).toFixed(2)),
+    center: {
+      x: Number(((Math.min(...xs) + Math.max(...xs)) / 2).toFixed(2)),
+      y: Number(((Math.min(...ys) + Math.max(...ys)) / 2).toFixed(2)),
+    },
   };
 };
 
@@ -251,9 +280,14 @@ const SketchMathWorkspace = () => {
   const [deletePrompt, setDeletePrompt] = useState<DeletePromptState>(null);
   const [extrudeDepthValue, setExtrudeDepthValue] = useState("10");
   const [holeDiameterValue, setHoleDiameterValue] = useState("8");
+  const [selectedHoleDiameterDraft, setSelectedHoleDiameterDraft] = useState("");
+  const [selectedHoleCenterXDraft, setSelectedHoleCenterXDraft] = useState("");
+  const [selectedHoleCenterYDraft, setSelectedHoleCenterYDraft] = useState("");
+  const [holeEditorMessage, setHoleEditorMessage] = useState<string | null>(null);
   const [holePlacement, setHolePlacement] = useState<HolePlacementState>(null);
   const [cadFeatureSummary, setCadFeatureSummary] = useState<string | null>(null);
   const [cadExportPath, setCadExportPath] = useState<string | null>(null);
+  const [cadExportArtifact, setCadExportArtifact] = useState<CadExportArtifact | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [systemEvents, setSystemEvents] = useState<TelemetryEvent[]>([]);
@@ -261,6 +295,7 @@ const SketchMathWorkspace = () => {
   const pointDragRef = useRef<{ entityId: string; start: Point; current: Point; moved: boolean } | null>(null);
   const ignoreNextCanvasClickRef = useRef(false);
   const notifiedArtifactPathsRef = useRef<Set<string>>(new Set());
+  const lastSelectedHoleIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.fridayTheme = colorMode;
@@ -372,9 +407,20 @@ const SketchMathWorkspace = () => {
     [committedEntities, selectedEntityIds],
   );
   const selectedPointEntities = useMemo(() => selectedEntities.filter(isPointEntity), [selectedEntities]);
+  const profileHoleParentById = useMemo(() => {
+    const map = new Map<string, string>();
+    committedEntities.filter(isClosedProfileEntity).forEach((profile) => {
+      (profile.holes || []).forEach((holeId) => map.set(holeId, profile.id));
+    });
+    return map;
+  }, [committedEntities]);
+  const profileHoleIds = useMemo(() => new Set(profileHoleParentById.keys()), [profileHoleParentById]);
   const closedProfileEntity = useMemo(
-    () => committedEntities.find(isClosedProfileEntity) || null,
-    [committedEntities],
+    () =>
+      committedEntities.find(
+        (entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => isClosedProfileEntity(entity) && !profileHoleIds.has(entity.id),
+      ) || null,
+    [committedEntities, profileHoleIds],
   );
   const selectedRectangleBaseId = useMemo(
     () => selectedEntityIds.map(rectangleBaseIdFromEntityId).find((value): value is string => Boolean(value)) || null,
@@ -389,13 +435,34 @@ const SketchMathWorkspace = () => {
     return profile && isClosedProfileEntity(profile) ? profile : null;
   }, [committedEntities, selectedRectangleBaseId]);
   const selectedClosedProfile = useMemo(
-    () => selectedEntities.find(isClosedProfileEntity) || null,
-    [selectedEntities],
+    () =>
+      selectedEntities.find(
+        (entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => isClosedProfileEntity(entity) && !profileHoleIds.has(entity.id),
+      ) || null,
+    [profileHoleIds, selectedEntities],
   );
+  const selectedHoleEntity = useMemo(
+    () =>
+      selectedEntities.length === 1 && isClosedProfileEntity(selectedEntities[0]) && profileHoleIds.has(selectedEntities[0].id)
+        ? selectedEntities[0]
+        : null,
+    [profileHoleIds, selectedEntities],
+  );
+  const selectedHoleSummary = useMemo<HoleSelectionSummary | null>(() => {
+    if (!selectedHoleEntity) {
+      return null;
+    }
+    const profileId = profileHoleParentById.get(selectedHoleEntity.id);
+    const geometry = profileDiameterAndCenter(selectedHoleEntity);
+    if (!profileId || !geometry) {
+      return null;
+    }
+    return { holeId: selectedHoleEntity.id, profileId, diameter: geometry.diameter, center: geometry.center };
+  }, [profileHoleParentById, selectedHoleEntity]);
   const activeProfileForHole = selectedRectangleProfile || selectedClosedProfile;
   const activeProfileHoleCount = activeProfileForHole ? activeProfileForHole.holes?.length || 0 : null;
   const activeProfileForCad = selectedRectangleProfile || selectedClosedProfile;
-  const cadExportFileName = cadExportPath ? fileNameFromPath(cadExportPath) : null;
+  const cadExportFileName = cadExportArtifact?.filename || (cadExportPath ? fileNameFromPath(cadExportPath) : null);
   const cadExportDownloadUrl = cadExportPath ? sketchMathStepDownloadUrl(cadExportPath) : null;
   const rectangleAnchorPoint = useMemo(() => {
     if (!selectedRectangleBaseId) {
@@ -454,6 +521,25 @@ const SketchMathWorkspace = () => {
     setRectangleWidthDraft(String(rectangleDimensions.width));
     setRectangleHeightDraft(String(rectangleDimensions.height));
   }, [rectangleDimensions]);
+
+  useEffect(() => {
+    if (!selectedHoleSummary) {
+      lastSelectedHoleIdRef.current = null;
+      setSelectedHoleDiameterDraft("");
+      setSelectedHoleCenterXDraft("");
+      setSelectedHoleCenterYDraft("");
+      setHoleEditorMessage(null);
+      return;
+    }
+    const selectedHoleChanged = lastSelectedHoleIdRef.current !== selectedHoleSummary.holeId;
+    lastSelectedHoleIdRef.current = selectedHoleSummary.holeId;
+    setSelectedHoleDiameterDraft(String(selectedHoleSummary.diameter));
+    setSelectedHoleCenterXDraft(String(selectedHoleSummary.center.x));
+    setSelectedHoleCenterYDraft(String(selectedHoleSummary.center.y));
+    if (selectedHoleChanged) {
+      setHoleEditorMessage(null);
+    }
+  }, [selectedHoleSummary]);
 
   const sketchStatus = useMemo(() => {
     if (error && (error.toLowerCase().includes("overconstrained") || error.toLowerCase().includes("conflict"))) {
@@ -569,6 +655,15 @@ const SketchMathWorkspace = () => {
     if (selectedEntityIds.length === 0) {
       return { ...base, kind: "none", summary: "Selected: Nothing" };
     }
+    if (selectedHoleSummary) {
+      return {
+        ...base,
+        kind: "profile_hole",
+        summary: "Selected: Profile hole",
+        parentSummary: `Parent: ${selectedHoleSummary.profileId}`,
+        detail: `Diameter: ${selectedHoleSummary.diameter} mm`,
+      };
+    }
     if (rectangleSelectionDetail?.kind === "edge") {
       const edgeName = rectangleSelectionDetail.dimension === "width" ? "width" : "height";
       return {
@@ -647,7 +742,7 @@ const SketchMathWorkspace = () => {
       return { ...base, kind: "rectangle", summary: "Selected: Rectangle", parentSummary: `Parent: Rectangle ${rectangleDimensions.baseId}`, canFixCorner: true };
     }
     return { ...base, kind: "mixed", summary: `Selected: ${selectedEntityIds.length} entities` };
-  }, [rectangleDimensions, rectangleSelectionDetail, selectedEntityIds.length, selectedLineEntities, selectedPointEntities]);
+  }, [rectangleDimensions, rectangleSelectionDetail, selectedEntityIds.length, selectedHoleSummary, selectedLineEntities, selectedPointEntities]);
 
   const syncSnapshot = (snapshot: SketchMathSessionSnapshot) => {
     setCommittedContext(snapshot.selection_context);
@@ -867,6 +962,8 @@ const SketchMathWorkspace = () => {
     setPendingCommandText("");
     setCadFeatureSummary(null);
     setCadExportPath(null);
+    setCadExportArtifact(null);
+    setHoleEditorMessage(null);
     setError(null);
   };
 
@@ -1377,7 +1474,9 @@ const SketchMathWorkspace = () => {
       const profileBaseId = profileId ? rectangleBaseIdFromEntityId(profileId) : null;
       setRectangleSelectionDetail(profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
       setCadFeatureSummary(summarizeExtrudeResult(result, true));
-      setCadExportPath(cadExportMetadata(result).stepPath);
+      const { artifact } = cadExportMetadata(result);
+      setCadExportArtifact(artifact);
+      setCadExportPath(artifact?.stepPath || null);
     }
   };
 
@@ -1424,19 +1523,32 @@ const SketchMathWorkspace = () => {
     }
   };
 
-  const cadExportMetadata = (result: SketchMathOperationResult | null): { holeCount: number; stepPath: string | null } => {
+  const cadExportMetadata = (result: SketchMathOperationResult | null): { holeCount: number; artifact: CadExportArtifact | null } => {
     const cadExport = result?.metadata?.cad_export as Record<string, unknown> | undefined;
     const exportMetadata = cadExport?.metadata as Record<string, unknown> | undefined;
     const artifacts = cadExport?.artifacts as Record<string, unknown> | undefined;
     const holeCount = typeof exportMetadata?.hole_count === "number" ? exportMetadata.hole_count : activeProfileForCad?.holes?.length || 0;
     const stepPath = typeof artifacts?.step_path === "string" ? artifacts.step_path : null;
-    return { holeCount, stepPath };
+    return {
+      holeCount,
+      artifact: stepPath
+        ? {
+            stepPath,
+            filename: typeof exportMetadata?.artifact_filename === "string" ? exportMetadata.artifact_filename : fileNameFromPath(stepPath),
+            sizeBytes: typeof exportMetadata?.artifact_size_bytes === "number" ? exportMetadata.artifact_size_bytes : null,
+            createdAt: typeof exportMetadata?.artifact_created_at === "string" ? exportMetadata.artifact_created_at : null,
+            profileId: typeof exportMetadata?.profile_id === "string" ? exportMetadata.profile_id : activeProfileForCad?.id || null,
+            extrusionDepth: typeof exportMetadata?.extrusion_depth === "number" ? exportMetadata.extrusion_depth : Number(extrudeDepthValue) || null,
+            extrusionDepthUnit: typeof exportMetadata?.extrusion_depth_unit === "string" ? exportMetadata.extrusion_depth_unit : "mm",
+          }
+        : null,
+    };
   };
 
   const summarizeExtrudeResult = (result: SketchMathOperationResult, committed = false): string => {
-    const { holeCount, stepPath } = cadExportMetadata(result);
+    const { holeCount, artifact } = cadExportMetadata(result);
     const holeText = holeCount === 1 ? "1 hole" : `${holeCount} holes`;
-    if (committed && stepPath) {
+    if (committed && artifact) {
       return `STEP export ready: profile accepted with ${holeText}`;
     }
     return `Extrude preview ready: profile accepted with ${holeText}`;
@@ -1459,6 +1571,7 @@ const SketchMathWorkspace = () => {
     const baseId = rectangleBaseIdFromEntityId(profile.id);
     setRectangleSelectionDetail(baseId ? { kind: "profile", baseId } : null);
     setCadExportPath(null);
+    setCadExportArtifact(null);
     const result = await previewCommand(command);
     if (result) {
       setCadFeatureSummary(summarizeExtrudeResult(result));
@@ -1527,6 +1640,54 @@ const SketchMathWorkspace = () => {
     const profileBaseId = rectangleBaseIdFromEntityId(profile.id);
     setRectangleSelectionDetail(profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
     setHolePlacement(null);
+    setPreviewResult(null);
+    setPendingCommandText(asCommandText({ ...command, mode: "commit" }));
+  };
+
+  const handleApplySelectedHoleUpdate = async () => {
+    if (!selectedHoleSummary) {
+      setHoleEditorMessage("Select a profile hole before editing it.");
+      return;
+    }
+    const parentProfile = committedEntities.find(
+      (entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => entity.id === selectedHoleSummary.profileId && isClosedProfileEntity(entity),
+    );
+    if (!parentProfile) {
+      setHoleEditorMessage("The parent profile for this hole is missing.");
+      return;
+    }
+    const diameter = Number(selectedHoleDiameterDraft);
+    const center = { x: Number(selectedHoleCenterXDraft), y: Number(selectedHoleCenterYDraft) };
+    if (!Number.isFinite(diameter) || diameter <= 0) {
+      setHoleEditorMessage("Hole diameter must be a positive number.");
+      setError("Hole diameter must be a positive number");
+      return;
+    }
+    if (!Number.isFinite(center.x) || !Number.isFinite(center.y)) {
+      setHoleEditorMessage("Hole center must use numeric X and Y values.");
+      setError("Hole center must use numeric X and Y values");
+      return;
+    }
+    if (!pointInsideProfile(center, parentProfile)) {
+      setHoleEditorMessage("Hole center must stay inside the selected profile.");
+      setError("Hole center must be inside the selected profile");
+      return;
+    }
+    const command = buildUpdateProfileHoleCommand(
+      selectedHoleSummary.profileId,
+      selectedHoleSummary.holeId,
+      Number(diameter.toFixed(2)),
+      { x: Number(center.x.toFixed(2)), y: Number(center.y.toFixed(2)) },
+      "mm",
+    );
+    const result = await commitCommand(command);
+    if (!result) {
+      setHoleEditorMessage("Hole update failed. Check the command error above.");
+      return;
+    }
+    setSelectedEntityIds([selectedHoleSummary.holeId]);
+    setRectangleSelectionDetail(null);
+    setHoleEditorMessage("Hole updated.");
     setPreviewResult(null);
     setPendingCommandText(asCommandText({ ...command, mode: "commit" }));
   };
@@ -2018,14 +2179,40 @@ const SketchMathWorkspace = () => {
                   <Box className="sketchmath-export-card" data-testid="sketchmath-export-card" mt={3}>
                     <Text fontWeight="600">Export succeeded</Text>
                     <Text fontSize="sm" opacity={0.85}>
-                      {cadExportFileName || "export.step"} is stored at {cadExportPath}.
+                      {cadExportFileName || "export.step"} is ready for download.
+                    </Text>
+                    <dl className="sketchmath-export-metadata" data-testid="sketchmath-export-metadata">
+                      <div><dt>Filename</dt><dd>{cadExportFileName || "export.step"}</dd></div>
+                      <div><dt>Size</dt><dd>{cadExportArtifact?.sizeBytes != null ? `${cadExportArtifact.sizeBytes} bytes` : "Not reported"}</dd></div>
+                      <div><dt>Created</dt><dd>{cadExportArtifact?.createdAt || "Not reported"}</dd></div>
+                      <div><dt>Profile</dt><dd>{cadExportArtifact?.profileId || activeProfileForCad?.id || "Selected profile"}</dd></div>
+                      <div><dt>Depth</dt><dd>{cadExportArtifact?.extrusionDepth != null ? `${cadExportArtifact.extrusionDepth} ${cadExportArtifact.extrusionDepthUnit || "mm"}` : `${extrudeDepthValue} mm`}</dd></div>
+                    </dl>
+                    <Text fontSize="sm" opacity={0.85}>
+                      Path: {cadExportPath}
                     </Text>
                     <Text fontSize="sm" opacity={0.75}>
-                      Download is served through FRIDAY. Generated artifact cleanup is manual for this MVP.
+                      Download is served through FRIDAY. 3D preview is not implemented in this MVP.
                     </Text>
-                    <Button as="a" href={cadExportDownloadUrl} size="sm" variant="outline" mt={2} download={cadExportFileName || "export.step"}>
-                      Download STEP
-                    </Button>
+                    <HStack spacing={2} flexWrap="wrap" mt={2}>
+                      <Button as="a" href={cadExportDownloadUrl} size="sm" variant="outline" download={cadExportFileName || "export.step"}>
+                        Download STEP
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => void handleCreateCadFeature()} isDisabled={!canExtrudeSelection}>
+                        Export again
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setCadExportPath(null);
+                          setCadExportArtifact(null);
+                          setCadFeatureSummary(null);
+                        }}
+                      >
+                        Clear export result
+                      </Button>
+                    </HStack>
                   </Box>
                 ) : null}
                 <Text fontSize="sm" opacity={0.75} mt={2}>
@@ -2052,6 +2239,11 @@ const SketchMathWorkspace = () => {
             rectangleAnchorSummary={rectangleAnchorSummary}
             profileSummary={profileSummary}
             profileHoleCount={activeProfileHoleCount}
+            selectedHole={selectedHoleSummary}
+            selectedHoleDiameterDraft={selectedHoleDiameterDraft}
+            selectedHoleCenterXDraft={selectedHoleCenterXDraft}
+            selectedHoleCenterYDraft={selectedHoleCenterYDraft}
+            holeEditorMessage={holeEditorMessage}
             rectangleWidthDraft={rectangleWidthDraft}
             rectangleHeightDraft={rectangleHeightDraft}
             dimensionEditor={dimensionEditor}
@@ -2084,6 +2276,10 @@ const SketchMathWorkspace = () => {
                 setRectangleSelectionDetail({ kind: "profile", baseId: rectangleDimensions.baseId });
               }
             }}
+            onSelectedHoleDiameterDraftChange={setSelectedHoleDiameterDraft}
+            onSelectedHoleCenterXDraftChange={setSelectedHoleCenterXDraft}
+            onSelectedHoleCenterYDraftChange={setSelectedHoleCenterYDraft}
+            onApplySelectedHoleUpdate={handleApplySelectedHoleUpdate}
             onDeleteWholeRectangle={() => {
               if (deletePrompt?.kind === "rectangle") {
                 void deleteRectangleCascade(deletePrompt.baseId);

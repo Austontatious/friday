@@ -78,6 +78,13 @@ export const buildAddProfileHoleCommand = (profileId: string, diameter: number, 
     center: [Number(center.x.toFixed(2)), Number(center.y.toFixed(2))],
   });
 
+export const buildUpdateProfileHoleCommand = (profileId: string, holeId: string, diameter: number, center: Point, unit: string = "mm"): SketchMathCommand =>
+  baseCommand("update_profile_hole", [profileId, holeId], {
+    diameter,
+    unit,
+    center: [Number(center.x.toFixed(2)), Number(center.y.toFixed(2))],
+  });
+
 export const buildTranslateCommand = (selection: string[], vector: Point): SketchMathCommand =>
   baseCommand("translate", selection, { vector: [Number(vector.x.toFixed(2)), Number(vector.y.toFixed(2))] });
 

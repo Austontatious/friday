@@ -61,6 +61,11 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
   - Preview mode returns the updated outer profile plus hole entity without mutating session state.
   - Commit mode persists the hole, updates the outer profile's `holes` list, and records replayable history.
   - Invalid diameter, missing profile selection, centers outside the profile, and holes that touch or exceed profile bounds return structured selection errors.
+- `update_profile_hole`
+  - Replaces an existing inner `profile_2d` hole's circular geometry while preserving its id and parent profile reference.
+  - Selection must include the parent profile id and existing hole id.
+  - Parameters include positive `diameter`, `unit`, and `center`.
+  - The command re-runs profile-hole validation before commit, so resized or moved holes must remain strictly inside the parent profile and non-overlapping.
 - `translate`
   - Shifts selected geometry by a vector.
 - `rotate`
@@ -163,6 +168,25 @@ The browser workspace exposes Add Hole only when a semantic rectangle/profile is
   "selection": ["profile_rect_<id>"],
   "parameters": {
     "diameter": 12,
+    "unit": "mm",
+    "center": [280, 170]
+  }
+}
+```
+
+Update Hole payload:
+
+The browser workspace exposes this when an existing hole is selected. It is used for post-placement diameter and center edits without adding general circle sketch entities.
+
+```json
+{
+  "version": "0.1",
+  "command_id": "update_profile_hole_<generated>",
+  "mode": "commit",
+  "command_type": "update_profile_hole",
+  "selection": ["profile_rect_<id>", "hole_profile_rect_<id>_<command_id>"],
+  "parameters": {
+    "diameter": 8,
     "unit": "mm",
     "center": [280, 170]
   }

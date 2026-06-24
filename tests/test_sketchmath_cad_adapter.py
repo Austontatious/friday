@@ -83,6 +83,12 @@ def test_extrude_profile_commit_exports_step_and_records_history() -> None:
     assert export["artifacts"]["preview_path"] is None
     assert Path(export["artifacts"]["step_path"]).exists()
     assert Path(export["artifacts"]["validation_json"]).exists()
+    assert export["metadata"]["artifact_filename"] == "export.step"
+    assert export["metadata"]["artifact_size_bytes"] > 0
+    assert export["metadata"]["artifact_created_at"]
+    assert export["metadata"]["profile_id"] == "profile_box"
+    assert export["metadata"]["extrusion_depth"] == pytest.approx(7.5)
+    assert export["metadata"]["extrusion_depth_unit"] == "mm"
     assert export["measurements"]["volume_mm3"] == pytest.approx(1500.0)
     assert export["measurements"]["area_mm2"] == pytest.approx(850.0)
     assert export["measurements"]["bbox"]["zmax"] == pytest.approx(7.5)
