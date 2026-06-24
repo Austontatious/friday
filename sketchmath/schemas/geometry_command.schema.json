@@ -28,6 +28,7 @@
         "solve_constraints",
         "make_profile",
         "add_profile_hole",
+        "update_profile_hole",
         "translate",
         "rotate",
         "mirror",

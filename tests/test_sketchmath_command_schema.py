@@ -69,6 +69,7 @@ def test_geometry_command_schema_lists_supported_mvp_commands() -> None:
     assert "delete_entity" in command_types
     assert "set_rectangle_dimension" in command_types
     assert "add_profile_hole" in command_types
+    assert "update_profile_hole" in command_types
     assert "extrude_profile" in command_types
     assert "define_circle" not in command_types
     assert "define_arc" not in command_types

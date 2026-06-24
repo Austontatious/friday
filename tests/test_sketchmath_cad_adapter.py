@@ -5,6 +5,15 @@ from pathlib import Path
 import pytest
 
 
+def test_profile_hole_validation_dependency_available() -> None:
+    from sketchmath.cad.profile_holes import _load_shapely
+
+    Polygon, orient = _load_shapely()
+
+    assert Polygon([(0, 0), (1, 0), (1, 1), (0, 0)]).area > 0
+    assert callable(orient)
+
+
 def _session(items: list[dict[str, object]]):
     from sketchmath.executor.command_router import GeometrySession
     from sketchmath.models.selection_context import SelectionContext

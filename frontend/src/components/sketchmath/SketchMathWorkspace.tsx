@@ -21,6 +21,7 @@ import type {
   SketchMathTranslationOutcome,
 } from "../../services/sketchmath";
 import {
+  SketchMathApiError,
   commitSketchMathCommand,
   createSketchMathSession,
   getSketchMathSession,
@@ -289,7 +290,9 @@ const SketchMathWorkspace = () => {
   const [cadExportPath, setCadExportPath] = useState<string | null>(null);
   const [cadExportArtifact, setCadExportArtifact] = useState<CadExportArtifact | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [constraintsOpen, setConstraintsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDebugText, setErrorDebugText] = useState<string | null>(null);
   const [systemEvents, setSystemEvents] = useState<TelemetryEvent[]>([]);
   const canvasDragRef = useRef<{ start: Point; moved: boolean; forceSquare: boolean } | null>(null);
   const pointDragRef = useRef<{ entityId: string; start: Point; current: Point; moved: boolean } | null>(null);
@@ -304,6 +307,26 @@ const SketchMathWorkspace = () => {
   const appendEvents = useCallback((events: TelemetryEvent[]) => {
     setSystemEvents((previous) => [...[...events].reverse(), ...previous].slice(0, 16));
   }, []);
+
+  const clearErrorState = () => {
+    setError(null);
+    setErrorDebugText(null);
+  };
+
+  const setUserError = (message: string, debugText?: string | null) => {
+    setError(message);
+    setErrorDebugText(debugText || null);
+  };
+
+  const normalizeCaughtError = (err: unknown, fallback: string): { message: string; debugText: string | null } => {
+    if (err instanceof SketchMathApiError) {
+      return { message: err.message, debugText: err.debugText };
+    }
+    if (err instanceof Error) {
+      return { message: err.message || fallback, debugText: err.stack || err.message };
+    }
+    return { message: fallback, debugText: null };
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -366,8 +389,8 @@ const SketchMathWorkspace = () => {
           ]);
         } catch (err) {
           if (!cancelled) {
-            const detail = err instanceof Error ? err.message : "Failed to initialize SketchMath";
-            setError(detail);
+            const { message: detail, debugText } = normalizeCaughtError(err, "Failed to initialize SketchMath");
+            setUserError(detail, debugText);
             appendEvents([
               makeTelemetryEvent("request_failed", {
                 detail,
@@ -784,11 +807,11 @@ const SketchMathWorkspace = () => {
       const response = await commitSketchMathCommand(sessionId, nextCommand);
       syncCommandResponse(response);
       setPreviewResult(response.result);
-      setError(null);
+      clearErrorState();
       return response.result;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Command failed";
-      setError(message);
+      const { message, debugText } = normalizeCaughtError(err, "Command failed");
+      setUserError(message, debugText);
       toast({
         title: "Sketch command failed",
         description: message,
@@ -813,7 +836,7 @@ const SketchMathWorkspace = () => {
       const command = parseCurrentCommand();
       const response = await previewSketchMathCommand(sessionId, command);
       setPreviewResult(response.result);
-      setError(null);
+      clearErrorState();
       if (tool === "point") {
         setDraftPoint(null);
       }
@@ -824,8 +847,8 @@ const SketchMathWorkspace = () => {
         isClosable: true,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Preview failed";
-      setError(message);
+      const { message, debugText } = normalizeCaughtError(err, "Preview failed");
+      setUserError(message, debugText);
       toast({
         title: "Preview failed",
         description: message,
@@ -852,7 +875,7 @@ const SketchMathWorkspace = () => {
       clearRectangleInteraction();
       setSelectedEntityIds([]);
       setTranslationOutcome(null);
-      setError(null);
+      clearErrorState();
       toast({
         title: "Committed",
         status: "success",
@@ -860,8 +883,8 @@ const SketchMathWorkspace = () => {
         isClosable: true,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Commit failed";
-      setError(message);
+      const { message, debugText } = normalizeCaughtError(err, "Commit failed");
+      setUserError(message, debugText);
       toast({
         title: "Commit failed",
         description: message,
@@ -875,7 +898,7 @@ const SketchMathWorkspace = () => {
   const clearPreview = () => {
     setPreviewResult(null);
     setHolePlacement(null);
-    setError(null);
+    clearErrorState();
   };
 
   const previewCommand = async (command: SketchMathCommand): Promise<SketchMathOperationResult | null> => {
@@ -886,11 +909,11 @@ const SketchMathWorkspace = () => {
     try {
       const response = await previewSketchMathCommand(sessionId, command);
       setPreviewResult(response.result);
-      setError(null);
+      clearErrorState();
       return response.result;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Preview failed";
-      setError(message);
+      const { message, debugText } = normalizeCaughtError(err, "Preview failed");
+      setUserError(message, debugText);
       toast({
         title: "Preview failed",
         description: message,
@@ -906,7 +929,7 @@ const SketchMathWorkspace = () => {
     setTranslationOutcome(null);
     setPendingCommandText("");
     setPreviewResult(null);
-    setError(null);
+    clearErrorState();
   };
 
   const revertLast = async () => {
@@ -922,7 +945,7 @@ const SketchMathWorkspace = () => {
       clearRectangleInteraction();
       setTranslationOutcome(null);
       setPendingCommandText("");
-      setError(null);
+      clearErrorState();
       toast({
         title: "Reverted",
         status: "info",
@@ -930,8 +953,8 @@ const SketchMathWorkspace = () => {
         isClosable: true,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Revert failed";
-      setError(message);
+      const { message, debugText } = normalizeCaughtError(err, "Revert failed");
+      setUserError(message, debugText);
     }
   };
 
@@ -939,7 +962,7 @@ const SketchMathWorkspace = () => {
     setPreviewResult(null);
     setPendingCommandText("");
     setHolePlacement(null);
-    setError(null);
+    clearErrorState();
   };
 
   const clearRectangleInteraction = () => {
@@ -964,7 +987,7 @@ const SketchMathWorkspace = () => {
     setCadExportPath(null);
     setCadExportArtifact(null);
     setHoleEditorMessage(null);
-    setError(null);
+    clearErrorState();
   };
 
   const commitRectangle = async (anchor: Point, rawCurrent: Point, forceSquare: boolean) => {
@@ -1018,7 +1041,7 @@ const SketchMathWorkspace = () => {
               }
             : current,
         );
-        setError("Hole center must be inside the selected profile");
+        setUserError("Hole center must be inside the selected profile");
         return;
       }
       setHolePlacement((current) => (current ? { ...current, center } : current));
@@ -1038,7 +1061,7 @@ const SketchMathWorkspace = () => {
     if (tool === "line") {
       if (!draftPoint) {
         setDraftPoint(point);
-        setError(null);
+        clearErrorState();
         return;
       }
       const stamp = Date.now().toString(36);
@@ -1065,7 +1088,7 @@ const SketchMathWorkspace = () => {
     if (tool === "rectangle") {
       if (!rectangleDraft) {
         setRectangleDraft({ anchor: point, current: point });
-        setError(null);
+        clearErrorState();
         canvasDragRef.current = null;
         return;
       }
@@ -1179,7 +1202,7 @@ const SketchMathWorkspace = () => {
       })();
       pointDragRef.current = null;
       setDragPreviewPoint(null);
-      setError(null);
+      clearErrorState();
       return;
     }
     if (tool !== "rectangle") {
@@ -1201,7 +1224,7 @@ const SketchMathWorkspace = () => {
   const handleCanvasContextMenu = () => {
     if (tool === "rectangle") {
       clearRectangleInteraction();
-      setError(null);
+      clearErrorState();
     }
   };
 
@@ -1264,13 +1287,13 @@ const SketchMathWorkspace = () => {
           }
           setDimensionEditor(null);
           setDeletePrompt(null);
-          setError(null);
+          clearErrorState();
           return;
         }
         toggleSelection([entityId]);
         setDimensionEditor(null);
         setDeletePrompt(null);
-        setError(null);
+        clearErrorState();
         return;
       }
       setSelectedEntityIds(rectangleSelectionIds(rectangleBaseId));
@@ -1286,7 +1309,7 @@ const SketchMathWorkspace = () => {
         setRectangleSelectionDetail({ kind: "profile", baseId: rectangleBaseId });
       }
       setDeletePrompt(null);
-      setError(null);
+      clearErrorState();
       return;
     }
     const nextGroup = entity && isLineEntity(entity) ? lineSelectionGroup(entity) : [entityId];
@@ -1298,7 +1321,7 @@ const SketchMathWorkspace = () => {
     }
     setDimensionEditor(null);
     setDeletePrompt(null);
-    setError(null);
+    clearErrorState();
   };
 
   const handleEntityMouseDown = (entityId: string, entityType: SketchMathEntity["type"], event: React.MouseEvent<SVGGElement>) => {
@@ -1316,7 +1339,7 @@ const SketchMathWorkspace = () => {
       moved: false,
     };
     setDragPreviewPoint({ id: entityId, point: { x: entity.coords[0], y: entity.coords[1] } });
-    setError(null);
+    clearErrorState();
   };
 
   const handleApplyLabel = async () => {
@@ -1340,7 +1363,7 @@ const SketchMathWorkspace = () => {
     await upsertSketchMathEntity(sessionId, payload as SketchMathEntity, "commit");
     const snapshot = await getSketchMathSession(sessionId);
     syncSnapshot(snapshot);
-    setError(null);
+    clearErrorState();
   };
 
   const handleToggleLockSelected = async () => {
@@ -1360,7 +1383,7 @@ const SketchMathWorkspace = () => {
     await upsertSketchMathEntity(sessionId, payload as SketchMathEntity, "commit");
     const snapshot = await getSketchMathSession(sessionId);
     syncSnapshot(snapshot);
-    setError(null);
+    clearErrorState();
   };
 
   const commitRectangleDimension = async (
@@ -1370,11 +1393,11 @@ const SketchMathWorkspace = () => {
     activeRectangleDetail: RectangleSelectionDetail | null = rectangleSelectionDetail,
   ): Promise<boolean> => {
     if (!sessionId || !baseId) {
-      setError("Select a rectangle before applying dimensions");
+      setUserError("Select a rectangle before applying dimensions");
       return false;
     }
     if (!Number.isFinite(value) || value <= 0) {
-      setError("Rectangle dimension must be a positive number");
+      setUserError("Rectangle dimension must be a positive number");
       return false;
     }
     const command = buildSetRectangleDimensionCommand(rectangleSelectionIds(baseId), dimension, value, "mm");
@@ -1412,7 +1435,7 @@ const SketchMathWorkspace = () => {
       return;
     }
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-      setError("Rectangle width and height must be positive numbers");
+      setUserError("Rectangle width and height must be positive numbers");
       return;
     }
     const baseId = rectangleDimensions.baseId;
@@ -1498,7 +1521,7 @@ const SketchMathWorkspace = () => {
           isPointEntity(entity) && entity.id === (selectedCornerId || ids.pointIds.a),
       );
       if (!latestAnchor) {
-        setError("Rectangle anchor point is missing");
+        setUserError("Rectangle anchor point is missing");
         return;
       }
       const pointIds = new Set(Object.values(ids.pointIds));
@@ -1506,7 +1529,7 @@ const SketchMathWorkspace = () => {
         (entity): entity is Extract<SketchMathEntity, { type: "point_2d" }> => isPointEntity(entity) && entity.id === ids.pointIds.a,
       );
       if (!lockTarget) {
-        setError("Rectangle anchor point is missing");
+        setUserError("Rectangle anchor point is missing");
         return;
       }
       await upsertSketchMathEntity(sessionId, { ...lockTarget, locked: true }, "commit");
@@ -1517,9 +1540,10 @@ const SketchMathWorkspace = () => {
         baseId: rectangleDimensions.baseId,
         cornerId: rectangleCornerIdFromPointId(lockTarget.id) || "a",
       });
-      setError(null);
+      clearErrorState();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fix rectangle corner");
+      const { message, debugText } = normalizeCaughtError(err, "Failed to fix rectangle corner");
+      setUserError(message, debugText);
     }
   };
 
@@ -1557,12 +1581,12 @@ const SketchMathWorkspace = () => {
   const handleCreateCadFeature = async () => {
     const profile = activeProfileForCad;
     if (!profile) {
-      setError("Select a closed profile before extrusion");
+      setUserError("Select a closed profile before extrusion");
       return;
     }
     const depth = Number(extrudeDepthValue);
     if (!Number.isFinite(depth) || depth <= 0) {
-      setError("Extrusion depth must be a positive number");
+      setUserError("Extrusion depth must be a positive number");
       return;
     }
     const normalizedDepth = Number(depth.toFixed(2));
@@ -1580,17 +1604,17 @@ const SketchMathWorkspace = () => {
 
   const handleAddProfileHole = async () => {
     if (!activeProfileForHole) {
-      setError("Select a rectangle or closed profile before adding a hole");
+      setUserError("Select a rectangle or closed profile before adding a hole");
       return;
     }
     const diameter = Number(holeDiameterValue);
     if (!Number.isFinite(diameter) || diameter <= 0) {
-      setError("Hole diameter must be a positive number");
+      setUserError("Hole diameter must be a positive number");
       return;
     }
     const center = profileCenter(activeProfileForHole);
     if (!center) {
-      setError("Selected profile does not have usable bounds");
+      setUserError("Selected profile does not have usable bounds");
       return;
     }
     setSelectedEntityIds([activeProfileForHole.id]);
@@ -1603,7 +1627,29 @@ const SketchMathWorkspace = () => {
       center,
       message: "Click inside selected profile to place the hole center.",
     });
-    setError(null);
+    clearErrorState();
+  };
+
+  const handleAddCenteredProfileHole = async () => {
+    if (!activeProfileForHole) {
+      setUserError("Select a rectangle or closed profile before adding a hole");
+      return;
+    }
+    const diameter = Number(holeDiameterValue);
+    if (!Number.isFinite(diameter) || diameter <= 0) {
+      setUserError("Hole diameter must be a positive number");
+      return;
+    }
+    const center = profileCenter(activeProfileForHole);
+    if (!center) {
+      setUserError("Selected profile does not have usable bounds");
+      return;
+    }
+    setSelectedEntityIds([activeProfileForHole.id]);
+    const baseId = rectangleBaseIdFromEntityId(activeProfileForHole.id);
+    setRectangleSelectionDetail(baseId ? { kind: "profile", baseId } : null);
+    setTool("select");
+    await commitProfileHole(center);
   };
 
   const commitProfileHole = async (center: Point) => {
@@ -1611,12 +1657,12 @@ const SketchMathWorkspace = () => {
       ? committedEntities.find((entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => entity.id === holePlacement.profileId && isClosedProfileEntity(entity))
       : activeProfileForHole;
     if (!profile) {
-      setError("Select a rectangle or closed profile before adding a hole");
+      setUserError("Select a rectangle or closed profile before adding a hole");
       return;
     }
     const diameter = Number(holeDiameterValue);
     if (!Number.isFinite(diameter) || diameter <= 0) {
-      setError("Hole diameter must be a positive number");
+      setUserError("Hole diameter must be a positive number");
       return;
     }
     if (!pointInsideProfile(center, profile)) {
@@ -1628,7 +1674,7 @@ const SketchMathWorkspace = () => {
             }
           : current,
       );
-      setError("Hole center must be inside the selected profile");
+      setUserError("Hole center must be inside the selected profile");
       return;
     }
     const command = buildAddProfileHoleCommand(profile.id, Number(diameter.toFixed(2)), center, "mm");
@@ -1660,17 +1706,17 @@ const SketchMathWorkspace = () => {
     const center = { x: Number(selectedHoleCenterXDraft), y: Number(selectedHoleCenterYDraft) };
     if (!Number.isFinite(diameter) || diameter <= 0) {
       setHoleEditorMessage("Hole diameter must be a positive number.");
-      setError("Hole diameter must be a positive number");
+      setUserError("Hole diameter must be a positive number");
       return;
     }
     if (!Number.isFinite(center.x) || !Number.isFinite(center.y)) {
       setHoleEditorMessage("Hole center must use numeric X and Y values.");
-      setError("Hole center must use numeric X and Y values");
+      setUserError("Hole center must use numeric X and Y values");
       return;
     }
     if (!pointInsideProfile(center, parentProfile)) {
       setHoleEditorMessage("Hole center must stay inside the selected profile.");
-      setError("Hole center must be inside the selected profile");
+      setUserError("Hole center must be inside the selected profile");
       return;
     }
     const command = buildUpdateProfileHoleCommand(
@@ -1695,7 +1741,7 @@ const SketchMathWorkspace = () => {
   const deleteRectangleCascade = async (baseId: string) => {
     const result = await commitCommand(buildDeleteEntityCommand(rectangleSelectionIds(baseId), true));
     if (!result) {
-      setError("Could not delete the rectangle safely. Open Advanced / Debug for details.");
+      setUserError("Could not delete the rectangle safely. Open Advanced / Debug for details.");
       return;
     }
     setSelectedEntityIds([]);
@@ -1707,7 +1753,7 @@ const SketchMathWorkspace = () => {
     setTranslationOutcome(null);
     setPendingCommandText("");
     setPreviewResult(null);
-    setError(null);
+    clearErrorState();
   };
 
   const handleDeleteSelected = async () => {
@@ -1735,12 +1781,12 @@ const SketchMathWorkspace = () => {
       return;
     }
     if (selectedIdsAreReferenced(selectedEntityIds)) {
-      setError("Selection is referenced by sketch constraints or profiles. Delete the parent sketch object instead.");
+      setUserError("Selection is referenced by sketch constraints or profiles. Delete the parent sketch object instead.");
       return;
     }
     const result = await commitCommand(buildDeleteEntityCommand(selectedEntityIds));
     if (!result) {
-      setError("Could not delete the selection safely. Open Advanced / Debug for details.");
+      setUserError("Could not delete the selection safely. Open Advanced / Debug for details.");
       return;
     }
     setSelectedEntityIds([]);
@@ -1759,7 +1805,8 @@ const SketchMathWorkspace = () => {
       syncSnapshot(snapshot);
       resetLocalInteractionState();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to clear sketch");
+      const { message, debugText } = normalizeCaughtError(err, "Failed to clear sketch");
+      setUserError(message, debugText);
     }
   };
 
@@ -1774,7 +1821,7 @@ const SketchMathWorkspace = () => {
         clearRectangleInteraction();
         setHolePlacement(null);
         setDraftPoint(null);
-        setError(null);
+        clearErrorState();
         return;
       }
       if (isTypingField) {
@@ -1800,12 +1847,13 @@ const SketchMathWorkspace = () => {
       setTranslationOutcome(response);
       if (response.status === "command" && response.command) {
         setPendingCommandText(JSON.stringify(response.command, null, 2));
-        setError(null);
+        clearErrorState();
       } else {
         setPendingCommandText("");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Translation failed");
+      const { message, debugText } = normalizeCaughtError(err, "Translation failed");
+      setUserError(message, debugText);
     }
   };
 
@@ -1826,7 +1874,7 @@ const SketchMathWorkspace = () => {
 
   const runQuickAngle = async () => {
     if (selectionRef.kind === "two_lines") {
-      setError("Arbitrary angle solving is not implemented yet. Perpendicular and parallel constraints are available.");
+      setUserError("Arbitrary angle solving is not implemented yet. Perpendicular and parallel constraints are available.");
       return;
     }
     if (pointSelectionIds.length < 3) {
@@ -1930,18 +1978,35 @@ const SketchMathWorkspace = () => {
     holePlacement && Number.isFinite(holePlacementDiameter) && holePlacementDiameter > 0
       ? { center: holePlacement.center, diameter: holePlacementDiameter }
       : null;
+  const canvasHelperText = holePlacement
+    ? "Click inside the selected profile to place the hole, or add it at the profile center from the workflow panel."
+    : tool === "rectangle"
+      ? "Drag on the canvas to draw a rectangle profile. Hold Shift while dragging for a square."
+      : tool === "dimension"
+        ? "Select a rectangle edge or click a dimension label to edit width or height."
+        : tool === "line"
+          ? draftPoint
+            ? "Click the line end point."
+            : "Click the line start point."
+          : tool === "point"
+            ? "Click the canvas to plot a point."
+            : selectedHoleSummary
+              ? "Selected hole: edit diameter and center in the workflow panel."
+              : selectionRef.summary === "Nothing selected."
+                ? "Select a rectangle or choose Draw rectangle to start the STEP workflow."
+                : `${selectionRef.summary}. Use the workflow panel for the next step.`;
 
   return (
     <Box className="friday-command-shell sketchmath-command-shell" data-testid="sketchmath-workspace">
       <aside className="friday-mode-rail" aria-label="Friday workspaces">
         <Link href="/" className="friday-brand-mark">F</Link>
         <Link href="/" className="friday-rail-item" aria-label="Direct Friday">
-          <span>FR</span>
-          <strong>Direct</strong>
+          <span>FRIDAY</span>
+          <strong>Chat</strong>
         </Link>
         <span className="friday-rail-item friday-rail-item-active" aria-label="SketchMath">
-          <span>SM</span>
-          <strong>Sketch</strong>
+          <span>Sketch Math</span>
+          <strong>CAD</strong>
         </span>
       </aside>
 
@@ -1981,6 +2046,9 @@ const SketchMathWorkspace = () => {
             <SketchMathToolbar mode={tool} onModeChange={handleToolChange} theme={colorMode} onToggleTheme={toggleColorMode} />
 
             <Box className="sketchmath-canvas-panel">
+              <Text className="sketchmath-canvas-helper" data-testid="sketchmath-canvas-helper">
+                {canvasHelperText}
+              </Text>
               <SketchCanvas2D
                 width={CANVAS_WIDTH}
                 height={CANVAS_HEIGHT}
@@ -2026,18 +2094,17 @@ const SketchMathWorkspace = () => {
               <h2>System Events</h2>
               <TelemetryEventList events={systemEvents} emptyMessage="SketchMath lifecycle events will appear here." />
             </section>
-          <Box className="sketchmath-panel" data-testid="sketchmath-workbench-panel">
+          <Box className="sketchmath-panel sketchmath-workflow-panel" data-testid="sketchmath-workbench-panel">
             <Heading size="sm" mb={3} className="sketchmath-panel-title">
-              Sketch Workbench
+              SketchMath workflow
             </Heading>
             <VStack align="stretch" spacing={3}>
-              <Box>
-                <Text fontWeight="600">Sketch status</Text>
-                <Text data-testid="sketchmath-status">{sketchStatus}</Text>
-                <Text fontSize="sm" opacity={0.8}>
-                  {dimensionSummary}
-                </Text>
-              </Box>
+              {error ? (
+                <Box className="sketchmath-error" data-testid="sketchmath-user-error">
+                  <Text fontWeight="600">Action needed</Text>
+                  <Text>{error}</Text>
+                </Box>
+              ) : null}
               <Box data-testid="sketchmath-selection-summary">
                 <Text fontWeight="600">{selectionRef.summary}</Text>
                 {selectionRef.parentSummary ? (
@@ -2050,73 +2117,80 @@ const SketchMathWorkspace = () => {
                     {selectionRef.detail}
                   </Text>
                 ) : null}
-              </Box>
-              <Box>
-                <Text fontWeight="600" mb={2}>
-                  Context actions
+                <Text data-testid="sketchmath-status" fontSize="sm" opacity={0.8}>
+                  {sketchStatus}
                 </Text>
-                <HStack spacing={2} flexWrap="wrap">
-                  <Input aria-label="SketchMath length" value={lengthValue} onChange={(event) => setLengthValue(event.target.value)} width="100px" />
-                  <Input aria-label="SketchMath angle" value={angleValue} onChange={(event) => setAngleValue(event.target.value)} width="100px" />
-                </HStack>
+              </Box>
+
+              <Box className="sketchmath-workflow-step" data-testid="sketchmath-workflow-draw">
+                <Text className="sketchmath-step-label">1. Draw</Text>
+                <Text fontSize="sm" opacity={0.85}>
+                  {rectangleDimensions ? `Rectangle ${rectangleDimensions.width} mm x ${rectangleDimensions.height} mm` : "Draw a rectangle profile on the canvas."}
+                </Text>
                 <HStack spacing={2} flexWrap="wrap" mt={2}>
-                  {selectionRef.canEditWidth ? (
-                    <Button size="sm" onClick={() => rectangleSelectionDetail?.kind === "edge" && openDimensionEditor(rectangleSelectionDetail.baseId, "width")}>
-                      Edit Width
-                    </Button>
-                  ) : null}
-                  {selectionRef.canEditHeight ? (
-                    <Button size="sm" onClick={() => rectangleSelectionDetail?.kind === "edge" && openDimensionEditor(rectangleSelectionDetail.baseId, "height")}>
-                      Edit Height
-                    </Button>
-                  ) : null}
-                  {selectionRef.canFixCorner ? (
-                    <Button size="sm" onClick={() => void handleFixRectangleCorner()}>
-                      Fix Corner
-                    </Button>
-                  ) : null}
-                  <Button size="sm" onClick={() => void runQuickLength()} isDisabled={!selectionRef.canSetLength}>
-                    Set Length
-                  </Button>
-                  <Button size="sm" onClick={() => void runQuickAngle()} isDisabled={!selectionRef.canSetAngle}>
-                    Set Angle
-                  </Button>
-                  <Button size="sm" onClick={() => void runQuickParallel()} isDisabled={!selectionRef.canMakeParallel}>
-                    Make Parallel
-                  </Button>
-                  <Button size="sm" onClick={() => void runQuickPerpendicular()} isDisabled={!selectionRef.canMakePerpendicular}>
-                    Make Perpendicular
-                  </Button>
-                  <Button size="sm" onClick={() => void runQuickEqualLength()} isDisabled={!selectionRef.canEqualLength}>
-                    Equal Length
-                  </Button>
-                  <Button size="sm" onClick={() => void runQuickEqualAngle()} isDisabled={pointSelectionIds.length < 6}>
-                    Equal Angle
-                  </Button>
-                  <Button size="sm" onClick={() => void handleDeleteSelected()} isDisabled={selectedEntityIds.length === 0}>
-                    Delete
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => void refreshSession()}>
-                    Solve
+                  <Button size="sm" onClick={() => handleToolChange("rectangle")} variant={tool === "rectangle" ? "solid" : "outline"}>
+                    Draw rectangle
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => void handleClearSketch()}>
                     Clear sketch
                   </Button>
                 </HStack>
-                {activeProfileForHole ? (
-                  <HStack spacing={2} flexWrap="wrap" mt={3}>
-                    <Input
-                      type="number"
-                      aria-label="Hole diameter"
-                      value={holeDiameterValue}
-                      onChange={(event) => setHoleDiameterValue(event.target.value)}
-                      width="110px"
-                    />
-                    <Button size="sm" onClick={() => void handleAddProfileHole()}>
-                      Add Hole
-                    </Button>
-                  </HStack>
+              </Box>
+
+              <Box className="sketchmath-workflow-step" data-testid="sketchmath-workflow-dimensions">
+                <Text className="sketchmath-step-label">2. Dimension</Text>
+                <Text fontSize="sm" opacity={0.85}>
+                  {dimensionSummary}
+                </Text>
+                <HStack spacing={2} flexWrap="wrap" mt={2}>
+                  <Input
+                    type="number"
+                    aria-label="Workflow rectangle width"
+                    value={rectangleWidthDraft}
+                    onChange={(event) => setRectangleWidthDraft(event.target.value)}
+                    width="104px"
+                    disabled={!rectangleDimensions}
+                  />
+                  <Input
+                    type="number"
+                    aria-label="Workflow rectangle height"
+                    value={rectangleHeightDraft}
+                    onChange={(event) => setRectangleHeightDraft(event.target.value)}
+                    width="104px"
+                    disabled={!rectangleDimensions}
+                  />
+                  <Button size="sm" onClick={() => void handleApplyRectangleDimensions()} isDisabled={!rectangleDimensions}>
+                    Apply Rectangle Dimensions
+                  </Button>
+                </HStack>
+                {!rectangleDimensions ? (
+                  <Text fontSize="sm" opacity={0.7} mt={2}>
+                    Draw or select a rectangle before editing dimensions.
+                  </Text>
                 ) : null}
+              </Box>
+
+              <Box className="sketchmath-workflow-step" data-testid="sketchmath-workflow-hole">
+                <Text className="sketchmath-step-label">3. Hole</Text>
+                <Text fontSize="sm" opacity={0.85}>
+                  {activeProfileForHole ? `Profile holes: ${activeProfileHoleCount}` : "Select the rectangle/profile before adding a hole."}
+                </Text>
+                <HStack spacing={2} flexWrap="wrap" mt={2}>
+                  <Input
+                    type="number"
+                    aria-label="Hole diameter"
+                    value={holeDiameterValue}
+                    onChange={(event) => setHoleDiameterValue(event.target.value)}
+                    width="110px"
+                    disabled={!activeProfileForHole && !selectedHoleSummary}
+                  />
+                  <Button size="sm" onClick={() => void handleAddCenteredProfileHole()} isDisabled={!activeProfileForHole}>
+                    Add center hole
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => void handleAddProfileHole()} isDisabled={!activeProfileForHole}>
+                    Add Hole
+                  </Button>
+                </HStack>
                 {holePlacement ? (
                   <Box mt={2} data-testid="sketchmath-hole-placement">
                     <Text fontSize="sm" opacity={0.85}>
@@ -2132,32 +2206,49 @@ const SketchMathWorkspace = () => {
                     </HStack>
                   </Box>
                 ) : null}
-                <Text fontSize="sm" opacity={0.75} mt={2}>
-                  Select geometry on the canvas, then apply constraints here.
-                </Text>
-                {previewResult?.status === "preview" ? (
-                  <HStack spacing={2} flexWrap="wrap" mt={3} data-testid="sketchmath-preview-controls">
-                    <Button size="sm" onClick={() => void commitPreview()}>
-                      Commit Preview
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={clearDimensionPreview}>
-                      Revert Preview
-                    </Button>
-                  </HStack>
+                {selectedHoleSummary ? (
+                  <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-workflow-hole-editor">
+                    <Text fontSize="sm" fontWeight="600">Selected hole</Text>
+                    <HStack spacing={2} flexWrap="wrap" mt={2}>
+                      <Input
+                        type="number"
+                        aria-label="Workflow selected hole diameter"
+                        value={selectedHoleDiameterDraft}
+                        onChange={(event) => setSelectedHoleDiameterDraft(event.target.value)}
+                        width="104px"
+                      />
+                      <Input
+                        type="number"
+                        aria-label="Workflow selected hole center X"
+                        value={selectedHoleCenterXDraft}
+                        onChange={(event) => setSelectedHoleCenterXDraft(event.target.value)}
+                        width="104px"
+                      />
+                      <Input
+                        type="number"
+                        aria-label="Workflow selected hole center Y"
+                        value={selectedHoleCenterYDraft}
+                        onChange={(event) => setSelectedHoleCenterYDraft(event.target.value)}
+                        width="104px"
+                      />
+                      <Button size="sm" onClick={() => void handleApplySelectedHoleUpdate()}>
+                        Update hole
+                      </Button>
+                    </HStack>
+                    {holeEditorMessage ? (
+                      <Text fontSize="sm" opacity={0.8} mt={2}>
+                        {holeEditorMessage}
+                      </Text>
+                    ) : null}
+                  </Box>
                 ) : null}
               </Box>
-              <Box>
-                <Text fontWeight="600" mb={2}>
-                  CAD feature
-                </Text>
+
+              <Box className="sketchmath-workflow-step" data-testid="sketchmath-workflow-extrude">
+                <Text className="sketchmath-step-label">4. Extrude</Text>
                 <Text fontSize="sm" opacity={0.85} data-testid="sketchmath-profile-status">
                   {profileSummary}
                 </Text>
-                {hasUsableGeometry ? (
-                  <Text fontSize="sm" opacity={0.85}>
-                    Ready for CAD feature
-                  </Text>
-                ) : null}
                 <HStack spacing={2} flexWrap="wrap" mt={2}>
                   <Input
                     type="number"
@@ -2170,13 +2261,34 @@ const SketchMathWorkspace = () => {
                     Extrude
                   </Button>
                 </HStack>
+                <Text fontSize="sm" opacity={0.75} mt={2}>
+                  {canExtrudeSelection
+                    ? "Ready for CAD feature. Selected profile is ready for extrusion."
+                    : hasUsableGeometry
+                      ? "Select a closed profile before extrusion."
+                      : "No extrusion available until a closed rectangle profile exists."}
+                </Text>
                 {cadFeatureSummary ? (
                   <Text fontSize="sm" mt={2} data-testid="sketchmath-cad-feature-summary">
                     {cadFeatureSummary}
                   </Text>
                 ) : null}
+                {previewResult?.status === "preview" ? (
+                  <HStack spacing={2} flexWrap="wrap" mt={3} data-testid="sketchmath-preview-controls">
+                    <Button size="sm" onClick={() => void commitPreview()}>
+                      Commit Preview
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={clearDimensionPreview}>
+                      Revert Preview
+                    </Button>
+                  </HStack>
+                ) : null}
+              </Box>
+
+              <Box className="sketchmath-workflow-step" data-testid="sketchmath-workflow-export">
+                <Text className="sketchmath-step-label">5. Export</Text>
                 {cadExportPath && cadExportDownloadUrl ? (
-                  <Box className="sketchmath-export-card" data-testid="sketchmath-export-card" mt={3}>
+                  <Box className="sketchmath-export-card" data-testid="sketchmath-export-card" mt={2}>
                     <Text fontWeight="600">Export succeeded</Text>
                     <Text fontSize="sm" opacity={0.85}>
                       {cadExportFileName || "export.step"} is ready for download.
@@ -2188,9 +2300,6 @@ const SketchMathWorkspace = () => {
                       <div><dt>Profile</dt><dd>{cadExportArtifact?.profileId || activeProfileForCad?.id || "Selected profile"}</dd></div>
                       <div><dt>Depth</dt><dd>{cadExportArtifact?.extrusionDepth != null ? `${cadExportArtifact.extrusionDepth} ${cadExportArtifact.extrusionDepthUnit || "mm"}` : `${extrudeDepthValue} mm`}</dd></div>
                     </dl>
-                    <Text fontSize="sm" opacity={0.85}>
-                      Path: {cadExportPath}
-                    </Text>
                     <Text fontSize="sm" opacity={0.75}>
                       Download is served through FRIDAY. 3D preview is not implemented in this MVP.
                     </Text>
@@ -2214,15 +2323,71 @@ const SketchMathWorkspace = () => {
                       </Button>
                     </HStack>
                   </Box>
-                ) : null}
-                <Text fontSize="sm" opacity={0.75} mt={2}>
-                  {canExtrudeSelection
-                    ? "Selected profile is ready for extrusion."
-                    : hasUsableGeometry
-                      ? "Select a closed profile before extrusion."
-                      : "Draw or select a closed profile before extrusion."}
-                </Text>
+                ) : (
+                  <Text fontSize="sm" opacity={0.75} mt={2}>
+                    Preview an extrusion, then export STEP.
+                  </Text>
+                )}
               </Box>
+
+              <Box>
+                <Button size="sm" variant="ghost" onClick={() => setConstraintsOpen((value) => !value)}>
+                  {constraintsOpen ? "Hide Advanced Constraints" : "Show Advanced Constraints"}
+                </Button>
+                {constraintsOpen ? (
+                  <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-advanced-constraints">
+                    <Text fontSize="sm" opacity={0.75} mb={2}>
+                      Constraint commands are for manual cleanup; the MVP rectangle workflow does not require them.
+                    </Text>
+                    <HStack spacing={2} flexWrap="wrap">
+                      <Input aria-label="SketchMath length" value={lengthValue} onChange={(event) => setLengthValue(event.target.value)} width="100px" />
+                      <Input aria-label="SketchMath angle" value={angleValue} onChange={(event) => setAngleValue(event.target.value)} width="100px" />
+                    </HStack>
+                    <HStack spacing={2} flexWrap="wrap" mt={2}>
+                      {selectionRef.canEditWidth ? (
+                        <Button size="sm" onClick={() => rectangleSelectionDetail?.kind === "edge" && openDimensionEditor(rectangleSelectionDetail.baseId, "width")}>
+                          Edit Width
+                        </Button>
+                      ) : null}
+                      {selectionRef.canEditHeight ? (
+                        <Button size="sm" onClick={() => rectangleSelectionDetail?.kind === "edge" && openDimensionEditor(rectangleSelectionDetail.baseId, "height")}>
+                          Edit Height
+                        </Button>
+                      ) : null}
+                      {selectionRef.canFixCorner ? (
+                        <Button size="sm" onClick={() => void handleFixRectangleCorner()}>
+                          Fix Corner
+                        </Button>
+                      ) : null}
+                      <Button size="sm" onClick={() => void runQuickLength()} isDisabled={!selectionRef.canSetLength}>
+                        Set Length
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickAngle()} isDisabled={!selectionRef.canSetAngle}>
+                        Set Angle
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickParallel()} isDisabled={!selectionRef.canMakeParallel}>
+                        Make Parallel
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickPerpendicular()} isDisabled={!selectionRef.canMakePerpendicular}>
+                        Make Perpendicular
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickEqualLength()} isDisabled={!selectionRef.canEqualLength}>
+                        Equal Length
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickEqualAngle()} isDisabled={pointSelectionIds.length < 6}>
+                        Equal Angle
+                      </Button>
+                      <Button size="sm" onClick={() => void handleDeleteSelected()} isDisabled={selectedEntityIds.length === 0}>
+                        Delete
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => void refreshSession()}>
+                        Solve
+                      </Button>
+                    </HStack>
+                  </Box>
+                ) : null}
+              </Box>
+
               <Button size="sm" variant="ghost" onClick={() => setAdvancedOpen((value) => !value)}>
                 {advancedOpen ? "Hide Advanced / Debug" : "Show Advanced / Debug"}
               </Button>
@@ -2294,6 +2459,16 @@ const SketchMathWorkspace = () => {
 
           {advancedOpen ? (
             <>
+              {errorDebugText ? (
+                <Box className="sketchmath-panel" data-testid="sketchmath-error-details">
+                  <Heading size="sm" mb={3} className="sketchmath-panel-title">
+                    Error details
+                  </Heading>
+                  <Text fontSize="sm" whiteSpace="pre-wrap" className="sketchmath-command-preview">
+                    {errorDebugText}
+                  </Text>
+                </Box>
+              ) : null}
               <MeasurementPanel previewResult={previewResult} />
               <CommandPanel
                 pendingCommandText={pendingCommandText}

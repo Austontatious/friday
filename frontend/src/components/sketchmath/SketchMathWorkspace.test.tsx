@@ -98,7 +98,7 @@ const makeResponse = (payload: any) => ({
   headers: { get: () => "application/json" },
 });
 
-const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
+const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfileHoleDependency?: boolean } = {}) => {
   let snapshot = baseSnapshot();
 
   const replaceNamedReference = (entityId: string, label: string | null | undefined) => {
@@ -610,6 +610,26 @@ const createSketchmathMock = (options: { failDefineLine?: boolean } = {}) => {
         return makeResponse(setRectangleDimension(command, mutate));
       }
       if (command.command_type === "add_profile_hole") {
+        if (options.failAddProfileHoleDependency) {
+          const payload = {
+            detail: {
+              error: {
+                code: "selection_resolution_error",
+                message: "shapely is required for SketchMath hole validation",
+                detail: { error_code: "dependency_missing", dependency: "shapely" },
+                retryable: false,
+              },
+            },
+          };
+          return {
+            __mockErrorResponse: true,
+            ok: false,
+            status: 422,
+            json: async () => payload,
+            text: async () => JSON.stringify(payload),
+            headers: { get: () => "application/json" },
+          };
+        }
         return makeResponse(addProfileHole(command, mutate));
       }
       if (command.command_type === "update_profile_hole") {
@@ -689,7 +709,8 @@ describe("SketchMath workspace", () => {
     expect(screen.getByRole("button", { name: "Select" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Line" })).toBeVisible();
     expect(screen.getAllByRole("button", { name: "Dimension" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Parallel" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Parallel" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Show Advanced Constraints" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Extrude" })).toBeDisabled();
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
     expect(screen.queryByTestId("sketchmath-command-box")).toBeNull();
@@ -715,6 +736,7 @@ describe("SketchMath workspace", () => {
     await waitFor(() => expect(screen.getByTestId(`entity-${lineId}`)).toBeVisible());
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(lineId));
 
+    await userEvent.click(within(workbench).getByRole("button", { name: "Show Advanced Constraints" }));
     await userEvent.click(within(workbench).getByRole("button", { name: "Set Length" }));
     await waitFor(() =>
       expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("distance 17.5 mm"),
@@ -788,7 +810,7 @@ describe("SketchMath workspace", () => {
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
     fireEvent.change(screen.getByLabelText("Rectangle height"), { target: { value: "25" } });
-    await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await userEvent.click(within(screen.getByTestId("sketchmath-selection-inspector")).getByRole("button", { name: "Apply Rectangle Dimensions" }));
 
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
@@ -1064,6 +1086,34 @@ describe("SketchMath workspace", () => {
     expect(commitCalls).toHaveLength(0);
   });
 
+  it("normalizes backend dependency errors and keeps raw details advanced-only", async () => {
+    const { fetchMock } = createSketchmathMock({ failAddProfileHoleDependency: true });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add Hole" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+    await screen.findByTestId("sketchmath-hole-placement");
+    await userEvent.click(screen.getByRole("button", { name: "Add Centered Hole" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("sketchmath-user-error")).toHaveTextContent("Geometry validation dependency is unavailable"),
+    );
+    expect(screen.getByTestId("sketchmath-user-error")).not.toHaveTextContent("HTTP 422");
+    expect(screen.getByTestId("sketchmath-user-error")).not.toHaveTextContent("shapely is required");
+    expect(screen.queryByTestId("sketchmath-error-details")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /Show Advanced \/ Debug/ }));
+    expect(screen.getByTestId("sketchmath-error-details")).toHaveTextContent("shapely is required for SketchMath hole validation");
+  });
+
   it("selects rectangle corners as editable anchor targets", async () => {
     const { fetchMock } = createSketchmathMock();
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -1176,7 +1226,7 @@ describe("SketchMath workspace", () => {
     const rightEdge = await screen.findByTestId(`entity-${baseId}_bc`);
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
-    await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await userEvent.click(within(screen.getByTestId("sketchmath-selection-inspector")).getByRole("button", { name: "Apply Rectangle Dimensions" }));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
 
     await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
@@ -1229,6 +1279,7 @@ describe("SketchMath workspace", () => {
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle width edge"));
     expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent(`Parent: Rectangle ${baseId}`);
+    await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
     expect(screen.getByRole("button", { name: "Edit Width" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Make Parallel" })).toBeDisabled();
 
@@ -1256,6 +1307,7 @@ describe("SketchMath workspace", () => {
     fireEvent.click(await screen.findByTestId(`entity-${baseId}_cd`), { shiftKey: true });
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: 2 lines"));
+    await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
     expect(screen.getByRole("button", { name: "Make Parallel" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Make Perpendicular" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Equal Length" })).toBeEnabled();
@@ -1283,6 +1335,7 @@ describe("SketchMath workspace", () => {
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle corner A"));
     expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Angle: 90");
+    await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
     expect(screen.getByRole("button", { name: "Fix Corner" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Set Angle" })).toBeDisabled();
   });
@@ -1468,7 +1521,7 @@ describe("SketchMath workspace", () => {
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
     fireEvent.change(screen.getByLabelText("Rectangle height"), { target: { value: "25" } });
-    await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await userEvent.click(within(screen.getByTestId("sketchmath-selection-inspector")).getByRole("button", { name: "Apply Rectangle Dimensions" }));
 
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));

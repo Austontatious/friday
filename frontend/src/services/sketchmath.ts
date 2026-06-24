@@ -154,6 +154,86 @@ const requestHeaders = (): HeadersInit => ({
   [DEVICE_HEADER]: resolveDeviceId(),
 });
 
+type ApiErrorPayload = {
+  code?: string;
+  message?: string;
+  detail?: unknown;
+  retryable?: boolean;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const userMessageForApiError = (status: number, payload: ApiErrorPayload | null, fallback: string): string => {
+  const code = String(payload?.code || "");
+  const message = String(payload?.message || fallback || "SketchMath request failed");
+  const detail = asRecord(payload?.detail);
+  const detailCode = String(detail?.error_code || "");
+  if (code === "selection_resolution_error" && detailCode === "dependency_missing") {
+    return "Geometry validation dependency is unavailable. Rebuild the backend or check SketchMath dependencies.";
+  }
+  if (code === "selection_resolution_error" && detailCode === "hole_outside_outer") {
+    return "Hole must stay inside the selected profile.";
+  }
+  if (code === "selection_resolution_error" && detailCode === "invalid_hole_diameter") {
+    return "Hole diameter must be a positive number.";
+  }
+  if (code === "selection_resolution_error" && detailCode === "profile_intersection") {
+    return "Hole must fit fully inside the profile without touching an edge or another hole.";
+  }
+  if (code === "cad_adapter_unavailable") {
+    return "STEP export is unavailable because the CAD adapter is not installed or configured.";
+  }
+  if (code === "cad_export_error") {
+    return "STEP export failed. Check Advanced / Debug for the backend details.";
+  }
+  if (status >= 500) {
+    return "SketchMath backend failed. Check Advanced / Debug for details.";
+  }
+  return message;
+};
+
+export class SketchMathApiError extends Error {
+  status: number;
+  code: string | null;
+  detail: unknown;
+  retryable: boolean;
+  debugText: string;
+
+  constructor(status: number, payload: ApiErrorPayload | null, rawText: string) {
+    const fallback = rawText || `HTTP ${status}`;
+    super(userMessageForApiError(status, payload, fallback));
+    this.name = "SketchMathApiError";
+    this.status = status;
+    this.code = typeof payload?.code === "string" ? payload.code : null;
+    this.detail = payload?.detail ?? null;
+    this.retryable = Boolean(payload?.retryable);
+    this.debugText = rawText;
+  }
+}
+
+const parseErrorPayload = (rawText: string): ApiErrorPayload | null => {
+  try {
+    const parsed = JSON.parse(rawText);
+    const root = asRecord(parsed);
+    const detail = asRecord(root?.detail);
+    const nested = asRecord(detail?.error);
+    const direct = asRecord(root?.error);
+    const source = nested || direct || detail || root;
+    if (!source) {
+      return null;
+    }
+    return {
+      code: typeof source.code === "string" ? source.code : undefined,
+      message: typeof source.message === "string" ? source.message : undefined,
+      detail: source.detail,
+      retryable: typeof source.retryable === "boolean" ? source.retryable : undefined,
+    };
+  } catch {
+    return null;
+  }
+};
+
 const fetchJson = async <T,>(path: string, body?: Record<string, unknown>): Promise<T> => {
   const response = await fetch(`${API_URL}${path}`, {
     method: body ? "POST" : "GET",
@@ -161,8 +241,8 @@ const fetchJson = async <T,>(path: string, body?: Record<string, unknown>): Prom
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`HTTP ${response.status}: ${detail}`);
+    const rawText = await response.text();
+    throw new SketchMathApiError(response.status, parseErrorPayload(rawText), rawText);
   }
   return (await response.json()) as T;
 };

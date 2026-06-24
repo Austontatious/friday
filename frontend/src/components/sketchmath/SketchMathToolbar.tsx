@@ -15,17 +15,11 @@ const SketchMathToolbar = ({ mode, onModeChange, theme, onToggleTheme }: SketchM
       <HStack spacing={2} flexWrap="wrap" alignItems="start">
         {[
           ["select", "Select"],
+          ["rectangle", "Rectangle"],
           ["point", "Point"],
           ["line", "Line"],
-          ["rectangle", "Rectangle"],
           ["dimension", "Dimension"],
-          ["horizontal", "Horizontal"],
-          ["vertical", "Vertical"],
-          ["parallel", "Parallel"],
-          ["perpendicular", "Perpendicular"],
-          ["equal", "Equal"],
           ["delete", "Delete"],
-          ["solve", "Solve"],
         ].map(([value, label]) => (
           <Button
             key={value}
