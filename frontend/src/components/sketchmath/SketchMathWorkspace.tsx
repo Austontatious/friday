@@ -11,6 +11,7 @@ import type { TelemetryEvent } from "../../telemetry/sessionTelemetry";
 import { makeTelemetryEvent } from "../../telemetry/sessionTelemetry";
 import type {
   SketchMathCommand,
+  SketchMathCommandResponse,
   SketchMathEntity,
   SketchMathHistoryEntry,
   SketchMathMode,
@@ -655,6 +656,21 @@ const SketchMathWorkspace = () => {
     window.localStorage.setItem(SESSION_STORAGE_KEY, snapshot.session_id);
   };
 
+  const syncCommandResponse = (response: SketchMathCommandResponse) => {
+    setCommittedContext(response.selection_context || response.result.after);
+    setSessionMetadata(response.session_metadata || {});
+    setHistory((current) => [
+      ...current,
+      {
+        command: response.result.command,
+        committed: response.result.status === "committed",
+        before: response.result.before,
+        after: response.result.after,
+      },
+    ]);
+    window.localStorage.setItem(SESSION_STORAGE_KEY, response.session_id);
+  };
+
   const refreshSession = async () => {
     if (!sessionId) {
       return;
@@ -671,8 +687,7 @@ const SketchMathWorkspace = () => {
     setPendingCommandText(asCommandText(nextCommand));
     try {
       const response = await commitSketchMathCommand(sessionId, nextCommand);
-      const snapshot = await getSketchMathSession(sessionId);
-      syncSnapshot(snapshot);
+      syncCommandResponse(response);
       setPreviewResult(response.result);
       setError(null);
       return response.result;
@@ -736,8 +751,7 @@ const SketchMathWorkspace = () => {
         mode: "commit" as const,
       };
       const response = await commitSketchMathCommand(sessionId, command);
-      const snapshot = await getSketchMathSession(sessionId);
-      syncSnapshot(snapshot);
+      syncCommandResponse(response);
       setPreviewResult(response.result);
       setDraftPoint(null);
       clearRectangleInteraction();
@@ -865,7 +879,7 @@ const SketchMathWorkspace = () => {
     const topRight = { x: resolvedCurrent.x, y: anchor.y };
     const bottomRight = { x: resolvedCurrent.x, y: resolvedCurrent.y };
     const bottomLeft = { x: anchor.x, y: resolvedCurrent.y };
-    const command = buildBatchCommand([
+    const commands = [
       buildDefinePointCommand(topLeft, ids.pointIds.a, "A"),
       buildDefinePointCommand(topRight, ids.pointIds.b, "B"),
       buildDefinePointCommand(bottomRight, ids.pointIds.c, "C"),
@@ -879,7 +893,8 @@ const SketchMathWorkspace = () => {
       buildMakePerpendicularCommand([ids.pointIds.a, ids.pointIds.b, ids.pointIds.b, ids.pointIds.c]),
       buildSolveConstraintsCommand(),
       buildMakeProfileCommand([ids.lineIds.ab, ids.lineIds.bc, ids.lineIds.cd, ids.lineIds.da], ids.profileId),
-    ]);
+    ];
+    const command = buildBatchCommand(commands.map((subcommand) => ({ ...subcommand, mode: "commit" as const })));
     const result = await commitCommand(command);
     if (!result) {
       return;
@@ -910,7 +925,7 @@ const SketchMathWorkspace = () => {
         return;
       }
       setHolePlacement((current) => (current ? { ...current, center } : current));
-      void previewProfileHole(center);
+      void commitProfileHole(center);
       return;
     }
     if (tool === "point") {
@@ -1251,16 +1266,31 @@ const SketchMathWorkspace = () => {
     setError(null);
   };
 
-  const previewRectangleDimension = async (dimension: "width" | "height", value: number) => {
-    if (!sessionId || !rectangleDimensions) {
-      return;
+  const commitRectangleDimension = async (
+    dimension: "width" | "height",
+    value: number,
+    baseId = rectangleDimensions?.baseId,
+    activeRectangleDetail: RectangleSelectionDetail | null = rectangleSelectionDetail,
+  ): Promise<boolean> => {
+    if (!sessionId || !baseId) {
+      setError("Select a rectangle before applying dimensions");
+      return false;
     }
     if (!Number.isFinite(value) || value <= 0) {
       setError("Rectangle dimension must be a positive number");
-      return;
+      return false;
     }
-    const command = buildSetRectangleDimensionCommand(rectangleSelectionIds(rectangleDimensions.baseId), dimension, value, "mm");
-    await previewCommand(command);
+    const command = buildSetRectangleDimensionCommand(rectangleSelectionIds(baseId), dimension, value, "mm");
+    const result = await commitCommand(command);
+    if (!result) {
+      return false;
+    }
+    setDimensionEditor(null);
+    setPreviewResult(null);
+    setPendingCommandText(asCommandText({ ...command, mode: "commit" }));
+    setDimensionEditedRectangleIds((current) => Array.from(new Set([...current, baseId])));
+    restoreRectangleSelection(baseId, activeRectangleDetail);
+    return true;
   };
 
   const restoreRectangleSelection = (baseId: string, activeRectangleDetail: RectangleSelectionDetail | null) => {
@@ -1288,13 +1318,19 @@ const SketchMathWorkspace = () => {
       setError("Rectangle width and height must be positive numbers");
       return;
     }
-    if (width !== rectangleDimensions.width) {
-      await previewRectangleDimension("width", width);
-      return;
+    const baseId = rectangleDimensions.baseId;
+    const activeRectangleDetail = rectangleSelectionDetail?.baseId === baseId ? rectangleSelectionDetail : { kind: "rectangle" as const, baseId };
+    let currentWidth = rectangleDimensions.width;
+    let currentHeight = rectangleDimensions.height;
+    if (width !== currentWidth) {
+      const applied = await commitRectangleDimension("width", width, baseId, activeRectangleDetail);
+      if (!applied) {
+        return;
+      }
+      currentWidth = width;
     }
-    if (height !== rectangleDimensions.height) {
-      await previewRectangleDimension("height", height);
-      return;
+    if (height !== currentHeight) {
+      await commitRectangleDimension("height", height, baseId, activeRectangleDetail);
     }
   };
 
@@ -1307,7 +1343,7 @@ const SketchMathWorkspace = () => {
       return;
     }
     const value = Number(dimensionEditor.value);
-    await previewRectangleDimension(dimensionEditor.dimension, value);
+    await commitRectangleDimension(dimensionEditor.dimension, value, dimensionEditor.baseId, rectangleSelectionDetail);
   };
 
   const commitPreview = async () => {
@@ -1434,6 +1470,11 @@ const SketchMathWorkspace = () => {
       setError("Select a rectangle or closed profile before adding a hole");
       return;
     }
+    const diameter = Number(holeDiameterValue);
+    if (!Number.isFinite(diameter) || diameter <= 0) {
+      setError("Hole diameter must be a positive number");
+      return;
+    }
     const center = profileCenter(activeProfileForHole);
     if (!center) {
       setError("Selected profile does not have usable bounds");
@@ -1452,7 +1493,7 @@ const SketchMathWorkspace = () => {
     setError(null);
   };
 
-  const previewProfileHole = async (center: Point) => {
+  const commitProfileHole = async (center: Point) => {
     const profile = holePlacement
       ? committedEntities.find((entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => entity.id === holePlacement.profileId && isClosedProfileEntity(entity))
       : activeProfileForHole;
@@ -1478,7 +1519,16 @@ const SketchMathWorkspace = () => {
       return;
     }
     const command = buildAddProfileHoleCommand(profile.id, Number(diameter.toFixed(2)), center, "mm");
-    await previewCommand(command);
+    const result = await commitCommand(command);
+    if (!result) {
+      return;
+    }
+    setSelectedEntityIds([profile.id]);
+    const profileBaseId = rectangleBaseIdFromEntityId(profile.id);
+    setRectangleSelectionDetail(profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
+    setHolePlacement(null);
+    setPreviewResult(null);
+    setPendingCommandText(asCommandText({ ...command, mode: "commit" }));
   };
 
   const deleteRectangleCascade = async (baseId: string) => {
@@ -1912,8 +1962,8 @@ const SketchMathWorkspace = () => {
                       {holePlacement.message}
                     </Text>
                     <HStack spacing={2} flexWrap="wrap" mt={2}>
-                      <Button size="sm" onClick={() => void previewProfileHole(holePlacement.center)}>
-                        Preview Centered Hole
+                      <Button size="sm" onClick={() => void commitProfileHole(holePlacement.center)}>
+                        Add Centered Hole
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setHolePlacement(null)}>
                         Cancel Hole Placement

@@ -49,6 +49,9 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 - Active canvas tools: Select, Point, Line, Rectangle, Dimension.
 - Active workbench actions: Set Length, Edit Width, Edit Height, Parallel, Perpendicular, Equal Length, Add Hole, Extrude, Commit Preview, Revert Preview, Download STEP.
+- Rectangle width/height controls commit typed `set_rectangle_dimension` commands directly and keep the rectangle/profile selected.
+- Add Hole enters placement mode; `Add Centered Hole` or a click inside the selected profile commits a typed `add_profile_hole` command with the current diameter.
+- The rectangle inspector exposes `Select profile` so the core workflow does not require selecting hidden profile geometry on the canvas.
 - Circle and Arc are intentionally labeled `coming soon` instead of being exposed as active tools. Circular holes are supported through `add_profile_hole`; free-standing circles and arcs are not first-class SketchMath entities in this MVP.
 
 ## STEP Export

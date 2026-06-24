@@ -749,22 +749,14 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId(`rectangle-selection-outline-${baseId}`)).toBeVisible();
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
-    await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    expect(screen.getByTestId("sketchmath-preview")).toBeVisible();
-    expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("240 mm");
-    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
-
-    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
-    expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("100 mm");
-    await waitFor(() => expect(screen.getByLabelText("Rectangle width")).toHaveValue(40));
-    await waitFor(() => expect(screen.getByLabelText("Rectangle height")).toHaveValue(100));
-
     fireEvent.change(screen.getByLabelText("Rectangle height"), { target: { value: "25" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
+
+    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
+    expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText("Rectangle width")).toHaveValue(40));
+    await waitFor(() => expect(screen.getByLabelText("Rectangle height")).toHaveValue(25));
     expect(topEdge.querySelector("line")).toHaveAttribute("x1", "160");
     expect(topEdge.querySelector("line")).toHaveAttribute("x2", "200");
 
@@ -835,12 +827,14 @@ describe("SketchMath workspace", () => {
     await screen.findByRole("heading", { name: "Edit width dimension" });
     fireEvent.change(screen.getByLabelText("Width dimension value"), { target: { value: "40" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    const previewCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("set_rectangle_dimension"));
-    expect(previewCall).toBeTruthy();
-    const previewBody = JSON.parse(String(previewCall?.[1]?.body || "{}"));
-    expect(previewBody.command).toMatchObject({
-      mode: "preview",
+    const commitCall = await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/commit") && String(init?.body || "").includes("set_rectangle_dimension"));
+      expect(call).toBeTruthy();
+      return call;
+    });
+    const commitBody = JSON.parse(String(commitCall?.[1]?.body || "{}"));
+    expect(commitBody.command).toMatchObject({
+      mode: "commit",
       command_type: "set_rectangle_dimension",
       selection: [
         `${baseId}_a`,
@@ -855,16 +849,9 @@ describe("SketchMath workspace", () => {
       ],
       parameters: { dimension: "width", value: 40, unit: "mm" },
     });
-    expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("240 mm");
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Width edge");
-    await userEvent.click(screen.getByRole("button", { name: "Revert Preview" }));
-    await waitFor(() => expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull());
-    expect(screen.queryByTestId("sketchmath-preview")).toBeNull();
-    expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("240 mm");
-    await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
+    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Width edge");
+    expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull();
     await waitFor(() =>
       expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Underdefined: width and height set, position is free"),
     );
@@ -873,8 +860,6 @@ describe("SketchMath workspace", () => {
     await screen.findByRole("heading", { name: "Edit height dimension" });
     fireEvent.change(screen.getByLabelText("Height dimension value"), { target: { value: "25" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
 
     await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
@@ -883,7 +868,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByLabelText("Height dimension value")).toHaveValue(25);
   });
 
-  it("exposes Add Hole on selected rectangles and previews a typed hole command", async () => {
+  it("exposes Add Hole on selected rectangles and commits a typed centered hole command", async () => {
     const { fetchMock } = createSketchmathMock();
     global.fetch = fetchMock as unknown as typeof fetch;
     renderWorkspace();
@@ -901,26 +886,22 @@ describe("SketchMath workspace", () => {
     fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "12" } });
     await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
     await screen.findByTestId("sketchmath-hole-placement");
-    await userEvent.click(screen.getByRole("button", { name: "Preview Centered Hole" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add Centered Hole" }));
 
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    const previewCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("add_profile_hole"));
-    expect(previewCall).toBeTruthy();
-    const previewBody = JSON.parse(String(previewCall?.[1]?.body || "{}"));
-    expect(previewBody.command).toMatchObject({
-      mode: "preview",
+    const commitCall = await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/commit") && String(init?.body || "").includes("add_profile_hole"));
+      expect(call).toBeTruthy();
+      return call;
+    });
+    const commitBody = JSON.parse(String(commitCall?.[1]?.body || "{}"));
+    expect(commitBody.command).toMatchObject({
+      mode: "commit",
       command_type: "add_profile_hole",
       selection: [`profile_${baseId}`],
       parameters: { diameter: 12, unit: "mm", center: [280, 170] },
     });
-    expect(screen.getByTestId("sketchmath-preview")).toBeVisible();
-    expect(screen.queryByTestId(/^entity-hole_/)).toBeNull();
-
-    await userEvent.click(screen.getByRole("button", { name: "Revert Preview" }));
-
-    await waitFor(() => expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull());
-    expect(screen.queryByTestId("sketchmath-preview")).toBeNull();
-    expect(screen.queryByTestId(/^entity-hole_/)).toBeNull();
+    await waitFor(() => expect(screen.getByTestId(/^entity-hole_/)).toBeVisible());
+    expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull();
   });
 
   it("commits Add Hole previews into visible profile holes", async () => {
@@ -939,9 +920,7 @@ describe("SketchMath workspace", () => {
     fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "12" } });
     await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
     await screen.findByTestId("sketchmath-hole-placement");
-    await userEvent.click(screen.getByRole("button", { name: "Preview Centered Hole" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add Centered Hole" }));
 
     await waitFor(() => expect(screen.getByTestId(/^entity-hole_/)).toBeVisible());
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Profile holes: 1");
@@ -967,14 +946,18 @@ describe("SketchMath workspace", () => {
     expect(await screen.findByTestId("sketchmath-hole-placement")).toHaveTextContent("Click inside selected profile");
     clickCanvasAt(canvas, 250, 160);
 
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    const previewCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("add_profile_hole"));
-    const previewBody = JSON.parse(String(previewCall?.[1]?.body || "{}"));
-    expect(previewBody.command).toMatchObject({
+    const commitCall = await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/commit") && String(init?.body || "").includes("add_profile_hole"));
+      expect(call).toBeTruthy();
+      return call;
+    });
+    const commitBody = JSON.parse(String(commitCall?.[1]?.body || "{}"));
+    expect(commitBody.command).toMatchObject({
       command_type: "add_profile_hole",
       selection: [`profile_${baseId}`],
       parameters: { diameter: 10, unit: "mm", center: [250, 160] },
     });
+    await waitFor(() => expect(screen.getByTestId(/^entity-hole_/)).toBeVisible());
   });
 
   it("handles outside Add Hole placement clicks without previewing", async () => {
@@ -994,8 +977,8 @@ describe("SketchMath workspace", () => {
     clickCanvasAt(canvas, 800, 500);
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-hole-placement")).toHaveTextContent("inside the selected profile"));
-    const previewCalls = fetchMock.mock.calls.filter(([url, init]) => String(url).includes("/commands/preview") && String(init?.body || "").includes("add_profile_hole"));
-    expect(previewCalls).toHaveLength(0);
+    const commitCalls = fetchMock.mock.calls.filter(([url, init]) => String(url).includes("/commands/commit") && String(init?.body || "").includes("add_profile_hole"));
+    expect(commitCalls).toHaveLength(0);
   });
 
   it("selects rectangle corners as editable anchor targets", async () => {
@@ -1062,9 +1045,7 @@ describe("SketchMath workspace", () => {
     fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "12" } });
     await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
     await screen.findByTestId("sketchmath-hole-placement");
-    await userEvent.click(screen.getByRole("button", { name: "Preview Centered Hole" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add Centered Hole" }));
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Profile holes: 1"));
 
     await userEvent.click(within(workbench).getByRole("button", { name: "Extrude" }));
@@ -1113,8 +1094,6 @@ describe("SketchMath workspace", () => {
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
 
     await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
@@ -1122,8 +1101,6 @@ describe("SketchMath workspace", () => {
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Height edge"));
     fireEvent.change(screen.getByLabelText("Height dimension value"), { target: { value: "25" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-preview-controls")).toBeVisible());
-    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
 
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
     expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Closed profile: valid");
@@ -1381,6 +1358,69 @@ describe("SketchMath workspace", () => {
     expect(screen.getByRole("link", { name: "Download STEP" })).toHaveAttribute(
       "href",
       expect.stringMatching(/^\/api\/sketchmath\/artifacts\/step\?path=%2Ftmp%2Fsketchmath%2Fextrude_profile_.+%2Fexport\.step$/),
+    );
+  });
+
+  it("completes the core browser workflow from rectangle to holed STEP download without JSON", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    const inspector = screen.getByTestId("sketchmath-selection-inspector");
+    const workbench = screen.getByTestId("sketchmath-workbench-panel");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await waitFor(() => expect(inspector).toHaveTextContent("Rectangle dimensions"));
+
+    fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
+    fireEvent.change(screen.getByLabelText("Rectangle height"), { target: { value: "25" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply Rectangle Dimensions" }));
+
+    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
+    await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
+    expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
+
+    await userEvent.click(within(screen.getByTestId("rectangle-semantic-summary")).getByRole("button", { name: "Select profile" }));
+    await waitFor(() => expect(inspector).toHaveTextContent("Selected profile"));
+
+    fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "8" } });
+    await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-hole-placement")).toHaveTextContent("Click inside selected profile"));
+    clickCanvasAt(canvas, 180, 132);
+
+    await waitFor(() => expect(screen.getByTestId(/^entity-hole_/)).toBeVisible());
+    await waitFor(() => expect(inspector).toHaveTextContent("Profile holes: 1"));
+
+    fireEvent.change(screen.getByLabelText("Extrusion depth"), { target: { value: "15" } });
+    await userEvent.click(within(workbench).getByRole("button", { name: "Extrude" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-cad-feature-summary")).toHaveTextContent("Extrude preview ready: profile accepted with 1 hole"));
+    await userEvent.click(screen.getByRole("button", { name: "Commit Preview" }));
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-export-card")).toHaveTextContent("Export succeeded"));
+    expect(screen.getByRole("link", { name: "Download STEP" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/api\/sketchmath\/artifacts\/step\?path=%2Ftmp%2Fsketchmath%2Fextrude_profile_.+%2Fexport\.step$/),
+    );
+    expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
+
+    const commandTypes = fetchMock.mock.calls
+      .filter(([url]) => String(url).includes("/commands/commit"))
+      .map(([, init]) => JSON.parse(String(init?.body || "{}")).command?.command_type);
+    expect(commandTypes).toEqual(expect.arrayContaining(["batch", "set_rectangle_dimension", "add_profile_hole", "extrude_profile"]));
+    const rectangleBatchCall = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/commands/commit") && String(init?.body || "").includes("\"command_type\":\"batch\""));
+    const rectangleBatchBody = JSON.parse(String(rectangleBatchCall?.[1]?.body || "{}"));
+    expect(rectangleBatchBody.command.parameters.commands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ mode: "commit", command_type: "define_point" }),
+        expect.objectContaining({ mode: "commit", command_type: "define_line" }),
+        expect.objectContaining({ mode: "commit", command_type: "make_profile" }),
+      ]),
     );
   });
 });

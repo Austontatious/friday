@@ -99,6 +99,14 @@ export type SketchMathSessionSnapshot = {
   history: SketchMathHistoryEntry[];
 };
 
+export type SketchMathCommandResponse = {
+  session_id: string;
+  selection_context: SketchMathSelectionContext;
+  result: SketchMathOperationResult;
+  history_length: number;
+  session_metadata?: Record<string, unknown>;
+};
+
 export type SketchMathTranslationOutcome =
   | {
       session_id: string;
@@ -196,13 +204,13 @@ export const getSketchMathSession = async (sessionId: string): Promise<SketchMat
 export const previewSketchMathCommand = async (
   sessionId: string,
   command: SketchMathCommand,
-): Promise<{ session_id: string; selection_context: SketchMathSelectionContext; result: SketchMathOperationResult; history_length: number }> =>
+): Promise<SketchMathCommandResponse> =>
   fetchJson(`/sketchmath/sessions/${sessionId}/commands/preview`, { command });
 
 export const commitSketchMathCommand = async (
   sessionId: string,
   command: SketchMathCommand,
-): Promise<{ session_id: string; selection_context: SketchMathSelectionContext; result: SketchMathOperationResult; history_length: number }> =>
+): Promise<SketchMathCommandResponse> =>
   fetchJson(`/sketchmath/sessions/${sessionId}/commands/commit`, { command });
 
 export const revertSketchMathSession = async (sessionId: string): Promise<SketchMathSessionSnapshot> =>

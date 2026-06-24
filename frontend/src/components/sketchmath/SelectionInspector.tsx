@@ -154,7 +154,17 @@ const SelectionInspector = ({
               </Button>
             </>
           ) : (
-            <Text>Rectangle</Text>
+            <>
+              <Text>Rectangle</Text>
+              <HStack mt={2} flexWrap="wrap">
+                <Button size="sm" variant="outline" onClick={onSelectWholeRectangle}>
+                  Select whole rectangle
+                </Button>
+                <Button size="sm" variant="outline" onClick={onSelectProfile}>
+                  Select profile
+                </Button>
+              </HStack>
+            </>
           )}
           <Text fontSize="sm" opacity={0.8}>
             {rectangleAnchorSummary || "Position free"}
