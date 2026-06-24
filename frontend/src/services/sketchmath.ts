@@ -7,6 +7,8 @@ export type SketchMathMode =
   | "point"
   | "line"
   | "rectangle"
+  | "hole"
+  | "pan"
   | "circle"
   | "arc"
   | "dimension"

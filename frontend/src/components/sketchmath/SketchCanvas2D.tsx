@@ -5,10 +5,12 @@ import PreviewLayer from "./PreviewLayer";
 import type { SketchMathEntity, SketchMathOperationResult } from "../../services/sketchmath";
 
 type Point = { x: number; y: number };
+type ViewBox = { x: number; y: number; width: number; height: number };
 
 type SketchCanvas2DProps = {
   width: number;
   height: number;
+  viewBox: ViewBox;
   entities: SketchMathEntity[];
   previewResult: SketchMathOperationResult | null;
   selectedEntityIds: string[];
@@ -18,6 +20,7 @@ type SketchCanvas2DProps = {
   dragPreviewPoint: { id: string; point: Point } | null;
   holePlacementPreview?: { center: Point; diameter: number } | null;
   holePlacementActive?: boolean;
+  showDebugLabels?: boolean;
   onCanvasClick: (point: Point) => void;
   onCanvasMouseDown: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
   onCanvasMouseMove: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
@@ -31,6 +34,7 @@ type SketchCanvas2DProps = {
 const SketchCanvas2D = ({
   width,
   height,
+  viewBox,
   entities,
   previewResult,
   selectedEntityIds,
@@ -40,6 +44,7 @@ const SketchCanvas2D = ({
   dragPreviewPoint,
   holePlacementPreview,
   holePlacementActive = false,
+  showDebugLabels = false,
   onCanvasClick,
   onCanvasMouseDown,
   onCanvasMouseMove,
@@ -51,14 +56,14 @@ const SketchCanvas2D = ({
 }: SketchCanvas2DProps) => {
   const getCanvasPoint = (event: React.MouseEvent<SVGSVGElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const scale = Math.min(bounds.width / width, bounds.height / height);
-    const contentWidth = width * scale;
-    const contentHeight = height * scale;
+    const scale = Math.min(bounds.width / viewBox.width, bounds.height / viewBox.height);
+    const contentWidth = viewBox.width * scale;
+    const contentHeight = viewBox.height * scale;
     const contentLeft = (bounds.width - contentWidth) / 2;
     const contentTop = (bounds.height - contentHeight) / 2;
     return {
-      x: ((event.clientX - bounds.left - contentLeft) / contentWidth) * width,
-      y: ((event.clientY - bounds.top - contentTop) / contentHeight) * height,
+      x: viewBox.x + ((event.clientX - bounds.left - contentLeft) / contentWidth) * viewBox.width,
+      y: viewBox.y + ((event.clientY - bounds.top - contentTop) / contentHeight) * viewBox.height,
     };
   };
 
@@ -100,7 +105,7 @@ const SketchCanvas2D = ({
 
   return (
     <svg
-      viewBox={`0 0 ${width} ${height}`}
+      viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
       role="img"
       aria-label="SketchMath canvas"
       className="sketchmath-canvas"
@@ -131,6 +136,7 @@ const SketchCanvas2D = ({
         onEntityClick={onEntityClick}
         onEntityMouseDown={onEntityMouseDown}
         onDimensionLabelEdit={onDimensionLabelEdit}
+        showDebugLabels={showDebugLabels}
       />
       {draftPoint ? <circle cx={draftPoint.x} cy={draftPoint.y} r={7} className="sketchmath-draft-point" data-testid="sketchmath-draft-point" /> : null}
       <PreviewLayer previewResult={previewResult} committedEntityIds={entities.map((entity) => entity.id)} />

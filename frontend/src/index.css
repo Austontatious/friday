@@ -728,6 +728,23 @@ input {
   background: rgba(116, 187, 255, 0.07);
 }
 
+.sketchmath-view-controls {
+  padding: 8px 0 2px;
+}
+
+.sketchmath-plane-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(116, 187, 255, 0.24);
+  border-radius: 8px;
+  color: var(--friday-text);
+  background: rgba(116, 187, 255, 0.07);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
 .sketchmath-canvas {
   width: 100%;
   min-height: min(760px, calc(100vh - 310px));
@@ -877,7 +894,7 @@ input {
 
 .sketchmath-line-hit-target {
   stroke: transparent;
-  stroke-width: 18;
+  stroke-width: 24;
   stroke-linecap: round;
   pointer-events: stroke;
 }
@@ -950,6 +967,26 @@ input {
   stroke-width: 2.2;
   pointer-events: all;
   cursor: pointer;
+}
+
+.sketchmath-profile-target {
+  fill: rgba(116, 187, 255, 0.035);
+  stroke: rgba(116, 187, 255, 0.42);
+  stroke-width: 2;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.sketchmath-profile-target:hover {
+  fill: rgba(116, 187, 255, 0.12);
+  stroke: rgba(116, 187, 255, 0.9);
+}
+
+.sketchmath-profile-target-selected {
+  fill: rgba(116, 187, 255, 0.12);
+  stroke: #74bbff;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 10px rgba(116, 187, 255, 0.32));
 }
 
 .sketchmath-hole-profile-selected {

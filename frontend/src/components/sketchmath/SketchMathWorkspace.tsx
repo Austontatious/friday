@@ -56,6 +56,7 @@ const CANVAS_HEIGHT = 800;
 const SESSION_STORAGE_KEY = "friday_sketchmath_session_id";
 
 type Point = { x: number; y: number };
+type ViewBoxState = { x: number; y: number; width: number; height: number };
 type RectangleDraft = { anchor: Point; current: Point };
 type RectanglePointId = "a" | "b" | "c" | "d";
 type RectangleEdgeId = "ab" | "bc" | "cd" | "da";
@@ -268,6 +269,8 @@ const SketchMathWorkspace = () => {
   const [rectangleDraft, setRectangleDraft] = useState<RectangleDraft | null>(null);
   const [dragPreviewPoint, setDragPreviewPoint] = useState<{ id: string; point: Point } | null>(null);
   const [tool, setTool] = useState<SketchMathMode>("select");
+  const [viewBoxState, setViewBoxState] = useState<ViewBoxState>({ x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+  const [showDebugLabels, setShowDebugLabels] = useState(false);
   const [pendingCommandText, setPendingCommandText] = useState("");
   const [translationOutcome, setTranslationOutcome] = useState<SketchMathTranslationOutcome | null>(null);
   const [labelDraft, setLabelDraft] = useState("");
@@ -295,6 +298,7 @@ const SketchMathWorkspace = () => {
   const [errorDebugText, setErrorDebugText] = useState<string | null>(null);
   const [systemEvents, setSystemEvents] = useState<TelemetryEvent[]>([]);
   const canvasDragRef = useRef<{ start: Point; moved: boolean; forceSquare: boolean } | null>(null);
+  const viewPanRef = useRef<{ last: Point } | null>(null);
   const pointDragRef = useRef<{ entityId: string; start: Point; current: Point; moved: boolean } | null>(null);
   const ignoreNextCanvasClickRef = useRef(false);
   const notifiedArtifactPathsRef = useRef<Set<string>>(new Set());
@@ -482,9 +486,16 @@ const SketchMathWorkspace = () => {
     }
     return { holeId: selectedHoleEntity.id, profileId, diameter: geometry.diameter, center: geometry.center };
   }, [profileHoleParentById, selectedHoleEntity]);
-  const activeProfileForHole = selectedRectangleProfile || selectedClosedProfile;
+  const selectedHoleParentProfile = useMemo(() => {
+    if (!selectedHoleSummary) {
+      return null;
+    }
+    const profile = committedEntities.find((entity) => entity.id === selectedHoleSummary.profileId);
+    return profile && isClosedProfileEntity(profile) ? profile : null;
+  }, [committedEntities, selectedHoleSummary]);
+  const activeProfileForHole = selectedRectangleProfile || selectedClosedProfile || selectedHoleParentProfile;
   const activeProfileHoleCount = activeProfileForHole ? activeProfileForHole.holes?.length || 0 : null;
-  const activeProfileForCad = selectedRectangleProfile || selectedClosedProfile;
+  const activeProfileForCad = selectedRectangleProfile || selectedClosedProfile || selectedHoleParentProfile;
   const cadExportFileName = cadExportArtifact?.filename || (cadExportPath ? fileNameFromPath(cadExportPath) : null);
   const cadExportDownloadUrl = cadExportPath ? sketchMathStepDownloadUrl(cadExportPath) : null;
   const rectangleAnchorPoint = useMemo(() => {
@@ -682,8 +693,8 @@ const SketchMathWorkspace = () => {
       return {
         ...base,
         kind: "profile_hole",
-        summary: "Selected: Profile hole",
-        parentSummary: `Parent: ${selectedHoleSummary.profileId}`,
+        summary: "Selected: Hole",
+        parentSummary: "Parent: Profile",
         detail: `Diameter: ${selectedHoleSummary.diameter} mm`,
       };
     }
@@ -693,7 +704,7 @@ const SketchMathWorkspace = () => {
         ...base,
         kind: "rectangle_edge",
         summary: `Selected: Rectangle ${edgeName} edge`,
-        parentSummary: `Parent: Rectangle ${rectangleSelectionDetail.baseId}`,
+        parentSummary: "Parent: Rectangle",
         detail: `Edge ${rectangleEdgeLabel(rectangleSelectionDetail.edgeId)}`,
         canEditWidth: rectangleSelectionDetail.dimension === "width",
         canEditHeight: rectangleSelectionDetail.dimension === "height",
@@ -704,13 +715,13 @@ const SketchMathWorkspace = () => {
         ...base,
         kind: "rectangle_corner",
         summary: `Selected: Rectangle corner ${rectangleSelectionDetail.cornerId.toUpperCase()}`,
-        parentSummary: `Parent: Rectangle ${rectangleSelectionDetail.baseId}`,
+        parentSummary: "Parent: Rectangle",
         detail: "Angle: 90 deg",
         canFixCorner: true,
       };
     }
     if (rectangleSelectionDetail?.kind === "profile") {
-      return { ...base, kind: "rectangle_profile", summary: "Selected: Rectangle profile", parentSummary: `Parent: Rectangle ${rectangleSelectionDetail.baseId}` };
+      return { ...base, kind: "rectangle_profile", summary: "Selected: Profile", parentSummary: "Parent: Rectangle" };
     }
     if (selectedLineEntities.length === 2) {
       return {
@@ -734,7 +745,7 @@ const SketchMathWorkspace = () => {
           ...base,
           kind: "rectangle_edge",
           summary: `Selected: Rectangle ${dimension} edge`,
-          parentSummary: `Parent: Rectangle ${rectangleBaseId}`,
+          parentSummary: "Parent: Rectangle",
           detail: `Edge ${rectangleEdgeLabel(edgeId)}`,
           canEditWidth: dimension === "width",
           canEditHeight: dimension === "height",
@@ -762,7 +773,7 @@ const SketchMathWorkspace = () => {
       return { ...base, kind: "one_point", summary: "Selected: 1 point", canFixCorner: true };
     }
     if (rectangleDimensions) {
-      return { ...base, kind: "rectangle", summary: "Selected: Rectangle", parentSummary: `Parent: Rectangle ${rectangleDimensions.baseId}`, canFixCorner: true };
+      return { ...base, kind: "rectangle", summary: "Selected: Rectangle", parentSummary: "Parent: Rectangle", canFixCorner: true };
     }
     return { ...base, kind: "mixed", summary: `Selected: ${selectedEntityIds.length} entities` };
   }, [rectangleDimensions, rectangleSelectionDetail, selectedEntityIds.length, selectedHoleSummary, selectedLineEntities, selectedPointEntities]);
@@ -969,6 +980,7 @@ const SketchMathWorkspace = () => {
     setRectangleDraft(null);
     setDragPreviewPoint(null);
     canvasDragRef.current = null;
+    viewPanRef.current = null;
     pointDragRef.current = null;
   };
 
@@ -1019,8 +1031,8 @@ const SketchMathWorkspace = () => {
     if (!result) {
       return;
     }
-    setSelectedEntityIds(rectangleSelectionIds(baseId));
-    setRectangleSelectionDetail({ kind: "rectangle", baseId });
+    setSelectedEntityIds([ids.profileId]);
+    setRectangleSelectionDetail({ kind: "profile", baseId });
     setTranslationOutcome(null);
   };
 
@@ -1103,6 +1115,10 @@ const SketchMathWorkspace = () => {
   };
 
   const handleCanvasMouseDown = (point: Point, event: React.MouseEvent<SVGSVGElement>) => {
+    if (tool === "pan" && event.button === 0) {
+      viewPanRef.current = { last: point };
+      return;
+    }
     if (tool !== "rectangle" || event.button !== 0) {
       return;
     }
@@ -1110,6 +1126,13 @@ const SketchMathWorkspace = () => {
   };
 
   const handleCanvasMouseMove = (point: Point, event: React.MouseEvent<SVGSVGElement>) => {
+    if (viewPanRef.current) {
+      const deltaX = viewPanRef.current.last.x - point.x;
+      const deltaY = viewPanRef.current.last.y - point.y;
+      viewPanRef.current = { last: point };
+      setViewBoxState((current) => ({ ...current, x: current.x + deltaX, y: current.y + deltaY }));
+      return;
+    }
     if (pointDragRef.current) {
       const drag = pointDragRef.current;
       const resolvedPoint = { x: Number(point.x.toFixed(2)), y: Number(point.y.toFixed(2)) };
@@ -1139,6 +1162,10 @@ const SketchMathWorkspace = () => {
   };
 
   const handleCanvasMouseUp = (point: Point, event: React.MouseEvent<SVGSVGElement>) => {
+    if (viewPanRef.current) {
+      viewPanRef.current = null;
+      return;
+    }
     if (pointDragRef.current) {
       const drag = pointDragRef.current;
       const entity = committedEntities.find((candidate) => candidate.id === drag.entityId);
@@ -1226,6 +1253,66 @@ const SketchMathWorkspace = () => {
       clearRectangleInteraction();
       clearErrorState();
     }
+    if (tool === "pan") {
+      viewPanRef.current = null;
+    }
+  };
+
+  const resetView = () => {
+    setViewBoxState({ x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+  };
+
+  const zoomView = (factor: number) => {
+    setViewBoxState((current) => {
+      const nextWidth = Math.max(120, Math.min(CANVAS_WIDTH * 2, current.width * factor));
+      const nextHeight = Math.max(80, Math.min(CANVAS_HEIGHT * 2, current.height * factor));
+      return {
+        x: current.x + (current.width - nextWidth) / 2,
+        y: current.y + (current.height - nextHeight) / 2,
+        width: nextWidth,
+        height: nextHeight,
+      };
+    });
+  };
+
+  const fitSketchToView = () => {
+    const points = committedEntities.flatMap((entity) => {
+      if (isPointEntity(entity)) {
+        return [{ x: entity.coords[0], y: entity.coords[1] }];
+      }
+      if (isLineEntity(entity)) {
+        return [
+          { x: entity.start[0], y: entity.start[1] },
+          { x: entity.end[0], y: entity.end[1] },
+        ];
+      }
+      if (isClosedProfileEntity(entity)) {
+        return entity.vertices.map((vertex) => ({ x: vertex[0], y: vertex[1] }));
+      }
+      return [];
+    });
+    if (points.length === 0) {
+      resetView();
+      return;
+    }
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const padding = 80;
+    const minX = Math.min(...xs) - padding;
+    const maxX = Math.max(...xs) + padding;
+    const minY = Math.min(...ys) - padding;
+    const maxY = Math.max(...ys) + padding;
+    const width = Math.max(180, maxX - minX);
+    const height = Math.max(140, maxY - minY);
+    const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
+    const fittedWidth = width / height > aspect ? width : height * aspect;
+    const fittedHeight = fittedWidth / aspect;
+    setViewBoxState({
+      x: minX - (fittedWidth - width) / 2,
+      y: minY - (fittedHeight - height) / 2,
+      width: fittedWidth,
+      height: fittedHeight,
+    });
   };
 
   const openDimensionEditor = (baseId: string, dimension: "width" | "height") => {
@@ -1275,7 +1362,9 @@ const SketchMathWorkspace = () => {
     if (rectangleBaseId) {
       const edgeId = rectangleEdgeIdFromEntityId(entityId);
       const cornerId = rectangleCornerIdFromPointId(entityId);
-      if (event.shiftKey) {
+      const isModifierSelection = event.shiftKey || event.ctrlKey || event.metaKey;
+      const isAdvancedEdgeMode = tool === "dimension" || constraintsOpen;
+      if (isModifierSelection) {
         if (selectionRef.kind === "rectangle" && selectedRectangleBaseId === rectangleBaseId) {
           setSelectedEntityIds([entityId]);
           if (edgeId) {
@@ -1291,6 +1380,15 @@ const SketchMathWorkspace = () => {
           return;
         }
         toggleSelection([entityId]);
+        setDimensionEditor(null);
+        setDeletePrompt(null);
+        clearErrorState();
+        return;
+      }
+      if (!isAdvancedEdgeMode) {
+        const ids = rectangleIdsFromBaseId(rectangleBaseId);
+        setSelectedEntityIds([ids.profileId]);
+        setRectangleSelectionDetail({ kind: "profile", baseId: rectangleBaseId });
         setDimensionEditor(null);
         setDeletePrompt(null);
         clearErrorState();
@@ -1313,7 +1411,7 @@ const SketchMathWorkspace = () => {
       return;
     }
     const nextGroup = entity && isLineEntity(entity) ? lineSelectionGroup(entity) : [entityId];
-    if (event.shiftKey) {
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
       toggleSelection(entity && isLineEntity(entity) ? [entity.id] : nextGroup);
     } else {
       setSelectedEntityIds(nextGroup);
@@ -1620,7 +1718,7 @@ const SketchMathWorkspace = () => {
     setSelectedEntityIds([activeProfileForHole.id]);
     const baseId = rectangleBaseIdFromEntityId(activeProfileForHole.id);
     setRectangleSelectionDetail(baseId ? { kind: "profile", baseId } : null);
-    setTool("select");
+    setTool("hole");
     setHolePlacement({
       profileId: activeProfileForHole.id,
       baseId,
@@ -1682,9 +1780,11 @@ const SketchMathWorkspace = () => {
     if (!result) {
       return;
     }
-    setSelectedEntityIds([profile.id]);
+    const afterProfile = result.after.items.find((entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => entity.id === profile.id && isClosedProfileEntity(entity));
+    const nextHoleId = afterProfile?.holes?.find((holeId) => !(profile.holes || []).includes(holeId));
+    setSelectedEntityIds(nextHoleId ? [nextHoleId] : [profile.id]);
     const profileBaseId = rectangleBaseIdFromEntityId(profile.id);
-    setRectangleSelectionDetail(profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
+    setRectangleSelectionDetail(nextHoleId ? null : profileBaseId ? { kind: "profile", baseId: profileBaseId } : null);
     setHolePlacement(null);
     setPreviewResult(null);
     setPendingCommandText(asCommandText({ ...command, mode: "commit" }));
@@ -1943,6 +2043,13 @@ const SketchMathWorkspace = () => {
       void handleDeleteSelected();
       return;
     }
+    if (nextTool === "hole") {
+      setTool(nextTool);
+      if (activeProfileForHole) {
+        void handleAddProfileHole();
+      }
+      return;
+    }
     setTool(nextTool);
   };
 
@@ -1982,6 +2089,10 @@ const SketchMathWorkspace = () => {
     ? "Click inside the selected profile to place the hole, or add it at the profile center from the workflow panel."
     : tool === "rectangle"
       ? "Drag on the canvas to draw a rectangle profile. Hold Shift while dragging for a square."
+      : tool === "hole"
+        ? "Select a profile, then click inside it to place a circular hole."
+        : tool === "pan"
+          ? "Drag the canvas to pan. Use Fit, Reset, and zoom controls to navigate the 2D sketch plane."
       : tool === "dimension"
         ? "Select a rectangle edge or click a dimension label to edit width or height."
         : tool === "line"
@@ -2049,9 +2160,33 @@ const SketchMathWorkspace = () => {
               <Text className="sketchmath-canvas-helper" data-testid="sketchmath-canvas-helper">
                 {canvasHelperText}
               </Text>
+              <HStack className="sketchmath-view-controls" spacing={2} flexWrap="wrap" mb={3} data-testid="sketchmath-view-controls">
+                <Button size="sm" variant={tool === "pan" ? "solid" : "outline"} onClick={() => handleToolChange("pan")}>
+                  Pan / view
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => zoomView(0.8)}>
+                  Zoom in
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => zoomView(1.25)}>
+                  Zoom out
+                </Button>
+                <Button size="sm" variant="outline" onClick={fitSketchToView}>
+                  Fit sketch
+                </Button>
+                <Button size="sm" variant="outline" onClick={resetView}>
+                  Reset view
+                </Button>
+                <Text className="sketchmath-plane-chip" data-testid="sketchmath-plane-widget">
+                  2D sketch plane
+                </Text>
+                <Button size="sm" variant="outline" isDisabled>
+                  3D orbit coming soon
+                </Button>
+              </HStack>
               <SketchCanvas2D
                 width={CANVAS_WIDTH}
                 height={CANVAS_HEIGHT}
+                viewBox={viewBoxState}
                 entities={committedEntities}
                 previewResult={previewResult}
                 selectedEntityIds={selectedEntityIds}
@@ -2067,6 +2202,7 @@ const SketchMathWorkspace = () => {
                 dragPreviewPoint={dragPreviewPoint}
                 holePlacementPreview={holePlacementPreview}
                 holePlacementActive={Boolean(holePlacement)}
+                showDebugLabels={showDebugLabels}
                 onCanvasClick={handleCanvasClick}
                 onCanvasMouseDown={handleCanvasMouseDown}
                 onCanvasMouseMove={handleCanvasMouseMove}
@@ -2080,20 +2216,6 @@ const SketchMathWorkspace = () => {
           </Box>
 
           <VStack align="stretch" spacing={4} className="friday-telemetry-sidecar sketchmath-sidebar" data-testid="friday-telemetry-panel">
-            <section className="friday-session-map" data-testid="friday-session-map">
-              <h2>Session Map</h2>
-              <dl>
-                <div><dt>Objective</dt><dd>Build a constrained sketch and export CAD-ready geometry.</dd></div>
-                <div><dt>Workspace</dt><dd>SketchMath canvas</dd></div>
-                <div><dt>Recent decisions</dt><dd>{history.length ? history.slice(-3).map((entry) => entry.command.command_type).join(" / ") : "No geometry commands yet"}</dd></div>
-                <div><dt>Attached context</dt><dd>{selectionRef.summary}</dd></div>
-                <div><dt>Artifacts</dt><dd>{cadExportPath || "No STEP export yet"}</dd></div>
-              </dl>
-            </section>
-            <section>
-              <h2>System Events</h2>
-              <TelemetryEventList events={systemEvents} emptyMessage="SketchMath lifecycle events will appear here." />
-            </section>
           <Box className="sketchmath-panel sketchmath-workflow-panel" data-testid="sketchmath-workbench-panel">
             <Heading size="sm" mb={3} className="sketchmath-panel-title">
               SketchMath workflow
@@ -2105,8 +2227,21 @@ const SketchMathWorkspace = () => {
                   <Text>{error}</Text>
                 </Box>
               ) : null}
+              <Box className="sketchmath-workflow-step" data-testid="sketchmath-tool-mode">
+                <Text className="sketchmath-step-label">Current mode</Text>
+                <Text fontWeight="600">{tool === "select" ? "Select" : tool === "rectangle" ? "Draw rectangle" : tool === "hole" ? "Add hole" : tool === "pan" ? "Pan / view" : tool}</Text>
+                <Text fontSize="sm" opacity={0.8}>
+                  {canvasHelperText}
+                </Text>
+              </Box>
+
               <Box data-testid="sketchmath-selection-summary">
                 <Text fontWeight="600">{selectionRef.summary}</Text>
+                {selectionRef.kind === "none" ? (
+                  <Text fontSize="sm" opacity={0.75}>
+                    Nothing selected.
+                  </Text>
+                ) : null}
                 {selectionRef.parentSummary ? (
                   <Text fontSize="sm" opacity={0.85}>
                     {selectionRef.parentSummary}
@@ -2120,6 +2255,39 @@ const SketchMathWorkspace = () => {
                 <Text data-testid="sketchmath-status" fontSize="sm" opacity={0.8}>
                   {sketchStatus}
                 </Text>
+                {rectangleDimensions ? (
+                  <Text fontSize="sm" opacity={0.75}>
+                    {rectangleAnchorSummary || "Position free"}
+                  </Text>
+                ) : null}
+                <HStack spacing={2} flexWrap="wrap" mt={2}>
+                  {rectangleDimensions ? (
+                    <Button size="sm" variant="outline" onClick={() => void handleFixRectangleCorner()}>
+                      Fix corner
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="outline" onClick={() => void handleDeleteSelected()} isDisabled={selectedEntityIds.length === 0}>
+                    Delete
+                  </Button>
+                </HStack>
+                {deletePrompt ? (
+                  <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-delete-prompt">
+                    <Text fontWeight="600" mb={1}>
+                      Dependency-aware delete
+                    </Text>
+                    <Text fontSize="sm" opacity={0.85}>
+                      {deletePrompt.message}
+                    </Text>
+                    <HStack mt={2}>
+                      <Button size="sm" onClick={() => void deleteRectangleCascade(deletePrompt.baseId)}>
+                        Delete whole rectangle
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setDeletePrompt(null)}>
+                        Cancel
+                      </Button>
+                    </HStack>
+                  </Box>
+                ) : null}
               </Box>
 
               <Box className="sketchmath-workflow-step" data-testid="sketchmath-workflow-draw">
@@ -2129,7 +2297,7 @@ const SketchMathWorkspace = () => {
                 </Text>
                 <HStack spacing={2} flexWrap="wrap" mt={2}>
                   <Button size="sm" onClick={() => handleToolChange("rectangle")} variant={tool === "rectangle" ? "solid" : "outline"}>
-                    Draw rectangle
+                    Start rectangle
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => void handleClearSketch()}>
                     Clear sketch
@@ -2139,13 +2307,16 @@ const SketchMathWorkspace = () => {
 
               <Box className="sketchmath-workflow-step" data-testid="sketchmath-workflow-dimensions">
                 <Text className="sketchmath-step-label">2. Dimension</Text>
+                <Text fontWeight="600" fontSize="sm">
+                  Rectangle dimensions
+                </Text>
                 <Text fontSize="sm" opacity={0.85}>
                   {dimensionSummary}
                 </Text>
                 <HStack spacing={2} flexWrap="wrap" mt={2}>
                   <Input
                     type="number"
-                    aria-label="Workflow rectangle width"
+                    aria-label="Rectangle width"
                     value={rectangleWidthDraft}
                     onChange={(event) => setRectangleWidthDraft(event.target.value)}
                     width="104px"
@@ -2153,7 +2324,7 @@ const SketchMathWorkspace = () => {
                   />
                   <Input
                     type="number"
-                    aria-label="Workflow rectangle height"
+                    aria-label="Rectangle height"
                     value={rectangleHeightDraft}
                     onChange={(event) => setRectangleHeightDraft(event.target.value)}
                     width="104px"
@@ -2167,6 +2338,25 @@ const SketchMathWorkspace = () => {
                   <Text fontSize="sm" opacity={0.7} mt={2}>
                     Draw or select a rectangle before editing dimensions.
                   </Text>
+                ) : null}
+                {dimensionEditor ? (
+                  <Box className="sketchmath-inline-editor" mt={3} data-testid="rectangle-dimension-editor">
+                    <Heading size="sm" mb={2}>
+                      Edit {dimensionEditor.dimension} dimension
+                    </Heading>
+                    <HStack spacing={2} flexWrap="wrap">
+                      <Input
+                        type="number"
+                        value={dimensionEditor.value}
+                        onChange={(event) => setDimensionEditor((current) => (current ? { ...current, value: event.target.value } : current))}
+                        aria-label={`${dimensionEditor.dimension === "width" ? "Width" : "Height"} dimension value`}
+                        width="110px"
+                      />
+                      <Button size="sm" onClick={() => void handleApplyDimensionEditor()}>
+                        Apply dimension
+                      </Button>
+                    </HStack>
+                  </Box>
                 ) : null}
               </Box>
 
@@ -2207,37 +2397,39 @@ const SketchMathWorkspace = () => {
                   </Box>
                 ) : null}
                 {selectedHoleSummary ? (
-                  <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-workflow-hole-editor">
+                  <Box className="sketchmath-inline-editor" mt={3} data-testid="selected-hole-editor">
                     <Text fontSize="sm" fontWeight="600">Selected hole</Text>
                     <HStack spacing={2} flexWrap="wrap" mt={2}>
                       <Input
                         type="number"
-                        aria-label="Workflow selected hole diameter"
+                        aria-label="Selected hole diameter"
                         value={selectedHoleDiameterDraft}
                         onChange={(event) => setSelectedHoleDiameterDraft(event.target.value)}
                         width="104px"
                       />
                       <Input
                         type="number"
-                        aria-label="Workflow selected hole center X"
+                        aria-label="Selected hole center X"
                         value={selectedHoleCenterXDraft}
                         onChange={(event) => setSelectedHoleCenterXDraft(event.target.value)}
                         width="104px"
                       />
                       <Input
                         type="number"
-                        aria-label="Workflow selected hole center Y"
+                        aria-label="Selected hole center Y"
                         value={selectedHoleCenterYDraft}
                         onChange={(event) => setSelectedHoleCenterYDraft(event.target.value)}
                         width="104px"
                       />
                       <Button size="sm" onClick={() => void handleApplySelectedHoleUpdate()}>
-                        Update hole
+                        Apply hole update
                       </Button>
                     </HStack>
                     {holeEditorMessage ? (
                       <Text fontSize="sm" opacity={0.8} mt={2}>
-                        {holeEditorMessage}
+                        <span data-testid="selected-hole-editor-message">
+                          {holeEditorMessage}
+                        </span>
                       </Text>
                     ) : null}
                   </Box>
@@ -2297,7 +2489,7 @@ const SketchMathWorkspace = () => {
                       <div><dt>Filename</dt><dd>{cadExportFileName || "export.step"}</dd></div>
                       <div><dt>Size</dt><dd>{cadExportArtifact?.sizeBytes != null ? `${cadExportArtifact.sizeBytes} bytes` : "Not reported"}</dd></div>
                       <div><dt>Created</dt><dd>{cadExportArtifact?.createdAt || "Not reported"}</dd></div>
-                      <div><dt>Profile</dt><dd>{cadExportArtifact?.profileId || activeProfileForCad?.id || "Selected profile"}</dd></div>
+                      <div><dt>Profile</dt><dd>Selected profile</dd></div>
                       <div><dt>Depth</dt><dd>{cadExportArtifact?.extrusionDepth != null ? `${cadExportArtifact.extrusionDepth} ${cadExportArtifact.extrusionDepthUnit || "mm"}` : `${extrudeDepthValue} mm`}</dd></div>
                     </dl>
                     <Text fontSize="sm" opacity={0.75}>
@@ -2338,6 +2530,9 @@ const SketchMathWorkspace = () => {
                   <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-advanced-constraints">
                     <Text fontSize="sm" opacity={0.75} mb={2}>
                       Constraint commands are for manual cleanup; the MVP rectangle workflow does not require them.
+                    </Text>
+                    <Text fontSize="sm" opacity={0.8} whiteSpace="pre-wrap" mb={2}>
+                      {constraintSummaries.length ? constraintSummaries.join("\n") : "No constraints yet."}
                     </Text>
                     <HStack spacing={2} flexWrap="wrap">
                       <Input aria-label="SketchMath length" value={lengthValue} onChange={(event) => setLengthValue(event.target.value)} width="100px" />
@@ -2394,71 +2589,95 @@ const SketchMathWorkspace = () => {
             </VStack>
           </Box>
 
-          <SelectionInspector
-            selectedEntities={selectedEntities}
-            sketchStatus={sketchStatus}
-            constraintSummaries={constraintSummaries}
-            dimensionSummary={dimensionSummary}
-            rectangleDimensions={rectangleDimensions}
-            rectangleSelectionDetail={rectangleSelectionDetail}
-            rectangleAnchorSummary={rectangleAnchorSummary}
-            profileSummary={profileSummary}
-            profileHoleCount={activeProfileHoleCount}
-            selectedHole={selectedHoleSummary}
-            selectedHoleDiameterDraft={selectedHoleDiameterDraft}
-            selectedHoleCenterXDraft={selectedHoleCenterXDraft}
-            selectedHoleCenterYDraft={selectedHoleCenterYDraft}
-            holeEditorMessage={holeEditorMessage}
-            rectangleWidthDraft={rectangleWidthDraft}
-            rectangleHeightDraft={rectangleHeightDraft}
-            dimensionEditor={dimensionEditor}
-            deletePrompt={deletePrompt}
-            showInternals={advancedOpen}
-            namedReferences={committedContext.named_references}
-            pendingCommandText={pendingCommandText}
-            labelDraft={labelDraft}
-            onLabelDraftChange={setLabelDraft}
-            onRectangleWidthDraftChange={setRectangleWidthDraft}
-            onRectangleHeightDraftChange={setRectangleHeightDraft}
-            onApplyRectangleDimensions={handleApplyRectangleDimensions}
-            onOpenDimensionEditor={(dimension) => {
-              if (rectangleDimensions) {
-                openDimensionEditor(rectangleDimensions.baseId, dimension);
-              }
-            }}
-            onDimensionEditorValueChange={(value) => setDimensionEditor((current) => (current ? { ...current, value } : current))}
-            onApplyDimensionEditor={handleApplyDimensionEditor}
-            onSelectWholeRectangle={() => {
-              if (rectangleDimensions) {
-                setSelectedEntityIds(rectangleSelectionIds(rectangleDimensions.baseId));
-                setRectangleSelectionDetail({ kind: "rectangle", baseId: rectangleDimensions.baseId });
-              }
-            }}
-            onSelectProfile={() => {
-              if (rectangleDimensions) {
-                const ids = rectangleIdsFromBaseId(rectangleDimensions.baseId);
-                setSelectedEntityIds([ids.profileId]);
-                setRectangleSelectionDetail({ kind: "profile", baseId: rectangleDimensions.baseId });
-              }
-            }}
-            onSelectedHoleDiameterDraftChange={setSelectedHoleDiameterDraft}
-            onSelectedHoleCenterXDraftChange={setSelectedHoleCenterXDraft}
-            onSelectedHoleCenterYDraftChange={setSelectedHoleCenterYDraft}
-            onApplySelectedHoleUpdate={handleApplySelectedHoleUpdate}
-            onDeleteWholeRectangle={() => {
-              if (deletePrompt?.kind === "rectangle") {
-                void deleteRectangleCascade(deletePrompt.baseId);
-              }
-            }}
-            onCancelDeletePrompt={() => setDeletePrompt(null)}
-            onFixRectangleCorner={handleFixRectangleCorner}
-            onApplyLabel={handleApplyLabel}
-            onToggleLockSelected={handleToggleLockSelected}
-            onDeleteSelected={handleDeleteSelected}
-          />
-
           {advancedOpen ? (
             <>
+              <section className="friday-session-map" data-testid="friday-session-map">
+                <h2>Session Map</h2>
+                <dl>
+                  <div><dt>Objective</dt><dd>Build a constrained sketch and export CAD-ready geometry.</dd></div>
+                  <div><dt>Workspace</dt><dd>SketchMath canvas</dd></div>
+                  <div><dt>Recent decisions</dt><dd>{history.length ? history.slice(-3).map((entry) => entry.command.command_type).join(" / ") : "No geometry commands yet"}</dd></div>
+                  <div><dt>Attached context</dt><dd>{selectionRef.summary}</dd></div>
+                  <div><dt>Artifacts</dt><dd>{cadExportPath || "No STEP export yet"}</dd></div>
+                </dl>
+              </section>
+              <section>
+                <h2>System Events</h2>
+                <TelemetryEventList events={systemEvents} emptyMessage="SketchMath lifecycle events will appear here." />
+              </section>
+              <Box className="sketchmath-panel">
+                <HStack justify="space-between" align="center">
+                  <Text fontWeight="600">Debug labels</Text>
+                  <Button size="sm" variant="outline" onClick={() => setShowDebugLabels((value) => !value)} data-testid="sketchmath-debug-label-toggle">
+                    {showDebugLabels ? "Hide debug labels" : "Show debug labels"}
+                  </Button>
+                </HStack>
+                <Text fontSize="sm" opacity={0.75} mt={2}>
+                  Shows raw point and line ids on the canvas for troubleshooting.
+                </Text>
+              </Box>
+              <SelectionInspector
+                selectedEntities={selectedEntities}
+                sketchStatus={sketchStatus}
+                constraintSummaries={constraintSummaries}
+                dimensionSummary={dimensionSummary}
+                rectangleDimensions={rectangleDimensions}
+                rectangleSelectionDetail={rectangleSelectionDetail}
+                rectangleAnchorSummary={rectangleAnchorSummary}
+                profileSummary={profileSummary}
+                profileHoleCount={activeProfileHoleCount}
+                selectedHole={selectedHoleSummary}
+                selectedHoleDiameterDraft={selectedHoleDiameterDraft}
+                selectedHoleCenterXDraft={selectedHoleCenterXDraft}
+                selectedHoleCenterYDraft={selectedHoleCenterYDraft}
+                holeEditorMessage={holeEditorMessage}
+                rectangleWidthDraft={rectangleWidthDraft}
+                rectangleHeightDraft={rectangleHeightDraft}
+                dimensionEditor={dimensionEditor}
+                deletePrompt={deletePrompt}
+                showInternals={advancedOpen}
+                namedReferences={committedContext.named_references}
+                pendingCommandText={pendingCommandText}
+                labelDraft={labelDraft}
+                onLabelDraftChange={setLabelDraft}
+                onRectangleWidthDraftChange={setRectangleWidthDraft}
+                onRectangleHeightDraftChange={setRectangleHeightDraft}
+                onApplyRectangleDimensions={handleApplyRectangleDimensions}
+                onOpenDimensionEditor={(dimension) => {
+                  if (rectangleDimensions) {
+                    openDimensionEditor(rectangleDimensions.baseId, dimension);
+                  }
+                }}
+                onDimensionEditorValueChange={(value) => setDimensionEditor((current) => (current ? { ...current, value } : current))}
+                onApplyDimensionEditor={handleApplyDimensionEditor}
+                onSelectWholeRectangle={() => {
+                  if (rectangleDimensions) {
+                    setSelectedEntityIds(rectangleSelectionIds(rectangleDimensions.baseId));
+                    setRectangleSelectionDetail({ kind: "rectangle", baseId: rectangleDimensions.baseId });
+                  }
+                }}
+                onSelectProfile={() => {
+                  if (rectangleDimensions) {
+                    const ids = rectangleIdsFromBaseId(rectangleDimensions.baseId);
+                    setSelectedEntityIds([ids.profileId]);
+                    setRectangleSelectionDetail({ kind: "profile", baseId: rectangleDimensions.baseId });
+                  }
+                }}
+                onSelectedHoleDiameterDraftChange={setSelectedHoleDiameterDraft}
+                onSelectedHoleCenterXDraftChange={setSelectedHoleCenterXDraft}
+                onSelectedHoleCenterYDraftChange={setSelectedHoleCenterYDraft}
+                onApplySelectedHoleUpdate={handleApplySelectedHoleUpdate}
+                onDeleteWholeRectangle={() => {
+                  if (deletePrompt?.kind === "rectangle") {
+                    void deleteRectangleCascade(deletePrompt.baseId);
+                  }
+                }}
+                onCancelDeletePrompt={() => setDeletePrompt(null)}
+                onFixRectangleCorner={handleFixRectangleCorner}
+                onApplyLabel={handleApplyLabel}
+                onToggleLockSelected={handleToggleLockSelected}
+                onDeleteSelected={handleDeleteSelected}
+              />
               {errorDebugText ? (
                 <Box className="sketchmath-panel" data-testid="sketchmath-error-details">
                   <Heading size="sm" mb={3} className="sketchmath-panel-title">

@@ -703,15 +703,22 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     expect(screen.getByTestId("sketchmath-workspace")).toBeInTheDocument();
     expect(screen.getByTestId("friday-telemetry-panel")).toBeInTheDocument();
-    expect(screen.getByText("Workspace initialized")).toBeVisible();
-    expect(screen.getAllByText("Raw details").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Workspace initialized")).toBeNull();
+    expect(screen.queryByText("Raw details")).toBeNull();
     expect(screen.getByTestId("sketchmath-canvas")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Select" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Draw rectangle" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add hole" })).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "Pan / view" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Line" })).toBeVisible();
     expect(screen.getAllByRole("button", { name: "Dimension" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Parallel" })).toBeNull();
     expect(screen.getByRole("button", { name: "Show Advanced Constraints" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Extrude" })).toBeDisabled();
+    expect(screen.getByTestId("sketchmath-view-controls")).toBeInTheDocument();
+    expect(screen.getByTestId("sketchmath-plane-widget")).toHaveTextContent("2D sketch plane");
+    expect(screen.getByRole("button", { name: "3D orbit coming soon" })).toBeDisabled();
+    expect(screen.queryByTestId("friday-session-map")).toBeNull();
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
     expect(screen.queryByTestId("sketchmath-command-box")).toBeNull();
   });
@@ -734,16 +741,14 @@ describe("SketchMath workspace", () => {
     const endPointId = `point_${stamp.value.toString(36)}_end`;
 
     await waitFor(() => expect(screen.getByTestId(`entity-${lineId}`)).toBeVisible());
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(lineId));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: 1 line"));
 
     await userEvent.click(within(workbench).getByRole("button", { name: "Show Advanced Constraints" }));
     await userEvent.click(within(workbench).getByRole("button", { name: "Set Length" }));
     await waitFor(() =>
-      expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("distance 17.5 mm"),
+      expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("distance 17.5 mm"),
     );
     expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Fully defined");
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(startPointId);
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(endPointId);
 
     stamp.value = 1710000001000;
     await userEvent.click(screen.getByRole("button", { name: "Line" }));
@@ -756,9 +761,9 @@ describe("SketchMath workspace", () => {
     await userEvent.click(within(workbench).getByRole("button", { name: "Make Parallel" }));
 
     await waitFor(() =>
-      expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("parallel_constraint"),
+      expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("parallel_constraint"),
     );
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("distance 17.5 mm");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("distance 17.5 mm");
   });
 
   it("creates a parametric rectangle from two clicks and keeps the workbench CAD-ready", async () => {
@@ -770,16 +775,13 @@ describe("SketchMath workspace", () => {
     const canvas = screen.getByTestId("sketchmath-canvas");
     const workbench = screen.getByTestId("sketchmath-workbench-panel");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("profile_"));
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("4 lines");
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("3 constraints");
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected object");
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Rectangle");
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Closed profile: valid");
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Profile"));
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Rectangle 240 mm x 100 mm");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Closed profile: valid");
     expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeEnabled();
   });
 
@@ -792,13 +794,13 @@ describe("SketchMath workspace", () => {
     const canvas = screen.getByTestId("sketchmath-canvas");
     const workbench = screen.getByTestId("sketchmath-workbench-panel");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
     const baseId = `rect_${firstStamp.toString(36)}`;
     const topEdge = await screen.findByTestId(`entity-${baseId}_ab`);
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Rectangle dimensions"));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Rectangle dimensions"));
     expect(screen.getByLabelText("Rectangle width")).toHaveValue(240);
     expect(screen.getByLabelText("Rectangle height")).toHaveValue(100);
     expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("240 mm");
@@ -810,7 +812,7 @@ describe("SketchMath workspace", () => {
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
     fireEvent.change(screen.getByLabelText("Rectangle height"), { target: { value: "25" } });
-    await userEvent.click(within(screen.getByTestId("sketchmath-selection-inspector")).getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await userEvent.click(within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Apply Rectangle Dimensions" }));
 
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
@@ -820,16 +822,12 @@ describe("SketchMath workspace", () => {
     expect(topEdge.querySelector("line")).toHaveAttribute("x1", "160");
     expect(topEdge.querySelector("line")).toHaveAttribute("x2", "200");
 
+    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
     await userEvent.click(topEdge);
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Width edge"));
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Parent: Rectangle");
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Width: 40 mm");
-    expect(screen.getByRole("button", { name: "Edit dimension" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Dimension this edge" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Select whole rectangle" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Select profile" })).toBeEnabled();
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: Rectangle width edge"));
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Parent: Rectangle");
+    expect(screen.getByLabelText("Width dimension value")).toHaveValue(40);
     expect(topEdge.querySelector("line.sketchmath-line")).toHaveClass("sketchmath-line-focus");
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent(`profile_${baseId}`);
   });
 
   it("shows CAD-style dimension guides only for the selected rectangle", async () => {
@@ -840,12 +838,12 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
     stamp.value = 1710000001000;
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 500, 180);
     clickCanvasAt(canvas, 620, 260);
 
@@ -875,7 +873,7 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -910,7 +908,7 @@ describe("SketchMath workspace", () => {
       parameters: { dimension: "width", value: 40, unit: "mm" },
     });
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Width edge");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: Rectangle width edge");
     expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull();
     await waitFor(() =>
       expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Underdefined: width and height set, position is free"),
@@ -924,7 +922,7 @@ describe("SketchMath workspace", () => {
 
     await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
     await userEvent.click(rightEdge);
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Height edge"));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: Rectangle height edge"));
     expect(screen.getByLabelText("Height dimension value")).toHaveValue(25);
   });
 
@@ -936,7 +934,7 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -972,7 +970,7 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -983,7 +981,7 @@ describe("SketchMath workspace", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add Centered Hole" }));
 
     await waitFor(() => expect(screen.getByTestId(/^entity-hole_/)).toBeVisible());
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Profile holes: 1");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Profile holes: 1");
   });
 
   it("selects an existing hole, labels its diameter, and edits it after placement", async () => {
@@ -994,7 +992,7 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1039,7 +1037,7 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1073,7 +1071,7 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1094,7 +1092,7 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1122,16 +1120,17 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
     const baseId = `rect_${firstStamp.toString(36)}`;
+    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
     await userEvent.click(await screen.findByTestId(`entity-${baseId}_a`));
 
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected: Rectangle corner"));
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Corner: A");
-    expect(screen.getByRole("button", { name: "Fix / Anchor corner" })).toBeEnabled();
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: Rectangle corner"));
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Angle: 90");
+    expect(screen.getByRole("button", { name: "Fix corner" })).toBeEnabled();
   });
 
   it("anchors a rectangle corner and reports fully defined status honestly", async () => {
@@ -1143,18 +1142,17 @@ describe("SketchMath workspace", () => {
     const canvas = screen.getByTestId("sketchmath-canvas");
     const workbench = screen.getByTestId("sketchmath-workbench-panel");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Position free"));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Position free"));
     await userEvent.click(screen.getByRole("button", { name: "Fix corner" }));
 
     await waitFor(() =>
       expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Fully defined: width, height, and anchor are fixed"),
     );
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Anchored at corner A");
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("locked");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Anchored at corner A");
   });
 
   it("previews extrusion for a selected profile with holes and exposes commit/export affordances", async () => {
@@ -1166,7 +1164,7 @@ describe("SketchMath workspace", () => {
     const canvas = screen.getByTestId("sketchmath-canvas");
     const workbench = screen.getByTestId("sketchmath-workbench-panel");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1179,7 +1177,7 @@ describe("SketchMath workspace", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
     await screen.findByTestId("sketchmath-hole-placement");
     await userEvent.click(screen.getByRole("button", { name: "Add Centered Hole" }));
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Profile holes: 1"));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Profile holes: 1"));
 
     await userEvent.click(within(workbench).getByRole("button", { name: "Extrude" }));
 
@@ -1207,7 +1205,7 @@ describe("SketchMath workspace", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Show Advanced \/ Debug/ }));
     expect(screen.getByTestId("sketchmath-command-panel")).toBeVisible();
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("extrude_profile");
+    expect(screen.getByTestId("sketchmath-command-panel")).toHaveTextContent("extrude_profile");
   });
 
   it("routes vertical rectangle edge edits through the parent rectangle without creating loose geometry", async () => {
@@ -1218,7 +1216,7 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1226,17 +1224,17 @@ describe("SketchMath workspace", () => {
     const rightEdge = await screen.findByTestId(`entity-${baseId}_bc`);
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
-    await userEvent.click(within(screen.getByTestId("sketchmath-selection-inspector")).getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await userEvent.click(within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Apply Rectangle Dimensions" }));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
 
     await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
     await userEvent.click(rightEdge);
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Selected edge: Height edge"));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: Rectangle height edge"));
     fireEvent.change(screen.getByLabelText("Height dimension value"), { target: { value: "25" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply dimension" }));
 
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Closed profile: valid");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Closed profile: valid");
     expect(screen.getAllByTestId(/^entity-rect_.*_[abcd]$/).length).toBe(4);
     expect(screen.getAllByTestId(/^entity-rect_.*_(ab|bc|cd|da)$/).length).toBe(4);
   });
@@ -1249,15 +1247,16 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
     const baseId = `rect_${firstStamp.toString(36)}`;
+    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
     await userEvent.click(await screen.findByTestId(`entity-${baseId}_ab`));
     fireEvent.keyDown(window, { key: "Delete" });
 
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("This edge belongs to a rectangle"));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("This edge belongs to a rectangle"));
     expect(screen.getByRole("button", { name: "Delete whole rectangle" })).toBeEnabled();
     expect(screen.queryByText(/Cannot delete an entity that is still referenced/)).toBeNull();
   });
@@ -1270,15 +1269,16 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
     const baseId = `rect_${firstStamp.toString(36)}`;
+    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
     await userEvent.click(await screen.findByTestId(`entity-${baseId}_ab`));
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle width edge"));
-    expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent(`Parent: Rectangle ${baseId}`);
+    expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Parent: Rectangle");
     await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
     expect(screen.getByRole("button", { name: "Edit Width" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Make Parallel" })).toBeDisabled();
@@ -1298,7 +1298,7 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1326,11 +1326,12 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
     const baseId = `rect_${firstStamp.toString(36)}`;
+    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
     await userEvent.click(await screen.findByTestId(`entity-${baseId}_a`));
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle corner A"));
@@ -1349,15 +1350,15 @@ describe("SketchMath workspace", () => {
     const canvas = screen.getByTestId("sketchmath-canvas");
     const workbench = screen.getByTestId("sketchmath-workbench-panel");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
     await waitFor(() => expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeEnabled());
-    await userEvent.click(within(screen.getByTestId("sketchmath-selection-inspector")).getByRole("button", { name: "Delete" }));
+    await userEvent.click(within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(screen.queryByTestId(/^entity-rect_/)).toBeNull());
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Nothing selected.");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Nothing selected.");
     expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeDisabled();
     expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Underdefined");
   });
@@ -1375,15 +1376,15 @@ describe("SketchMath workspace", () => {
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByTestId(/^entity-point_.*_start$/)).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
-    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Rectangle"));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Rectangle"));
 
     await userEvent.click(screen.getByRole("button", { name: "Clear sketch" }));
 
     await waitFor(() => expect(screen.queryByTestId(/^entity-rect_/)).toBeNull());
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Nothing selected.");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Nothing selected.");
     expect(screen.getByRole("button", { name: "Extrude" })).toBeDisabled();
   });
 
@@ -1402,7 +1403,7 @@ describe("SketchMath workspace", () => {
     await waitFor(() => expect(screen.queryByTestId(/^entity-point_.*_start$/)).toBeNull());
     expect(screen.queryByTestId(/^entity-point_.*_end$/)).toBeNull();
     expect(screen.queryByTestId(/^entity-line_/)).toBeNull();
-    expect(screen.getByTestId("sketchmath-selection-inspector")).toHaveTextContent("Nothing selected.");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Nothing selected.");
     expect(screen.queryByText(/HTTP 500|selection_resolution_error/)).toBeNull();
   });
 
@@ -1415,7 +1416,7 @@ describe("SketchMath workspace", () => {
     const canvas = screen.getByTestId("sketchmath-canvas");
     const workbench = screen.getByTestId("sketchmath-workbench-panel");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1449,7 +1450,7 @@ describe("SketchMath workspace", () => {
     expect(convertButton).toBeDisabled();
 
     const canvas = screen.getByTestId("sketchmath-canvas");
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 120, 120);
     clickCanvasAt(canvas, 320, 240);
 
@@ -1478,7 +1479,7 @@ describe("SketchMath workspace", () => {
 
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1509,10 +1510,10 @@ describe("SketchMath workspace", () => {
 
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
-    const inspector = screen.getByTestId("sketchmath-selection-inspector");
+    const inspector = screen.getByTestId("sketchmath-workbench-panel");
     const workbench = screen.getByTestId("sketchmath-workbench-panel");
 
-    await userEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);
     clickCanvasAt(canvas, 400, 220);
 
@@ -1521,14 +1522,11 @@ describe("SketchMath workspace", () => {
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
     fireEvent.change(screen.getByLabelText("Rectangle height"), { target: { value: "25" } });
-    await userEvent.click(within(screen.getByTestId("sketchmath-selection-inspector")).getByRole("button", { name: "Apply Rectangle Dimensions" }));
+    await userEvent.click(within(screen.getByTestId("sketchmath-workbench-panel")).getByRole("button", { name: "Apply Rectangle Dimensions" }));
 
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-width`)).toHaveTextContent("40 mm"));
     await waitFor(() => expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("25 mm"));
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
-
-    await userEvent.click(within(screen.getByTestId("rectangle-semantic-summary")).getByRole("button", { name: "Select profile" }));
-    await waitFor(() => expect(inspector).toHaveTextContent("Selected profile"));
 
     fireEvent.change(screen.getByLabelText("Hole diameter"), { target: { value: "6" } });
     await userEvent.click(screen.getByRole("button", { name: "Add Hole" }));
@@ -1541,8 +1539,6 @@ describe("SketchMath workspace", () => {
     fireEvent.change(screen.getByLabelText("Selected hole diameter"), { target: { value: "8" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply hole update" }));
     await waitFor(() => expect(screen.getByTestId("selected-hole-editor-message")).toHaveTextContent("Hole updated."));
-    await userEvent.click(await screen.findByTestId(`entity-${baseId}_ab`));
-    await userEvent.click(within(screen.getByTestId("rectangle-semantic-summary")).getByRole("button", { name: "Select profile" }));
 
     fireEvent.change(screen.getByLabelText("Extrusion depth"), { target: { value: "15" } });
     await userEvent.click(within(workbench).getByRole("button", { name: "Extrude" }));

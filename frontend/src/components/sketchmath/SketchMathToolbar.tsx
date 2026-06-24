@@ -15,7 +15,9 @@ const SketchMathToolbar = ({ mode, onModeChange, theme, onToggleTheme }: SketchM
       <HStack spacing={2} flexWrap="wrap" alignItems="start">
         {[
           ["select", "Select"],
-          ["rectangle", "Rectangle"],
+          ["rectangle", "Draw rectangle"],
+          ["hole", "Add hole"],
+          ["pan", "Pan / view"],
           ["point", "Point"],
           ["line", "Line"],
           ["dimension", "Dimension"],

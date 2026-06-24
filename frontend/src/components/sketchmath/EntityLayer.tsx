@@ -6,6 +6,7 @@ type EntityLayerProps = {
   selectedEntityIds: string[];
   focusedEntityId: string | null;
   placementActive?: boolean;
+  showDebugLabels?: boolean;
   onEntityClick: (entityId: string, event: React.MouseEvent<SVGGElement | SVGCircleElement | SVGPolygonElement>) => void;
   onEntityMouseDown?: (entityId: string, entityType: SketchMathEntity["type"], event: React.MouseEvent<SVGGElement>) => void;
   onDimensionLabelEdit?: (baseId: string, dimension: "width" | "height") => void;
@@ -57,7 +58,7 @@ const rectangleBaseIdFromEntityId = (entityId: string): string | null => {
   return profileMatch ? profileMatch[1] : null;
 };
 
-const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementActive = false, onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
+const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementActive = false, showDebugLabels = false, onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
   const linesById = new Map(entities.filter(isLine).map((entity) => [entity.id, entity] as const));
   const profileById = new Map(entities.filter(isProfile).map((entity) => [entity.id, entity] as const));
   const profileHoleIds = new Set(
@@ -86,6 +87,26 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
           points={`${top.start.join(",")} ${top.end.join(",")} ${right.end.join(",")} ${bottom.end.join(",")}`}
           className="sketchmath-rectangle-selection-outline"
           data-testid={`rectangle-selection-outline-${baseId}`}
+        />
+      );
+    })}
+    {entities.filter((entity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> => isProfile(entity) && !profileHoleIds.has(entity.id)).map((entity) => {
+      const points = entity.vertices.map((vertex) => vertex.join(",")).join(" ");
+      const selected = selectedEntityIds.includes(entity.id) || Boolean(rectangleBaseIdFromEntityId(entity.id) && selectedRectangleBaseIds.has(rectangleBaseIdFromEntityId(entity.id) as string));
+      return (
+        <polygon
+          key={entity.id}
+          points={points}
+          className={selected ? "sketchmath-profile-target sketchmath-profile-target-selected" : "sketchmath-profile-target"}
+          data-testid={`entity-${entity.id}`}
+          data-entity-id={entity.id}
+          data-entity-type={entity.type}
+          role="button"
+          tabIndex={0}
+          onClick={(event) => {
+            event.stopPropagation();
+            onEntityClick(entity.id, event);
+          }}
         />
       );
     })}
@@ -155,9 +176,11 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
               focusedEntityId === entity.id ? "sketchmath-line-focus" : "",
             ].filter(Boolean).join(" ")}
           />
-          <text x={midpointX + 8} y={midpointY - 8} className="sketchmath-label">
-            {displayName}
-          </text>
+          {showDebugLabels ? (
+            <text x={midpointX + 8} y={midpointY - 8} className="sketchmath-label">
+              {displayName}
+            </text>
+          ) : null}
         </g>
       );
     })}
@@ -188,9 +211,11 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
               focusedEntityId === entity.id ? "sketchmath-point-focus" : "",
             ].filter(Boolean).join(" ")}
           />
-          <text x={entity.coords[0] + 10} y={entity.coords[1] - 10} className="sketchmath-label">
-            {displayName}
-          </text>
+          {showDebugLabels ? (
+            <text x={entity.coords[0] + 10} y={entity.coords[1] - 10} className="sketchmath-label">
+              {displayName}
+            </text>
+          ) : null}
         </g>
       );
     })}
