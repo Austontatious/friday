@@ -16,6 +16,27 @@ from sketchmath.translator.translator_service import translate_utterance
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CASES_ROOT = REPO_ROOT / "evals" / "cases"
 RESULTS_PATH = REPO_ROOT / "evals" / "sketchmath_semantic_results.json"
+VOLATILE_RESULT_KEYS = {"artifact_created_at"}
+
+
+def _stable_result_value(value: Any) -> Any:
+    """Remove runtime-only fields before writing the tracked eval report."""
+    if isinstance(value, dict):
+        stable = {
+            key: _stable_result_value(item)
+            for key, item in value.items()
+            if key not in VOLATILE_RESULT_KEYS
+        }
+        if "command_id" in stable:
+            stable["command_id"] = "<generated>"
+        if stable.get("command_type") == "make_profile" and isinstance(stable.get("parameters"), dict):
+            parameters = stable["parameters"]
+            if isinstance(parameters.get("name"), str) and parameters["name"].startswith("profile_"):
+                parameters["name"] = "<generated_profile>"
+        return stable
+    if isinstance(value, list):
+        return [_stable_result_value(item) for item in value]
+    return value
 
 
 def _load_case(path: Path) -> dict[str, Any]:
@@ -186,7 +207,7 @@ def _run_case(path: Path) -> dict[str, Any]:
                 "value": result.value,
                 "unit": result.unit,
                 "changed_entity_ids": result.changed_entity_ids,
-                "metadata": result.metadata,
+                "metadata": _stable_result_value(result.metadata),
                 "after": _extract_state_snapshot(result.after),
             },
         }
@@ -200,7 +221,7 @@ def _run_case(path: Path) -> dict[str, Any]:
         "diagnostic": diagnostic,
         "result": {
             "status": translation.status,
-            "command": translation.command.model_dump(mode="json") if translation.command is not None else None,
+            "command": _stable_result_value(translation.command.model_dump(mode="json")) if translation.command is not None else None,
             "reason": translation.reason,
             "options": translation.options,
         },
