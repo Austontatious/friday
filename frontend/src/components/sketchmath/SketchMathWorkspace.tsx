@@ -813,7 +813,18 @@ const SketchMathWorkspace = () => {
         return references.some((entityId) => typeof entityId === "string" && selectedEntityIds.includes(entityId));
       }).map((constraint, index) => {
         const type = typeof constraint.type === "string" ? constraint.type : "constraint";
-        const label = typeof constraint.id === "string" ? constraint.id : `constraint_${index + 1}`;
+        const friendlyType = {
+          distance_constraint: "Distance",
+          angle_constraint: "Angle",
+          horizontal_constraint: "Horizontal",
+          vertical_constraint: "Vertical",
+          coincident_constraint: "Coincident",
+          parallel_constraint: "Parallel",
+          perpendicular_constraint: "Perpendicular",
+          equal_length_constraint: "Equal length",
+          equal_angle_constraint: "Equal angle",
+          fixed_constraint: "Fixed",
+        }[type] || "Constraint";
         const detailParts: string[] = [];
         if (typeof (constraint as Record<string, unknown>).distance === "number") {
           const distance = (constraint as Record<string, unknown>).distance as number;
@@ -825,7 +836,22 @@ const SketchMathWorkspace = () => {
           const unit = typeof (constraint as Record<string, unknown>).unit === "string" ? (constraint as Record<string, unknown>).unit : "deg";
           detailParts.push(`angle ${angle} ${unit}`);
         }
-        return `${index + 1}. ${type} • ${label}${detailParts.length ? ` • ${detailParts.join(" • ")}` : ""}`;
+        return `${index + 1}. ${friendlyType}${detailParts.length ? ` • ${detailParts.join(" • ")}` : ""}`;
+      }),
+    [committedContext.constraints, selectedEntityIds],
+  );
+
+  const constraintDebugSummaries = useMemo(
+    () =>
+      committedContext.constraints.filter((constraint) => {
+        if (selectedEntityIds.length === 0) return true;
+        const record = constraint as Record<string, unknown>;
+        const references = Array.isArray(record.points) ? record.points : typeof record.point_id === "string" ? [record.point_id] : [];
+        return references.some((entityId) => typeof entityId === "string" && selectedEntityIds.includes(entityId));
+      }).map((constraint, index) => {
+        const type = typeof constraint.type === "string" ? constraint.type : "constraint";
+        const id = typeof constraint.id === "string" ? constraint.id : `constraint_${index + 1}`;
+        return `${index + 1}. ${type} • ${id}`;
       }),
     [committedContext.constraints, selectedEntityIds],
   );
@@ -982,8 +1008,14 @@ const SketchMathWorkspace = () => {
     return { ...base, kind: "mixed", summary: `Selected: ${selectedEntityIds.length} entities` };
   }, [rectangleDimensions, rectangleSelectionDetail, selectedEntities, selectedEntityIds.length, selectedHoleSummary, selectedLineEntities, selectedPointEntities]);
 
+  const reconcileSelection = (items: SketchMathEntity[]) => {
+    const validIds = new Set(items.map((entity) => entity.id));
+    setSelectedEntityIds((current) => current.filter((entityId) => validIds.has(entityId)));
+  };
+
   const syncSnapshot = (snapshot: SketchMathSessionSnapshot) => {
     setCommittedContext(snapshot.selection_context);
+    reconcileSelection(snapshot.selection_context.items);
     setSessionMetadata(snapshot.session_metadata || {});
     setHistory(snapshot.history);
     setCanUndo(Boolean(snapshot.can_undo ?? snapshot.history_length > 0));
@@ -993,6 +1025,7 @@ const SketchMathWorkspace = () => {
 
   const syncCommandResponse = (response: SketchMathCommandResponse) => {
     setCommittedContext(response.selection_context || response.result.after);
+    reconcileSelection((response.selection_context || response.result.after).items);
     setSessionMetadata(response.session_metadata || {});
     setHistory((current) => [
       ...current,
@@ -1329,6 +1362,7 @@ const SketchMathWorkspace = () => {
       setDraftPoint(null);
       setCircleDraft(null);
       setSelectedEntityIds([pointId]);
+      setTool("select");
       setTranslationOutcome(null);
       return;
     }
@@ -1377,7 +1411,10 @@ const SketchMathWorkspace = () => {
       setCircleDraft(null);
       void (async () => {
         const result = await commitCommand(buildBatchCommand(commands));
-        if (result) setSelectedEntityIds([circleId]);
+        if (result) {
+          setSelectedEntityIds([circleId]);
+          setTool("select");
+        }
       })();
       return;
     }
@@ -1391,9 +1428,15 @@ const SketchMathWorkspace = () => {
       const resolvedCurrent = clampRectanglePoint(rectangleDraft.anchor, point, false);
       void commitRectangle(rectangleDraft.anchor, resolvedCurrent, false);
       clearRectangleInteraction();
+      setTool("select");
       return;
     }
     if (tool === "select") {
+      setSelectedEntityIds([]);
+      setRectangleSelectionDetail(null);
+      setDimensionEditor(null);
+      setDeletePrompt(null);
+      clearErrorState();
       return;
     }
   };
@@ -1505,6 +1548,7 @@ const SketchMathWorkspace = () => {
       ignoreNextCanvasClickRef.current = true;
       void commitRectangle(drag.start, point, event.shiftKey || drag.forceSquare);
       clearRectangleInteraction();
+      setTool("select");
       return;
     }
     canvasDragRef.current = null;
@@ -2199,6 +2243,7 @@ const SketchMathWorkspace = () => {
         setHolePlacement(null);
         setDraftPoint(null);
         setCircleDraft(null);
+        setTool("select");
         clearErrorState();
         return;
       }
@@ -2340,6 +2385,7 @@ const SketchMathWorkspace = () => {
       clearRectangleInteraction();
       setHolePlacement(null);
       setDraftPoint(null);
+      setCircleDraft(null);
     }
     if (nextTool === "solve") {
       setTool(nextTool);
@@ -2406,12 +2452,12 @@ const SketchMathWorkspace = () => {
         ? "Select a profile, then click inside it to place a circular hole."
         : tool === "pan"
           ? "Drag the canvas to pan. Use Fit, Reset, and zoom controls to navigate the 2D sketch plane."
-      : tool === "dimension"
-        ? "Select a rectangle edge or click a dimension label to edit width or height."
-        : tool === "line"
+        : tool === "dimension"
+          ? "Select a rectangle edge or click a dimension label to edit width or height."
+          : tool === "line"
           ? draftPoint
             ? "Click the line end point."
-            : "Click the line start point."
+            : "Click the line start point. The Line tool stays active for repeated placement; press Escape to return to Select."
           : tool === "point"
             ? "Click the canvas to plot a point."
             : selectedHoleSummary
@@ -2444,7 +2490,7 @@ const SketchMathWorkspace = () => {
           </div>
           <div className="friday-status-grid" aria-label="SketchMath runtime status">
             <span><b>Mode</b> CAD workspace</span>
-            <span><b>Route / Model</b> Deterministic CAD executor</span>
+            <span><b>Sketch</b> Parametric 2D workspace</span>
             <span><b>Context</b> {committedEntities.length} entities / {committedContext.constraints.length} constraints</span>
             <span><b>Health</b> {error ? "Degraded" : "Ready"}</span>
           </div>
@@ -2458,9 +2504,7 @@ const SketchMathWorkspace = () => {
             <Box className="sketchmath-shell-header sketchmath-workspace-summary">
               <VStack align="start" spacing={1}>
                 <Text opacity={0.8}>Canvas-first deterministic sketching inside FRIDAY.</Text>
-                <Text fontSize="sm" opacity={0.6}>
-                  Session: {sessionId || "loading"} {sessionMetadata.storage_path ? `• ${String(sessionMetadata.storage_path)}` : ""}
-                </Text>
+                <Text fontSize="sm" opacity={0.6}>Your sketch is active in this browser session.</Text>
               </VStack>
               <Link href="/" className="sketchmath-link">
                 Back to FRIDAY chat
@@ -2963,7 +3007,7 @@ const SketchMathWorkspace = () => {
                       Committed constraints for the current selection.
                     </Text>
                     <Text fontSize="sm" opacity={0.8} whiteSpace="pre-wrap" mb={2}>
-                      {constraintSummaries.length ? constraintSummaries.join("\n") : "No constraints yet."}
+                      {constraintDebugSummaries.length ? constraintDebugSummaries.join("\n") : "No constraints yet."}
                     </Text>
                     <HStack spacing={2} flexWrap="wrap" mt={2}>
                       <Button size="sm" onClick={() => void runQuickEqualAngle()} isDisabled={pointSelectionIds.length < 6}>

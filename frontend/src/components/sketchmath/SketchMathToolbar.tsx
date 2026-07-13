@@ -29,6 +29,8 @@ const SketchMathToolbar = ({ mode, onModeChange, theme, onToggleTheme }: SketchM
             size="sm"
             variant={mode === value ? "solid" : "outline"}
             onClick={() => onModeChange(value as SketchMathMode)}
+            aria-pressed={mode === value}
+            title={mode === value ? `${label} tool active` : `Switch to ${label}`}
           >
             {label}
           </Button>

@@ -888,9 +888,14 @@ describe("SketchMath workspace", () => {
     await userEvent.click(within(workbench).getByRole("button", { name: "Parallel" }));
 
     await waitFor(() =>
-      expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("parallel_constraint"),
+      expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Parallel"),
     );
     expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("distance 17.5 mm");
+    expect(screen.getByTestId("sketchmath-workbench-panel")).not.toHaveTextContent("parallel_constraint");
+
+    await userEvent.click(screen.getByRole("button", { name: "Select" }));
+    clickCanvasAt(canvas, 620, 520);
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Nothing selected."));
   });
 
   it("creates a parametric rectangle from two clicks and keeps the workbench CAD-ready", async () => {
@@ -1566,6 +1571,7 @@ describe("SketchMath workspace", () => {
     clickCanvasAt(canvas, 160, 120);
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByTestId(/^entity-point_.*_start$/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Select" })).toHaveAttribute("aria-pressed", "true");
 
     await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
     clickCanvasAt(canvas, 160, 120);

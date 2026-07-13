@@ -171,15 +171,15 @@ test.describe("SketchMath workspace", () => {
     await clickSvgPrimitiveCenter(page, '[data-testid^="entity-line_"] line.sketchmath-line', { shift: true, first: true });
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 2 lines");
     await clickWorkbenchButton(page, "Parallel");
-    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("parallel_constraint");
+    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("Parallel");
     await clickWorkbenchButton(page, "Undo");
     await selectFirstTwoLines(page);
     await clickWorkbenchButton(page, "Perpendicular");
-    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("perpendicular_constraint");
+    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("Perpendicular");
     await clickWorkbenchButton(page, "Undo");
     await selectFirstTwoLines(page);
     await clickWorkbenchButton(page, "Equal Length");
-    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("equal_length_constraint");
+    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("Equal length");
 
     await clickWorkbenchButton(page, "Show Advanced / Debug");
     await page.getByRole("button", { name: "Show Advanced / Debug DSL" }).click();
@@ -336,6 +336,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-canvas")).toContainText("25 mm", { timeout: 20000 });
 
     await page.keyboard.press("Escape");
+    await expect(page.getByTestId("sketchmath-tool-mode")).toContainText("Select");
     await shiftClickEntity(page, '[data-testid^="entity-rect_"][data-testid$="_ab"]');
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 2 lines");
     await expect(page.getByRole("button", { name: "Parallel" })).toBeEnabled();
