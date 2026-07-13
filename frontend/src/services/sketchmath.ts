@@ -36,6 +36,18 @@ export type SketchMathLineEntity = {
   end: [number, number];
   locked?: boolean;
   label?: string | null;
+  start_point_id?: string | null;
+  end_point_id?: string | null;
+};
+
+export type SketchMathCircleEntity = {
+  id: string;
+  type: "circle_2d";
+  center: [number, number];
+  radius: number;
+  center_point_id?: string | null;
+  locked?: boolean;
+  label?: string | null;
 };
 
 export type SketchMathProfileEntity = {
@@ -49,11 +61,14 @@ export type SketchMathProfileEntity = {
   closed?: boolean;
   locked?: boolean;
   label?: string | null;
+  source_line_ids?: string[];
+  source_circle_id?: string | null;
 };
 
 export type SketchMathEntity =
   | SketchMathPointEntity
   | SketchMathLineEntity
+  | SketchMathCircleEntity
   | SketchMathProfileEntity;
 
 export type SketchMathSelectionContext = {
@@ -66,7 +81,7 @@ export type SketchMathSelectionContext = {
 };
 
 export type SketchMathCommand = {
-  version: "0.1";
+  version: "0.1" | "0.2";
   command_id: string;
   mode?: "preview" | "commit";
   command_type: string;
@@ -131,6 +146,20 @@ export type SketchMathSessionSnapshot = {
   session_metadata: Record<string, unknown>;
   history_length: number;
   history: SketchMathHistoryEntry[];
+  history_cursor?: number;
+  can_undo?: boolean;
+  can_redo?: boolean;
+};
+
+export type SketchMathProfileCandidate = {
+  candidate_id: string;
+  line_ids: string[];
+  point_ids: string[];
+  vertices: [number, number][];
+  valid: boolean;
+  area: number;
+  winding: string;
+  warnings: string[];
 };
 
 export type SketchMathCommandResponse = {
@@ -329,6 +358,9 @@ export const commitSketchMathCommand = async (
 
 export const revertSketchMathSession = async (sessionId: string): Promise<SketchMathSessionSnapshot> =>
   fetchJson<SketchMathSessionSnapshot>(`/sketchmath/sessions/${sessionId}/revert`, {});
+
+export const redoSketchMathSession = async (sessionId: string): Promise<SketchMathSessionSnapshot> =>
+  fetchJson<SketchMathSessionSnapshot>(`/sketchmath/sessions/${sessionId}/redo`, {});
 
 export const upsertSketchMathEntity = async (
   sessionId: string,

@@ -45,6 +45,7 @@ jest.mock("@chakra-ui/react", () => {
 type Entity =
   | { id: string; type: "point_2d"; coords: [number, number]; locked: boolean; label?: string | null }
   | { id: string; type: "line_2d"; start: [number, number]; end: [number, number]; locked: boolean; label?: string | null }
+  | { id: string; type: "circle_2d"; center: [number, number]; radius: number; center_point_id?: string | null; locked: boolean; label?: string | null }
   | {
       id: string;
       type: "profile_2d";
@@ -600,6 +601,9 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       snapshot = baseSnapshot();
       return makeResponse(snapshot);
     }
+    if (url.endsWith(`/api/sketchmath/sessions/${snapshot.session_id}/redo`) && method === "POST") {
+      return makeResponse(snapshot);
+    }
     if (url.endsWith(`/api/sketchmath/sessions/${snapshot.session_id}/entities`) && method === "POST") {
       const body = JSON.parse(String(init?.body || "{}"));
       const entity = body.entity;
@@ -640,6 +644,24 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
           };
         }
         return makeResponse(defineLine(command, mutate));
+      }
+      if (command.command_type === "define_circle") {
+        const entity: Entity = { id: command.parameters.name, type: "circle_2d", center: command.parameters.center, radius: command.parameters.radius, center_point_id: command.parameters.center_point_id, locked: false, label: command.parameters.label };
+        return makeResponse(setSnapshot([...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity], [entity.id], command, mutate));
+      }
+      if (command.command_type === "update_circle") {
+        const existing = snapshot.selection_context.items.find((item) => item.id === command.selection[0]) as any;
+        const entity = { ...existing, center: command.parameters.center || existing.center, radius: command.parameters.radius || existing.radius };
+        return makeResponse(setSnapshot([...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity], [entity.id], command, mutate));
+      }
+      if (command.command_type === "make_circle_profile") {
+        const circle = snapshot.selection_context.items.find((item) => item.id === command.selection[0]) as any;
+        const vertices = Array.from({ length: 17 }, (_, index) => {
+          const angle = (index % 16) * Math.PI * 2 / 16;
+          return [circle.center[0] + circle.radius * Math.cos(angle), circle.center[1] + circle.radius * Math.sin(angle)] as [number, number];
+        });
+        const entity: Entity = { id: command.parameters.name || `profile_${circle.id}`, type: "profile_2d", vertices, area: Math.PI * circle.radius ** 2, winding: "counterclockwise", warnings: [], closed: true, locked: false, holes: [] };
+        return makeResponse(setSnapshot([...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity], [entity.id], command, mutate));
       }
       if (command.command_type === "delete_entity") {
         const deleted = deleteEntity(command, mutate);
@@ -697,6 +719,20 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       }
       if (command.command_type === "make_equal_angle") {
         return makeResponse(constraintHandler(command, mutate, "equal_angle_constraint", command.selection.slice(0, 6)));
+      }
+      if (command.command_type === "make_horizontal") {
+        return makeResponse(constraintHandler(command, mutate, "horizontal_constraint", command.selection));
+      }
+      if (command.command_type === "make_vertical") {
+        return makeResponse(constraintHandler(command, mutate, "vertical_constraint", command.selection));
+      }
+      if (command.command_type === "make_coincident") {
+        return makeResponse(constraintHandler(command, mutate, "coincident_constraint", command.selection.slice(0, 2)));
+      }
+      if (command.command_type === "detect_profiles") {
+        const response = setSnapshot(snapshot.selection_context.items, [], command, false);
+        response.result.metadata = { profile_candidates: [] };
+        return makeResponse(response);
       }
       if (command.command_type === "solve_constraints") {
         return makeResponse(solveConstraints(command, mutate));
@@ -832,13 +868,14 @@ describe("SketchMath workspace", () => {
 
     await waitFor(() => expect(screen.getByTestId(`entity-${lineId}`)).toBeVisible());
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: 1 line"));
+    expect(within(workbench).getByRole("button", { name: "Horizontal" })).toBeEnabled();
+    expect(within(workbench).getByRole("button", { name: "Vertical" })).toBeEnabled();
 
-    await userEvent.click(within(workbench).getByRole("button", { name: "Show Advanced Constraints" }));
-    await userEvent.click(within(workbench).getByRole("button", { name: "Set Length" }));
+    await userEvent.click(within(workbench).getByRole("button", { name: "Apply length" }));
     await waitFor(() =>
       expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("distance 17.5 mm"),
     );
-    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Fully defined");
+    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Constraints present");
 
     stamp.value = 1710000001000;
     await userEvent.click(screen.getByRole("button", { name: "Line" }));
@@ -848,7 +885,7 @@ describe("SketchMath workspace", () => {
     const secondLineId = `line_${stamp.value.toString(36)}`;
     await waitFor(() => expect(screen.getByTestId(`entity-${secondLineId}`)).toBeVisible());
     await waitFor(() => expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeDisabled());
-    await userEvent.click(within(workbench).getByRole("button", { name: "Make Parallel" }));
+    await userEvent.click(within(workbench).getByRole("button", { name: "Parallel" }));
 
     await waitFor(() =>
       expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("parallel_constraint"),
@@ -897,7 +934,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("100 mm");
     expect(screen.getByTestId(`dimension-guide-${baseId}-width`)).toBeVisible();
     expect(screen.getByTestId(`dimension-guide-${baseId}-height`)).toBeVisible();
-    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Underdefined: size/profile exists, position is free");
+    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Constraints present");
     expect(screen.getByTestId(`rectangle-selection-outline-${baseId}`)).toBeVisible();
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
@@ -1001,7 +1038,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: Rectangle width edge");
     expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull();
     await waitFor(() =>
-      expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Underdefined: width and height set, position is free"),
+      expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Constraints present"),
     );
 
     await userEvent.click(screen.getByTestId(`dimension-${baseId}-height`));
@@ -1240,7 +1277,7 @@ describe("SketchMath workspace", () => {
     await userEvent.click(screen.getByRole("button", { name: "Fix corner" }));
 
     await waitFor(() =>
-      expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Fully defined: width, height, and anchor are fixed"),
+      expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Constraints present"),
     );
     expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Anchored at corner A");
   });
@@ -1438,15 +1475,12 @@ describe("SketchMath workspace", () => {
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle width edge"));
     expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Parent: Rectangle");
-    await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
-    expect(screen.getByRole("button", { name: "Edit Width" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Make Parallel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Apply Rectangle Dimensions" })).toBeEnabled();
 
     await userEvent.click(await screen.findByTestId(`entity-${baseId}_bc`));
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle height edge"));
-    expect(screen.getByRole("button", { name: "Edit Height" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Make Perpendicular" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Apply Rectangle Dimensions" })).toBeEnabled();
   });
 
   it("shift-click toggles rectangle edges into a contextual two-line selection", async () => {
@@ -1466,11 +1500,10 @@ describe("SketchMath workspace", () => {
     fireEvent.click(await screen.findByTestId(`entity-${baseId}_cd`), { shiftKey: true });
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: 2 lines"));
-    await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
-    expect(screen.getByRole("button", { name: "Make Parallel" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Make Perpendicular" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Parallel" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Perpendicular" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Equal Length" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Set Angle" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Set Angle" })).toBeNull();
 
     fireEvent.click(await screen.findByTestId(`entity-${baseId}_cd`), { shiftKey: true });
 
@@ -1495,9 +1528,8 @@ describe("SketchMath workspace", () => {
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Rectangle corner A"));
     expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Angle: 90");
-    await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
-    expect(screen.getByRole("button", { name: "Fix Corner" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Set Angle" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Fix corner" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Set Angle" })).toBeNull();
   });
 
   it("deletes a selected rectangle as one dependency-safe object", async () => {
@@ -1519,7 +1551,7 @@ describe("SketchMath workspace", () => {
     await waitFor(() => expect(screen.queryByTestId(/^entity-rect_/)).toBeNull());
     expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Nothing selected.");
     expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeDisabled();
-    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Underdefined");
+    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("No constraints");
   });
 
   it("clears the sketch and removes stale geometry from the normal UI", async () => {
@@ -1618,17 +1650,37 @@ describe("SketchMath workspace", () => {
     );
   });
 
-  it("labels unsupported circle and arc tools instead of advertising them as active tools", async () => {
+  it("enables circles while keeping arcs explicitly deferred", async () => {
     const { fetchMock } = createSketchmathMock();
     global.fetch = fetchMock as unknown as typeof fetch;
     renderWorkspace();
 
     await screen.findByText("SketchMath");
 
-    expect(screen.queryByRole("button", { name: "Circle" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Circle" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Arc" })).toBeNull();
-    expect(screen.getByText("Circle: coming soon")).toBeVisible();
     expect(screen.getByText("Arc: coming soon")).toBeVisible();
+  });
+
+  it("draws and edits a selectable circle backed by an extrusion profile", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Circle" }));
+    clickCanvasAt(canvas, 300, 220);
+    expect(screen.getByTestId("sketchmath-circle-draft")).toBeVisible();
+    clickCanvasAt(canvas, 340, 220);
+
+    const circleId = `circle_${stamp.value.toString(36)}`;
+    await waitFor(() => expect(screen.getByTestId(`entity-${circleId}`)).toBeVisible());
+    expect(screen.getByTestId("sketchmath-circle-editor")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Extrude" })).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("Circle radius"), { target: { value: "25" } });
+    await userEvent.click(screen.getByRole("button", { name: "Apply radius" }));
+    await waitFor(() => expect(screen.getByLabelText("Circle radius")).toHaveValue(25));
   });
 
   it("shows a productized STEP export card with browser download href after extrusion commit", async () => {

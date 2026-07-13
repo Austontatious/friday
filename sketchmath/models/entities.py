@@ -55,6 +55,8 @@ class Profile2DEntity(_EntityBase):
     warnings: list[str] = Field(default_factory=list)
     closed: bool = True
     holes: list[str] = Field(default_factory=list)
+    source_line_ids: list[str] = Field(default_factory=list)
+    source_circle_id: str | None = None
 
 
 SelectionEntity = Annotated[

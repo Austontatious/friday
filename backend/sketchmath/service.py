@@ -67,6 +67,22 @@ def _command_from_entity(entity: dict[str, Any], *, command_id: str, mode: str) 
                 "label": entity.get("label"),
             },
         }
+    elif entity_type == "circle_2d":
+        payload = {
+            "version": "0.2",
+            "command_id": command_id,
+            "mode": mode,
+            "command_type": "define_circle",
+            "selection": [],
+            "parameters": {
+                "name": entity["id"],
+                "center": entity["center"],
+                "radius": entity["radius"],
+                "center_point_id": entity.get("center_point_id"),
+                "locked": entity.get("locked", False),
+                "label": entity.get("label"),
+            },
+        }
     elif entity_type in {"line_2d", "construction_line_2d"}:
         payload = {
             "version": "0.1",
@@ -80,6 +96,8 @@ def _command_from_entity(entity: dict[str, Any], *, command_id: str, mode: str) 
                 "end": entity["end"],
                 "locked": entity.get("locked", False),
                 "label": entity.get("label"),
+                "start_point_id": entity.get("start_point_id"),
+                "end_point_id": entity.get("end_point_id"),
             },
         }
     elif entity_type == "profile_2d":
@@ -98,6 +116,8 @@ def _command_from_entity(entity: dict[str, Any], *, command_id: str, mode: str) 
                 "closed": entity.get("closed", True),
                 "locked": entity.get("locked", False),
                 "label": entity.get("label"),
+                "source_line_ids": entity.get("source_line_ids", []),
+                "source_circle_id": entity.get("source_circle_id"),
             },
         }
     else:

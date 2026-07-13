@@ -2,7 +2,7 @@ import React from "react";
 import GridLayer from "./GridLayer";
 import EntityLayer from "./EntityLayer";
 import PreviewLayer from "./PreviewLayer";
-import type { SketchMathEntity, SketchMathOperationResult } from "../../services/sketchmath";
+import type { SketchMathEntity, SketchMathOperationResult, SketchMathProfileCandidate } from "../../services/sketchmath";
 
 type Point = { x: number; y: number };
 type ViewBox = { x: number; y: number; width: number; height: number };
@@ -17,10 +17,12 @@ type SketchCanvas2DProps = {
   focusedEntityId: string | null;
   draftPoint: Point | null;
   rectangleDraft: { anchor: Point; current: Point } | null;
+  circleDraft?: { center: Point; current: Point } | null;
   dragPreviewPoint: { id: string; point: Point } | null;
   holePlacementPreview?: { center: Point; diameter: number } | null;
   holePlacementActive?: boolean;
   showDebugLabels?: boolean;
+  profileCandidates?: SketchMathProfileCandidate[];
   onCanvasClick: (point: Point) => void;
   onCanvasMouseDown: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
   onCanvasMouseMove: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
@@ -41,10 +43,12 @@ const SketchCanvas2D = ({
   focusedEntityId,
   draftPoint,
   rectangleDraft,
+  circleDraft,
   dragPreviewPoint,
   holePlacementPreview,
   holePlacementActive = false,
   showDebugLabels = false,
+  profileCandidates = [],
   onCanvasClick,
   onCanvasMouseDown,
   onCanvasMouseMove,
@@ -118,6 +122,7 @@ const SketchCanvas2D = ({
     >
       <GridLayer width={width} height={height} />
       {rectangleDraft ? <polygon points={rectanglePoints} className="sketchmath-draft-rectangle" data-testid="sketchmath-rectangle-draft" /> : null}
+      {circleDraft ? <circle cx={circleDraft.center.x} cy={circleDraft.center.y} r={Math.hypot(circleDraft.current.x - circleDraft.center.x, circleDraft.current.y - circleDraft.center.y)} fill="none" className="sketchmath-draft-rectangle" data-testid="sketchmath-circle-draft" /> : null}
       {dragPreviewPoint ? <circle cx={dragPreviewPoint.point.x} cy={dragPreviewPoint.point.y} r={7} className="sketchmath-draft-point" data-testid={`sketchmath-drag-${dragPreviewPoint.id}`} /> : null}
       {holePlacementPreview ? (
         <circle
@@ -137,6 +142,7 @@ const SketchCanvas2D = ({
         onEntityMouseDown={onEntityMouseDown}
         onDimensionLabelEdit={onDimensionLabelEdit}
         showDebugLabels={showDebugLabels}
+        profileCandidates={profileCandidates}
       />
       {draftPoint ? <circle cx={draftPoint.x} cy={draftPoint.y} r={7} className="sketchmath-draft-point" data-testid="sketchmath-draft-point" /> : null}
       <PreviewLayer previewResult={previewResult} committedEntityIds={entities.map((entity) => entity.id)} />

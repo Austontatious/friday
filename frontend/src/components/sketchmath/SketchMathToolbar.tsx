@@ -20,6 +20,7 @@ const SketchMathToolbar = ({ mode, onModeChange, theme, onToggleTheme }: SketchM
           ["pan", "Pan / view"],
           ["point", "Point"],
           ["line", "Line"],
+          ["circle", "Circle"],
           ["dimension", "Dimension"],
           ["delete", "Delete"],
         ].map(([value, label]) => (
@@ -32,9 +33,6 @@ const SketchMathToolbar = ({ mode, onModeChange, theme, onToggleTheme }: SketchM
             {label}
           </Button>
         ))}
-        <Text className="sketchmath-tool-unavailable" fontSize="sm">
-          Circle: coming soon
-        </Text>
         <Text className="sketchmath-tool-unavailable" fontSize="sm">
           Arc: coming soon
         </Text>

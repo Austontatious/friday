@@ -1,5 +1,5 @@
 import React from "react";
-import type { SketchMathEntity } from "../../services/sketchmath";
+import type { SketchMathEntity, SketchMathProfileCandidate } from "../../services/sketchmath";
 
 type EntityLayerProps = {
   entities: SketchMathEntity[];
@@ -7,6 +7,7 @@ type EntityLayerProps = {
   focusedEntityId: string | null;
   placementActive?: boolean;
   showDebugLabels?: boolean;
+  profileCandidates?: SketchMathProfileCandidate[];
   onEntityClick: (entityId: string, event: React.MouseEvent<SVGGElement | SVGCircleElement | SVGPolygonElement>) => void;
   onEntityMouseDown?: (entityId: string, entityType: SketchMathEntity["type"], event: React.MouseEvent<SVGGElement>) => void;
   onDimensionLabelEdit?: (baseId: string, dimension: "width" | "height") => void;
@@ -20,6 +21,7 @@ const isLine = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, {
 
 const isProfile = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> =>
   entity.type === "profile_2d";
+const isCircle = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "circle_2d" }> => entity.type === "circle_2d";
 
 const formatDimension = (value: number): string => Number(value.toFixed(2)).toString();
 const DIMENSION_GUIDE_OFFSET = 34;
@@ -58,7 +60,7 @@ const rectangleBaseIdFromEntityId = (entityId: string): string | null => {
   return profileMatch ? profileMatch[1] : null;
 };
 
-const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementActive = false, showDebugLabels = false, onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
+const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementActive = false, showDebugLabels = false, profileCandidates = [], onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
   const linesById = new Map(entities.filter(isLine).map((entity) => [entity.id, entity] as const));
   const profileById = new Map(entities.filter(isProfile).map((entity) => [entity.id, entity] as const));
   const profileHoleIds = new Set(
@@ -73,6 +75,9 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
 
   return (
   <g data-testid="sketchmath-entities" className={placementActive ? "sketchmath-placement-active" : undefined}>
+    {profileCandidates.filter((candidate) => candidate.valid).map((candidate) => (
+      <polygon key={candidate.candidate_id} points={candidate.vertices.map((vertex) => vertex.join(",")).join(" ")} fill="none" className="sketchmath-profile-target-selected" data-testid={`profile-candidate-${candidate.candidate_id}`} />
+    ))}
     {Array.from(selectedRectangleBaseIds).map((baseId) => {
       const top = linesById.get(`${baseId}_ab`);
       const right = linesById.get(`${baseId}_bc`);
@@ -182,6 +187,28 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
             </text>
           ) : null}
         </g>
+      );
+    })}
+    {entities.filter(isCircle).map((entity) => {
+      const selected = selectedEntityIds.includes(entity.id);
+      return (
+        <circle
+          key={entity.id}
+          cx={entity.center[0]}
+          cy={entity.center[1]}
+          r={entity.radius}
+          fill="none"
+          className={selected ? "sketchmath-line sketchmath-line-selected" : "sketchmath-line"}
+          data-testid={`entity-${entity.id}`}
+          data-entity-id={entity.id}
+          data-entity-type={entity.type}
+          role="button"
+          tabIndex={0}
+          onClick={(event) => {
+            event.stopPropagation();
+            onEntityClick(entity.id, event);
+          }}
+        />
       );
     })}
     {entities.filter(isPoint).map((entity) => {

@@ -153,6 +153,7 @@ def apply_geometry_command(
         "define_circle": _handle_define_circle,
         "update_circle": _handle_update_circle,
         "make_circle_profile": _handle_make_circle_profile,
+        "move_point": _handle_move_point,
     })
     handler = handlers.get(command.command_type)
     if handler is None:
@@ -245,6 +246,8 @@ def _handle_define_profile(command: GeometryCommand, state: SelectionContext) ->
         closed=bool(command.parameters.get("closed", True)),
         locked=bool(command.parameters.get("locked", False)),
         label=label,
+        source_line_ids=[str(item) for item in command.parameters.get("source_line_ids", [])],
+        source_circle_id=command.parameters.get("source_circle_id"),
     )
     state.replace_entity(profile)
     _sync_named_reference(state, profile.id, label)
@@ -607,6 +610,44 @@ def _handle_make_coincident(command: GeometryCommand, state: SelectionContext) -
     return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id}
 
 
+def _handle_move_point(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    if len(command.selection) != 1:
+        raise SelectionResolutionError("move_point requires one point", detail={"selection": command.selection})
+    point = _resolve_point(state, command.selection[0], "point")
+    _ensure_mutable(state, [point.id], command.command_type)
+    target = _point_tuple(_parameter(command, "coords"))
+    delta = subtract(target, point.coords)
+    coincident_ids = {point.id}
+    changed_members = True
+    while changed_members:
+        changed_members = False
+        for constraint in state.constraints:
+            if isinstance(constraint, CoincidentConstraint) and coincident_ids.intersection(constraint.points):
+                before = len(coincident_ids)
+                coincident_ids.update(constraint.points)
+                changed_members = changed_members or len(coincident_ids) != before
+    members = [_resolve_point(state, point_id, "coincident_point") for point_id in sorted(coincident_ids)]
+    _ensure_mutable(state, [member.id for member in members], command.command_type)
+    for member in members:
+        state.replace_entity(_replace_point(member, add(member.coords, delta)))
+
+    changed = [member.id for member in members]
+    for constraint in state.constraints:
+        if isinstance(constraint, FixedPointConstraint) and constraint.point_id in coincident_ids:
+            raise SolverError("Drag conflicts with fixed point constraint", detail={"constraint_id": constraint.id, "entity_id": constraint.point_id})
+        if isinstance(constraint, DistanceConstraint) and coincident_ids.intersection(constraint.points):
+            a, b = _resolve_points(state, list(constraint.points))
+            moving, anchor = (a, b) if a.id in coincident_ids and b.id not in coincident_ids else (b, a)
+            target_mm = normalize_length(constraint.distance, constraint.unit)
+            direction = normalize(subtract(moving.coords, anchor.coords))
+            state.replace_entity(_replace_point(moving, add(anchor.coords, scale(direction, target_mm))))
+            changed.append(moving.id)
+        elif isinstance(constraint, (HorizontalConstraint, VerticalConstraint, CoincidentConstraint)):
+            outcome = _apply_constraint(constraint, state)
+            changed.extend(outcome.get("changed_entity_ids", []))
+    return state, _dedupe(changed), None, None, {"dragged_point_id": point.id, "constraints_preserved": True}
+
+
 def _handle_detect_profiles(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
     candidates = detect_line_profiles(state)
     return state, [], None, None, {"profile_candidates": candidates, "candidate_count": len(candidates)}
@@ -622,6 +663,7 @@ def _circle_profile(circle: Circle2DEntity, profile_id: str, *, segments: int = 
         warnings=analysis.warnings,
         closed=True,
         label=circle.label or "Circle profile",
+        source_circle_id=circle.id,
     )
 
 
@@ -719,6 +761,7 @@ def _handle_make_profile(command: GeometryCommand, state: SelectionContext) -> t
         winding=analysis.winding,  # type: ignore[arg-type]
         warnings=analysis.warnings,
         closed=analysis.closed,
+        source_line_ids=[entity.id for entity in entities if isinstance(entity, Line2DEntity)],
     )
     state.replace_entity(profile)
     return state, [profile.id], analysis.area, "square_mm", {"area": analysis.area, "winding": analysis.winding, "warnings": analysis.warnings}
@@ -759,7 +802,9 @@ def _handle_add_profile_hole(command: GeometryCommand, state: SelectionContext) 
         warnings=analysis.warnings,
         closed=analysis.closed,
         label=command.parameters.get("label") or "Hole",
+        source_circle_id=f"{hole_id}_circle",
     )
+    hole_circle = Circle2DEntity(id=f"{hole_id}_circle", center=center, radius=diameter_mm / 2.0, label=command.parameters.get("label") or "Hole")
     existing_holes = [_resolve_profile(state, hole_ref) for hole_ref in profile.holes if hole_ref != hole_id]
     validation = validate_profile_holes(profile, [*existing_holes, hole])
     if not validation.ok:
@@ -769,6 +814,7 @@ def _handle_add_profile_hole(command: GeometryCommand, state: SelectionContext) 
         )
     updated_profile = Profile2DEntity(**{**profile.model_dump(), "holes": _dedupe([*profile.holes, hole_id])})
     state.replace_entity(updated_profile)
+    state.replace_entity(hole_circle)
     state.replace_entity(hole)
     return (
         state,
@@ -837,6 +883,10 @@ def _handle_update_profile_hole(command: GeometryCommand, state: SelectionContex
             detail={"command_type": command.command_type, **validation.to_dict()},
         )
     state.replace_entity(updated_hole)
+    if hole.source_circle_id:
+        source = state.get_entity(hole.source_circle_id)
+        if isinstance(source, Circle2DEntity):
+            state.replace_entity(Circle2DEntity(**{**source.model_dump(), "center": center, "radius": diameter_mm / 2.0}))
     return (
         state,
         [profile.id, updated_hole.id],
@@ -1278,6 +1328,18 @@ def _sync_linked_geometry(state: SelectionContext) -> None:
             state.replace_entity(type(entity)(**payload))
         elif isinstance(entity, Circle2DEntity) and entity.center_point_id in points:
             state.replace_entity(Circle2DEntity(**{**entity.model_dump(), "center": points[entity.center_point_id].coords}))
+    entity_map = state.entity_map()
+    for entity in list(state.items):
+        if isinstance(entity, Profile2DEntity) and entity.source_line_ids:
+            source_lines = [entity_map.get(line_id) for line_id in entity.source_line_ids]
+            if all(isinstance(line, Line2DEntity) for line in source_lines):
+                analysis = analyze_closed_polygon(_profile_vertices(source_lines))  # type: ignore[arg-type]
+                state.replace_entity(Profile2DEntity(**{**entity.model_dump(), "vertices": analysis.vertices, "area": analysis.area, "winding": analysis.winding, "warnings": analysis.warnings}))
+        elif isinstance(entity, Profile2DEntity) and entity.source_circle_id:
+            source_circle = entity_map.get(entity.source_circle_id)
+            if isinstance(source_circle, Circle2DEntity):
+                analysis = analyze_closed_polygon(_circle_profile_vertices(source_circle.center, source_circle.radius, max(12, len(entity.vertices) - 1)))
+                state.replace_entity(Profile2DEntity(**{**entity.model_dump(), "vertices": analysis.vertices, "area": analysis.area, "winding": analysis.winding, "warnings": analysis.warnings}))
 
 
 def _translate_entity(entity: SelectionEntity, delta: Point2D) -> SelectionEntity:
