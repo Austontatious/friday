@@ -54,6 +54,21 @@ class EqualAngleConstraint(_ConstraintBase):
     points: tuple[str, str, str, str, str, str]
 
 
+class HorizontalConstraint(_ConstraintBase):
+    type: Literal["horizontal_constraint"] = "horizontal_constraint"
+    points: tuple[str, str]
+
+
+class VerticalConstraint(_ConstraintBase):
+    type: Literal["vertical_constraint"] = "vertical_constraint"
+    points: tuple[str, str]
+
+
+class CoincidentConstraint(_ConstraintBase):
+    type: Literal["coincident_constraint"] = "coincident_constraint"
+    points: tuple[str, str]
+
+
 ConstraintEntity = Annotated[
     FixedPointConstraint
     | DistanceConstraint
@@ -61,6 +76,9 @@ ConstraintEntity = Annotated[
     | ParallelConstraint
     | PerpendicularConstraint
     | EqualLengthConstraint
-    | EqualAngleConstraint,
+    | EqualAngleConstraint
+    | HorizontalConstraint
+    | VerticalConstraint
+    | CoincidentConstraint,
     Field(discriminator="type"),
 ]

@@ -180,6 +180,15 @@ def revert(session_id: str):
         _raise_http(exc)
 
 
+@router.post("/sketchmath/sessions/{session_id}/redo", summary="Redo the next retained SketchMath operation")
+def redo(session_id: str):
+    _require_enabled()
+    try:
+        return _store().redo(session_id)
+    except SketchMathError as exc:
+        _raise_http(exc)
+
+
 @router.post("/sketchmath/sessions/{session_id}/translate", summary="Translate a SketchMath utterance into a typed command")
 def translate_utterance(session_id: str, payload: Dict[str, Any]):
     _require_enabled()

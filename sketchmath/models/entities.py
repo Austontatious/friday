@@ -22,6 +22,8 @@ class Line2DEntity(_EntityBase):
     type: Literal["line_2d"] = "line_2d"
     start: tuple[float, float]
     end: tuple[float, float]
+    start_point_id: str | None = None
+    end_point_id: str | None = None
 
 
 class Axis2DEntity(_EntityBase):
@@ -34,6 +36,15 @@ class ConstructionLine2DEntity(_EntityBase):
     type: Literal["construction_line_2d"] = "construction_line_2d"
     start: tuple[float, float]
     end: tuple[float, float]
+    start_point_id: str | None = None
+    end_point_id: str | None = None
+
+
+class Circle2DEntity(_EntityBase):
+    type: Literal["circle_2d"] = "circle_2d"
+    center: tuple[float, float]
+    radius: float = Field(gt=0)
+    center_point_id: str | None = None
 
 
 class Profile2DEntity(_EntityBase):
@@ -47,6 +58,6 @@ class Profile2DEntity(_EntityBase):
 
 
 SelectionEntity = Annotated[
-    Point2DEntity | Line2DEntity | Axis2DEntity | ConstructionLine2DEntity | Profile2DEntity,
+    Point2DEntity | Line2DEntity | Axis2DEntity | ConstructionLine2DEntity | Circle2DEntity | Profile2DEntity,
     Field(discriminator="type"),
 ]

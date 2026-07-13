@@ -23,6 +23,9 @@ from sketchmath.models.constraints import (
     EqualAngleConstraint,
     EqualLengthConstraint,
     FixedPointConstraint,
+    HorizontalConstraint,
+    VerticalConstraint,
+    CoincidentConstraint,
     ParallelConstraint,
     PerpendicularConstraint,
 )
@@ -32,11 +35,13 @@ from sketchmath.cad.preview_mesh import build_preview_mesh
 from sketchmath.models.entities import (
     Axis2DEntity,
     ConstructionLine2DEntity,
+    Circle2DEntity,
     Line2DEntity,
     Point2DEntity,
     Profile2DEntity,
     SelectionEntity,
 )
+from sketchmath.geometry.topology import detect_line_profiles
 from sketchmath.models.geometry_command import GeometryCommand
 from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
@@ -69,14 +74,14 @@ class GeometrySession:
         before = self.state.model_copy(deep=True)
         after, changed, value, unit, metadata = apply_geometry_command(command, before)
         result_metadata = dict(metadata)
-        result_metadata.setdefault("history_length", len(self.history.records) + (1 if command.mode == "commit" else 0))
+        result_metadata.setdefault("history_length", self.history.cursor + (1 if command.mode == "commit" else 0))
         result = OperationResult(
             command=command,
             status="committed" if command.mode == "commit" else "preview",
             before=before,
             after=after.model_copy(deep=True),
             changed_entity_ids=changed,
-            replay_index=len(self.history.records),
+            replay_index=self.history.cursor,
             value=value,
             unit=unit,
             metadata=result_metadata,
@@ -94,10 +99,15 @@ class GeometrySession:
         return result
 
     def revert(self) -> SelectionContext:
-        if not self.history.records:
+        if self.history.cursor == 0:
             self.state = self.initial_state.model_copy(deep=True)
             return self.state
         self.history.pop_last()
+        self.state = self.history.replay(self.initial_state)
+        return self.state
+
+    def redo(self) -> SelectionContext:
+        self.history.redo_next()
         self.state = self.history.replay(self.initial_state)
         return self.state
 
@@ -135,13 +145,24 @@ def apply_geometry_command(
         "project_point_to_line": _handle_project_point_to_line,
         "batch": _handle_batch,
     }
+    handlers.update({
+        "make_horizontal": _handle_make_horizontal,
+        "make_vertical": _handle_make_vertical,
+        "make_coincident": _handle_make_coincident,
+        "detect_profiles": _handle_detect_profiles,
+        "define_circle": _handle_define_circle,
+        "update_circle": _handle_update_circle,
+        "make_circle_profile": _handle_make_circle_profile,
+    })
     handler = handlers.get(command.command_type)
     if handler is None:
         raise UnsupportedCommandError(
             f"Unsupported SketchMath command: {command.command_type}",
             detail={"command_type": command.command_type},
         )
-    return handler(command, state)
+    result = handler(command, state)
+    _sync_linked_geometry(result[0])
+    return result
 
 
 def _handle_measure_distance(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
@@ -192,7 +213,15 @@ def _handle_define_line(command: GeometryCommand, state: SelectionContext) -> tu
     start = _point_tuple(_parameter(command, "start"))
     end = _point_tuple(_parameter(command, "end"))
     label = command.parameters.get("label")
-    line = Line2DEntity(id=name, start=start, end=end, locked=bool(command.parameters.get("locked", False)), label=label)
+    line = Line2DEntity(
+        id=name,
+        start=start,
+        end=end,
+        start_point_id=command.parameters.get("start_point_id"),
+        end_point_id=command.parameters.get("end_point_id"),
+        locked=bool(command.parameters.get("locked", False)),
+        label=label,
+    )
     state.replace_entity(line)
     _sync_named_reference(state, line.id, label)
     return state, [line.id], None, None, {}
@@ -540,6 +569,105 @@ def _handle_make_equal_angle(command: GeometryCommand, state: SelectionContext) 
     constraint = EqualAngleConstraint(id=f"constraint_{command.command_id}", points=(a1.id, a2.id, a3.id, b1.id, b2.id, b3.id))
     state.replace_constraint(constraint)
     return state, [b3.id], None, None, {"constraint_id": constraint.id}
+
+
+def _axis_constraint_points(command: GeometryCommand, state: SelectionContext) -> tuple[Point2DEntity, Point2DEntity]:
+    if len(command.selection) == 1:
+        line = _resolve_line_like(state, command.selection[0], "line")
+        if not isinstance(line, (Line2DEntity, ConstructionLine2DEntity)) or not line.start_point_id or not line.end_point_id:
+            raise SelectionResolutionError(
+                "Selected line does not have addressable endpoint identities",
+                detail={"command_type": command.command_type, "entity_id": line.id},
+            )
+        return _resolve_point(state, line.start_point_id, "start"), _resolve_point(state, line.end_point_id, "end")
+    return _resolve_points(state, command.selection)
+
+
+def _handle_make_horizontal(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    a, b = _axis_constraint_points(command, state)
+    constraint = HorizontalConstraint(id=f"constraint_{command.command_id}", points=(a.id, b.id))
+    outcome = _apply_horizontal_constraint(constraint, state)
+    state.replace_constraint(constraint)
+    return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id}
+
+
+def _handle_make_vertical(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    a, b = _axis_constraint_points(command, state)
+    constraint = VerticalConstraint(id=f"constraint_{command.command_id}", points=(a.id, b.id))
+    outcome = _apply_vertical_constraint(constraint, state)
+    state.replace_constraint(constraint)
+    return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id}
+
+
+def _handle_make_coincident(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    a, b = _resolve_points(state, command.selection)
+    constraint = CoincidentConstraint(id=f"constraint_{command.command_id}", points=(a.id, b.id))
+    outcome = _apply_coincident_constraint(constraint, state)
+    state.replace_constraint(constraint)
+    return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id}
+
+
+def _handle_detect_profiles(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    candidates = detect_line_profiles(state)
+    return state, [], None, None, {"profile_candidates": candidates, "candidate_count": len(candidates)}
+
+
+def _circle_profile(circle: Circle2DEntity, profile_id: str, *, segments: int = 48) -> Profile2DEntity:
+    analysis = analyze_closed_polygon(_circle_profile_vertices(circle.center, circle.radius, segments))
+    return Profile2DEntity(
+        id=profile_id,
+        vertices=analysis.vertices,
+        area=analysis.area,
+        winding=analysis.winding,  # type: ignore[arg-type]
+        warnings=analysis.warnings,
+        closed=True,
+        label=circle.label or "Circle profile",
+    )
+
+
+def _handle_define_circle(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    name = str(_parameter(command, "name"))
+    center = _point_tuple(_parameter(command, "center"))
+    radius = float(_parameter(command, "radius"))
+    if radius <= 0:
+        raise SelectionResolutionError("Circle radius must be positive", detail={"command_type": command.command_type, "radius": radius})
+    circle = Circle2DEntity(
+        id=name,
+        center=center,
+        radius=radius,
+        center_point_id=command.parameters.get("center_point_id"),
+        locked=bool(command.parameters.get("locked", False)),
+        label=command.parameters.get("label"),
+    )
+    state.replace_entity(circle)
+    return state, [circle.id], radius, state.units, {"radius": radius, "diameter": radius * 2}
+
+
+def _handle_update_circle(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    if len(command.selection) != 1:
+        raise SelectionResolutionError("update_circle requires one circle", detail={"selection": command.selection})
+    circle = state.get_entity(command.selection[0])
+    if not isinstance(circle, Circle2DEntity):
+        raise WrongEntityTypeError("Selected entity is not a circle", detail={"entity_id": circle.id})
+    _ensure_mutable(state, [circle.id], command.command_type)
+    radius = float(command.parameters.get("radius", circle.radius))
+    center = _point_tuple(command.parameters.get("center", circle.center))
+    if radius <= 0:
+        raise SelectionResolutionError("Circle radius must be positive", detail={"radius": radius})
+    updated = Circle2DEntity(**{**circle.model_dump(), "center": center, "radius": radius})
+    state.replace_entity(updated)
+    return state, [updated.id], radius, state.units, {"radius": radius, "diameter": radius * 2}
+
+
+def _handle_make_circle_profile(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    if len(command.selection) != 1:
+        raise SelectionResolutionError("make_circle_profile requires one circle", detail={"selection": command.selection})
+    circle = state.get_entity(command.selection[0])
+    if not isinstance(circle, Circle2DEntity):
+        raise WrongEntityTypeError("Selected entity is not a circle", detail={"entity_id": circle.id})
+    profile = _circle_profile(circle, str(command.parameters.get("name") or f"profile_{circle.id}"), segments=int(command.parameters.get("segments", 48)))
+    state.replace_entity(profile)
+    return state, [profile.id], profile.area, "square_mm", {"source_circle_id": circle.id, "profile_id": profile.id}
 
 
 def _handle_solve_constraints(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
@@ -907,6 +1035,12 @@ def _apply_constraint(constraint: ConstraintEntity, state: SelectionContext) -> 
         return _apply_equal_length_constraint(constraint, state)
     if isinstance(constraint, EqualAngleConstraint):
         return _apply_equal_angle_constraint(constraint, state)
+    if isinstance(constraint, HorizontalConstraint):
+        return _apply_horizontal_constraint(constraint, state)
+    if isinstance(constraint, VerticalConstraint):
+        return _apply_vertical_constraint(constraint, state)
+    if isinstance(constraint, CoincidentConstraint):
+        return _apply_coincident_constraint(constraint, state)
     raise SolverError("Unsupported constraint type", detail={"constraint_id": constraint.id})
 
 
@@ -918,6 +1052,52 @@ def _apply_fixed_point_constraint(constraint: FixedPointConstraint, state: Selec
         state.replace_entity(_replace_point(point, constraint.coords))
         return {"status": "changed", "changed_entity_ids": [point.id]}
     return {"status": "ok", "changed_entity_ids": []}
+
+
+def _axis_target(a: Point2DEntity, b: Point2DEntity, *, horizontal: bool) -> tuple[Point2DEntity, Point2D]:
+    if a.locked and b.locked:
+        aligned = math.isclose(a.coords[1 if horizontal else 0], b.coords[1 if horizontal else 0], abs_tol=1e-9)
+        if not aligned:
+            raise SolverError(
+                f"{'Horizontal' if horizontal else 'Vertical'} constraint conflicts with locked points",
+                detail={"point_ids": [a.id, b.id]},
+            )
+        return b, b.coords
+    if b.locked:
+        moving, anchor = a, b
+    else:
+        moving, anchor = b, a
+    coords = (moving.coords[0], anchor.coords[1]) if horizontal else (anchor.coords[0], moving.coords[1])
+    return moving, coords
+
+
+def _apply_horizontal_constraint(constraint: HorizontalConstraint, state: SelectionContext) -> dict[str, Any]:
+    a, b = _resolve_points(state, list(constraint.points))
+    moving, coords = _axis_target(a, b, horizontal=True)
+    if moving.coords == coords:
+        return {"status": "ok", "changed_entity_ids": []}
+    state.replace_entity(_replace_point(moving, coords))
+    return {"status": "changed", "changed_entity_ids": [moving.id]}
+
+
+def _apply_vertical_constraint(constraint: VerticalConstraint, state: SelectionContext) -> dict[str, Any]:
+    a, b = _resolve_points(state, list(constraint.points))
+    moving, coords = _axis_target(a, b, horizontal=False)
+    if moving.coords == coords:
+        return {"status": "ok", "changed_entity_ids": []}
+    state.replace_entity(_replace_point(moving, coords))
+    return {"status": "changed", "changed_entity_ids": [moving.id]}
+
+
+def _apply_coincident_constraint(constraint: CoincidentConstraint, state: SelectionContext) -> dict[str, Any]:
+    a, b = _resolve_points(state, list(constraint.points))
+    if a.coords == b.coords:
+        return {"status": "ok", "changed_entity_ids": []}
+    if a.locked and b.locked:
+        raise SolverError("Coincident constraint conflicts with locked points", detail={"constraint_id": constraint.id, "point_ids": [a.id, b.id]})
+    moving, anchor = (a, b) if b.locked else (b, a)
+    state.replace_entity(_replace_point(moving, anchor.coords))
+    return {"status": "changed", "changed_entity_ids": [moving.id]}
 
 
 def _apply_distance_constraint(constraint: DistanceConstraint, state: SelectionContext) -> dict[str, Any]:
@@ -1080,6 +1260,24 @@ def _profile_vertices(entities: list[SelectionEntity]) -> list[Point2D]:
     if vertices[0] != vertices[-1]:
         raise SelectionResolutionError("Profile is open", detail={"first": vertices[0], "last": vertices[-1]})
     return vertices
+
+
+def _sync_linked_geometry(state: SelectionContext) -> None:
+    points = {item.id: item for item in state.items if isinstance(item, Point2DEntity)}
+    for entity in list(state.items):
+        if isinstance(entity, (Line2DEntity, ConstructionLine2DEntity)):
+            start = points.get(entity.start_point_id or "")
+            end = points.get(entity.end_point_id or "")
+            if start is None and end is None:
+                continue
+            payload = entity.model_dump()
+            if start is not None:
+                payload["start"] = start.coords
+            if end is not None:
+                payload["end"] = end.coords
+            state.replace_entity(type(entity)(**payload))
+        elif isinstance(entity, Circle2DEntity) and entity.center_point_id in points:
+            state.replace_entity(Circle2DEntity(**{**entity.model_dump(), "center": points[entity.center_point_id].coords}))
 
 
 def _translate_entity(entity: SelectionEntity, delta: Point2D) -> SelectionEntity:

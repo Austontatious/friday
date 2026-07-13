@@ -182,8 +182,11 @@ class SketchMathSessionStore:
                 "persisted": True,
                 "storage_path": str(self._session_path(session_id)),
             },
-            "history_length": len(session.history.records),
+            "history_length": session.history.cursor,
             "history": [_serialize_history_record(record) for record in session.history.records],
+            "history_cursor": session.history.cursor,
+            "can_undo": session.history.cursor > 0,
+            "can_redo": bool(session.history.redo_records),
         }
 
     def _save(self, session_id: str, stored: _StoredSession) -> None:
@@ -197,6 +200,7 @@ class SketchMathSessionStore:
                 "updated_at": _now_iso(),
             },
             "history": [_serialize_history_record(record) for record in stored.session.history.records],
+            "redo_history": [_serialize_history_record(record) for record in stored.session.history.redo_records],
         }
         path = self._session_path(session_id)
         tmp_path = path.with_suffix(".json.tmp")
@@ -213,6 +217,7 @@ class SketchMathSessionStore:
         session = GeometrySession(initial_state)
         history_records = [_history_record_from_payload(record) for record in payload.get("history", [])]
         session.history.records = history_records
+        session.history.redo_records = [_history_record_from_payload(record) for record in payload.get("redo_history", [])]
         session.state = current_state
         metadata = dict(payload.get("session_metadata") or {})
         metadata.setdefault("persisted", True)
@@ -267,7 +272,7 @@ class SketchMathSessionStore:
             "session_id": session_id,
             "selection_context": session.state.model_dump(mode="json"),
             "result": result.model_dump(mode="json"),
-            "history_length": len(session.history.records),
+            "history_length": session.history.cursor,
             "session_metadata": {
                 **stored.metadata,
                 "persisted": True,
@@ -302,6 +307,13 @@ class SketchMathSessionStore:
         stored = self._get_stored(session_id)
         session = stored.session
         session.revert()
+        stored.metadata["updated_at"] = _now_iso()
+        self._save(session_id, stored)
+        return self._build_snapshot(session_id, stored)
+
+    def redo(self, session_id: str) -> dict[str, Any]:
+        stored = self._get_stored(session_id)
+        stored.session.redo()
         stored.metadata["updated_at"] = _now_iso()
         self._save(session_id, stored)
         return self._build_snapshot(session_id, stored)

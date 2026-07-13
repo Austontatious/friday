@@ -19,16 +19,31 @@ class OperationRecord:
 @dataclass
 class GeometryHistory:
     records: list[OperationRecord] = field(default_factory=list)
+    redo_records: list[OperationRecord] = field(default_factory=list)
+
+    @property
+    def cursor(self) -> int:
+        return len(self.records)
 
     def append(self, record: OperationRecord) -> None:
         if not record.committed:
             raise ValueError("Only committed operation records can be stored in history")
+        self.redo_records.clear()
         self.records.append(record)
 
     def pop_last(self) -> OperationRecord | None:
         if not self.records:
             return None
-        return self.records.pop()
+        record = self.records.pop()
+        self.redo_records.append(record)
+        return record
+
+    def redo_next(self) -> OperationRecord | None:
+        if not self.redo_records:
+            return None
+        record = self.redo_records.pop()
+        self.records.append(record)
+        return record
 
     def replay(self, base_state: "SelectionContext") -> "SelectionContext":
         from sketchmath.executor.command_router import apply_geometry_command
