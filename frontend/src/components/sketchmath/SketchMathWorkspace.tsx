@@ -95,7 +95,7 @@ type CadExportArtifact = {
   extrusionDepthUnit: string | null;
 };
 type SelectionRef = {
-  kind: "none" | "rectangle_edge" | "rectangle_corner" | "rectangle_profile" | "profile_hole" | "rectangle" | "circle" | "one_line" | "two_lines" | "one_point" | "two_points" | "mixed";
+  kind: "none" | "rectangle_edge" | "rectangle_corner" | "rectangle_profile" | "profile" | "profile_hole" | "rectangle" | "circle" | "one_line" | "two_lines" | "one_point" | "two_points" | "mixed";
   summary: string;
   parentSummary?: string;
   detail?: string;
@@ -384,6 +384,7 @@ const SketchMathWorkspace = () => {
   const pointDragRef = useRef<{ entityId: string; start: Point; current: Point; moved: boolean } | null>(null);
   const dragPreviewTimerRef = useRef<number | null>(null);
   const ignoreNextCanvasClickRef = useRef(false);
+  const profileCandidateRequestRef = useRef(0);
   const notifiedArtifactPathsRef = useRef<Set<string>>(new Set());
   const lastSelectedHoleIdRef = useRef<string | null>(null);
 
@@ -921,6 +922,9 @@ const SketchMathWorkspace = () => {
     if (rectangleSelectionDetail?.kind === "profile") {
       return { ...base, kind: "rectangle_profile", summary: "Selected: Profile", parentSummary: "Parent: Rectangle" };
     }
+    if (selectedEntities.length === 1 && isClosedProfileEntity(selectedEntities[0])) {
+      return { ...base, kind: "profile", summary: "Selected: Profile", detail: "Closed profile: valid" };
+    }
     if (selectedLineEntities.length === 2) {
       return {
         ...base,
@@ -1006,12 +1010,16 @@ const SketchMathWorkspace = () => {
 
   const refreshProfileCandidates = async () => {
     if (!sessionId) return;
+    const requestId = profileCandidateRequestRef.current + 1;
+    profileCandidateRequestRef.current = requestId;
     try {
       const response = await previewSketchMathCommand(sessionId, buildDetectProfilesCommand());
       const raw = response.result.metadata.profile_candidates;
-      setProfileCandidates(Array.isArray(raw) ? raw as SketchMathProfileCandidate[] : []);
+      if (requestId === profileCandidateRequestRef.current) {
+        setProfileCandidates(Array.isArray(raw) ? raw as SketchMathProfileCandidate[] : []);
+      }
     } catch {
-      setProfileCandidates([]);
+      if (requestId === profileCandidateRequestRef.current) setProfileCandidates([]);
     }
   };
 

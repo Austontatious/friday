@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { openSketchMath } from "./helpers/sketchmath";
 
 const screenshotPath = (name: string) => `../tmp/sketchmath_sol/${name}`;
@@ -58,8 +58,62 @@ const clickSvgViewBoxPoint = async (page: Page, x: number, y: number) => {
   await page.mouse.click(point.x, point.y);
 };
 
+const dispatchCanvasViewBoxPoint = async (page: Page, x: number, y: number) => {
+  await page.getByTestId("sketchmath-canvas").evaluate((element, coords) => {
+    const svg = element as SVGSVGElement;
+    const svgBox = svg.getBoundingClientRect();
+    const viewBox = svg.viewBox.baseVal;
+    const scale = Math.min(svgBox.width / viewBox.width, svgBox.height / viewBox.height);
+    const contentLeft = svgBox.left + (svgBox.width - viewBox.width * scale) / 2;
+    const contentTop = svgBox.top + (svgBox.height - viewBox.height * scale) / 2;
+    svg.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      clientX: contentLeft + (coords.x - viewBox.x) * scale,
+      clientY: contentTop + (coords.y - viewBox.y) * scale,
+    }));
+  }, { x, y });
+};
+
+const dragSvgEntityToViewBoxPoint = async (page: Page, target: string | Locator, x: number, y: number) => {
+  const entity = typeof target === "string" ? page.locator(target) : target;
+  const coordinates = await page.getByTestId("sketchmath-canvas").evaluate((element, coords) => {
+    const svg = element as SVGSVGElement;
+    const svgBox = svg.getBoundingClientRect();
+    const viewBox = svg.viewBox.baseVal;
+    const scale = Math.min(svgBox.width / viewBox.width, svgBox.height / viewBox.height);
+    const contentLeft = svgBox.left + (svgBox.width - viewBox.width * scale) / 2;
+    const contentTop = svgBox.top + (svgBox.height - viewBox.height * scale) / 2;
+    return {
+      x: contentLeft + (coords.x - viewBox.x) * scale,
+      y: contentTop + (coords.y - viewBox.y) * scale,
+    };
+  }, { x, y });
+  const source = await entity.boundingBox();
+  if (!source) throw new Error("Unable to locate draggable SVG entity");
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(coordinates.x, coordinates.y, { steps: 4 });
+  await page.mouse.up();
+};
+
 const shiftClickEntity = async (page: Page, selector: string) => {
   await page.locator(selector).last().dispatchEvent("click", { shiftKey: true });
+};
+
+const selectFirstTwoLines = async (page: Page) => {
+  await clickSvgPrimitiveCenter(page, '[data-testid^="entity-line_"] line.sketchmath-line', { first: true });
+  await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 line");
+  await clickSvgPrimitiveCenter(page, '[data-testid^="entity-line_"] line.sketchmath-line', { shift: true });
+  await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 2 lines");
+};
+
+const makePointsCoincident = async (page: Page, firstIndex: number, secondIndex: number) => {
+  const points = page.locator('[data-entity-type="point_2d"]');
+  await points.nth(firstIndex).dispatchEvent("click");
+  await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 point");
+  await points.nth(secondIndex).dispatchEvent("click", { shiftKey: true });
+  await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 2 points");
+  await clickWorkbenchButton(page, "Coincident");
 };
 
 test.describe("SketchMath workspace", () => {
@@ -118,6 +172,14 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 2 lines");
     await clickWorkbenchButton(page, "Parallel");
     await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("parallel_constraint");
+    await clickWorkbenchButton(page, "Undo");
+    await selectFirstTwoLines(page);
+    await clickWorkbenchButton(page, "Perpendicular");
+    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("perpendicular_constraint");
+    await clickWorkbenchButton(page, "Undo");
+    await selectFirstTwoLines(page);
+    await clickWorkbenchButton(page, "Equal Length");
+    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("equal_length_constraint");
 
     await clickWorkbenchButton(page, "Show Advanced / Debug");
     await page.getByRole("button", { name: "Show Advanced / Debug DSL" }).click();
@@ -175,6 +237,14 @@ test.describe("SketchMath workspace", () => {
     await clickSvgPrimitiveCenter(page, '[data-testid^="rectangle-selection-outline-"]');
     await expect(page.locator('[data-testid^="entity-hole_"]').last()).toBeVisible({ timeout: 20000 });
     await expect(page.getByTestId("sketchmath-workbench-panel")).toContainText("Profile holes: 1");
+    const holeCenterX = page.getByLabel("Selected hole center X");
+    const holeCenterY = page.getByLabel("Selected hole center Y");
+    const shiftedX = Number(await holeCenterX.inputValue()) + 2;
+    await page.getByLabel("Selected hole diameter").fill("6");
+    await holeCenterX.fill(String(shiftedX));
+    await holeCenterY.fill(await holeCenterY.inputValue());
+    await page.getByRole("button", { name: "Apply hole update" }).click();
+    await expect(page.getByTestId("selected-hole-editor-message")).toContainText("Hole updated");
     await page.screenshot({ path: screenshotPath("sketchmath-hole-placed-committed.png"), fullPage: true });
 
     await expect(createFeatureButton).toBeEnabled();
@@ -183,9 +253,22 @@ test.describe("SketchMath workspace", () => {
     await createFeatureButton.click();
     await expect(page.getByTestId("sketchmath-cad-feature-summary")).toContainText("Extrude preview ready: profile accepted with 1 hole");
     await expect(page.getByTestId("sketchmath-preview-controls")).toBeVisible();
+    const cameraHud = page.getByTestId("sketchmath-solid-camera-hud");
+    const initialCamera = await cameraHud.textContent();
+    await page.getByTestId("sketchmath-solid-preview-canvas").dragTo(page.getByTestId("sketchmath-solid-preview-canvas"), {
+      sourcePosition: { x: 240, y: 180 },
+      targetPosition: { x: 310, y: 220 },
+      force: true,
+    });
+    await expect.poll(async () => await cameraHud.textContent()).not.toBe(initialCamera);
     await page.getByRole("button", { name: "Commit Preview" }).click();
     await expect(page.getByTestId("sketchmath-cad-feature-summary")).toContainText("STEP export ready");
-    await expect(page.getByRole("link", { name: "Download STEP" })).toBeVisible();
+    const downloadLink = page.getByRole("link", { name: "Download STEP" });
+    await expect(downloadLink).toBeVisible();
+    const downloadPromise = page.waitForEvent("download");
+    await downloadLink.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("export.step");
     await expect(page.getByTestId("sketchmath-command-panel")).toHaveCount(0);
     await page.screenshot({ path: screenshotPath("sketchmath-extrude-normal-ui.png"), fullPage: true });
 
@@ -265,5 +348,139 @@ test.describe("SketchMath workspace", () => {
     await expect(page.locator('[data-testid^="entity-rect_"]')).toHaveCount(0, { timeout: 20000 });
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Nothing");
     await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" })).toBeDisabled();
+  });
+
+  test("detects and extrudes a profile built from four independent lines", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Line" }).first().click();
+    const segments = [
+      [[120, 100], [260, 100]],
+      [[260, 100], [260, 200]],
+      [[260, 200], [120, 200]],
+      [[120, 200], [120, 100]],
+    ] as const;
+    for (const [index, [start, end]] of segments.entries()) {
+      await dispatchCanvasViewBoxPoint(page, start[0], start[1]);
+      await dispatchCanvasViewBoxPoint(page, end[0], end[1]);
+      await expect(page.locator('[data-testid^="entity-line_"]')).toHaveCount(index + 1);
+    }
+    await page.getByRole("button", { name: "Select" }).click();
+    await makePointsCoincident(page, 1, 2);
+    await makePointsCoincident(page, 3, 4);
+    await makePointsCoincident(page, 5, 6);
+    await makePointsCoincident(page, 7, 0);
+
+    const candidates = page.getByTestId("sketchmath-profile-candidates");
+    await expect(candidates).toContainText("Valid closed loop", { timeout: 20000 });
+    await candidates.getByRole("button", { name: "Create profile" }).click();
+    const profile = page.locator('[data-entity-type="profile_2d"]').last();
+    await expect(profile).toBeAttached();
+    await profile.dispatchEvent("click");
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+
+    await clickWorkbenchButton(page, "Extrude");
+    await expect(page.getByTestId("sketchmath-cad-feature-summary")).toContainText("Extrude preview ready");
+    await page.getByRole("button", { name: "Commit Preview" }).click();
+    await expect(page.getByRole("link", { name: "Download STEP" })).toBeVisible();
+    await page.screenshot({ path: screenshotPath("sketchmath-detected-line-profile-step.png"), fullPage: true });
+  });
+
+  test("preserves horizontal, vertical, and coincident constraints during endpoint dragging", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Line" }).first().click();
+    await dispatchCanvasViewBoxPoint(page, 120, 120);
+    await dispatchCanvasViewBoxPoint(page, 260, 150);
+    await expect(page.locator('[data-testid^="entity-line_"]')).toHaveCount(1);
+    await clickWorkbenchButton(page, "Horizontal");
+
+    const points = page.locator('[data-entity-type="point_2d"]');
+    await dragSvgEntityToViewBoxPoint(page, points.nth(1), 280, 190);
+    const firstLine = page.locator('[data-testid^="entity-line_"]').nth(0).locator("line.sketchmath-line");
+    await expect.poll(async () => await firstLine.getAttribute("y1") === await firstLine.getAttribute("y2")).toBe(true);
+
+    await page.getByRole("button", { name: "Line" }).first().click();
+    await dispatchCanvasViewBoxPoint(page, 340, 100);
+    await dispatchCanvasViewBoxPoint(page, 370, 220);
+    await expect(page.locator('[data-testid^="entity-line_"]')).toHaveCount(2);
+    await page.getByRole("button", { name: "Select" }).click();
+    await clickSvgPrimitiveCenter(page, '[data-testid^="entity-line_"] line.sketchmath-line');
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 line");
+    await clickWorkbenchButton(page, "Vertical");
+    await dragSvgEntityToViewBoxPoint(page, points.nth(3), 410, 240);
+    const secondLine = page.locator('[data-testid^="entity-line_"]').nth(1).locator("line.sketchmath-line");
+    await expect.poll(async () => await secondLine.getAttribute("x1") === await secondLine.getAttribute("x2")).toBe(true);
+
+    await page.getByRole("button", { name: "Select" }).click();
+    await points.nth(1).dispatchEvent("click");
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 point");
+    await points.nth(2).dispatchEvent("click", { shiftKey: true });
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 2 points");
+    await clickWorkbenchButton(page, "Coincident");
+    await dragSvgEntityToViewBoxPoint(page, points.nth(1), 300, 160);
+    await expect.poll(async () => {
+      const first = points.nth(1);
+      const second = points.nth(2);
+      return await first.getAttribute("cx") === await second.getAttribute("cx") && await first.getAttribute("cy") === await second.getAttribute("cy");
+    }).toBe(true);
+    await page.screenshot({ path: screenshotPath("sketchmath-foundational-constrained-drag.png"), fullPage: true });
+  });
+
+  test("draws, edits, and extrudes a standalone circle", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Circle" }).click();
+    await clickSvgViewBoxPoint(page, 220, 160);
+    await clickSvgViewBoxPoint(page, 260, 160);
+
+    const circle = page.locator('[data-entity-type="circle_2d"]').last();
+    await expect(circle).toBeVisible();
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Circle");
+    await page.getByLabel("Circle radius").fill("30");
+    await clickWorkbenchButton(page, "Apply radius");
+    await expect(page.getByLabel("Circle radius")).toHaveValue("30");
+    await expect(circle).toHaveAttribute("r", "30");
+
+    await clickWorkbenchButton(page, "Extrude");
+    await expect(page.getByTestId("sketchmath-cad-feature-summary")).toContainText("Extrude preview ready");
+    await page.getByRole("button", { name: "Commit Preview" }).click();
+    await expect(page.getByRole("link", { name: "Download STEP" })).toBeVisible();
+    await page.screenshot({ path: screenshotPath("sketchmath-circle-profile-step.png"), fullPage: true });
+  });
+
+  test("keeps multi-step undo and redo backend-authoritative across a branch edit", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Line" }).first().click();
+    await clickSvgViewBoxPoint(page, 120, 120);
+    await clickSvgViewBoxPoint(page, 260, 120);
+    await clickWorkbenchButton(page, "Apply length");
+    await clickWorkbenchButton(page, "Horizontal");
+    await page.getByRole("button", { name: "Circle" }).click();
+    await clickSvgViewBoxPoint(page, 320, 180);
+    await clickSvgViewBoxPoint(page, 350, 180);
+    await expect(page.locator('[data-entity-type="circle_2d"]')).toHaveCount(1);
+
+    const undo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Undo" });
+    const redo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Redo" });
+    for (let index = 0; index < 4; index += 1) await undo.click();
+    await expect(page.locator('[data-entity-type="circle_2d"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="entity-line_"]')).toHaveCount(0);
+    for (let index = 0; index < 4; index += 1) await redo.click();
+    await expect(page.locator('[data-entity-type="circle_2d"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid^="entity-line_"]')).toHaveCount(1);
+
+    await undo.click();
+    await undo.click();
+    await page.getByRole("button", { name: "Point" }).click();
+    await clickSvgViewBoxPoint(page, 380, 220);
+    await expect(redo).toBeDisabled();
+
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+    const snapshot = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    expect(snapshot.ok()).toBeTruthy();
+    const state = await snapshot.json() as { can_redo: boolean; history_length: number; selection_context: { items: unknown[] } };
+    expect(state.can_redo).toBe(false);
+    expect(state.history_length).toBe(3);
+    expect(state.selection_context.items).toHaveLength(4);
+    await page.screenshot({ path: screenshotPath("sketchmath-history-branch.png"), fullPage: true });
   });
 });

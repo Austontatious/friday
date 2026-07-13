@@ -1296,15 +1296,25 @@ def _profile_vertices(entities: list[SelectionEntity]) -> list[Point2D]:
     if all(isinstance(entity, Point2DEntity) for entity in entities):
         vertices = [entity.coords for entity in entities]
     elif all(isinstance(entity, (Line2DEntity, ConstructionLine2DEntity)) for entity in entities):
-        vertices = [entities[0].start]  # type: ignore[union-attr]
-        for entity in entities:
-            start, end = _line_points(entity)  # type: ignore[arg-type]
-            if vertices[-1] == start:
-                vertices.append(end)
-            elif vertices[-1] == end:
-                vertices.append(start)
+        first_start, first_end = _line_points(entities[0])  # type: ignore[arg-type]
+        vertices = []
+        failed_entity_id = entities[0].id
+        for initial_start, initial_end in ((first_start, first_end), (first_end, first_start)):
+            candidate = [initial_start, initial_end]
+            for entity in entities[1:]:
+                start, end = _line_points(entity)  # type: ignore[arg-type]
+                if candidate[-1] == start:
+                    candidate.append(end)
+                elif candidate[-1] == end:
+                    candidate.append(start)
+                else:
+                    failed_entity_id = entity.id
+                    break
             else:
-                raise SelectionResolutionError("Profile lines are not continuous", detail={"entity_id": entity.id})
+                vertices = candidate
+                break
+        if not vertices:
+            raise SelectionResolutionError("Profile lines are not continuous", detail={"entity_id": failed_entity_id})
     else:
         raise SelectionResolutionError("Profile requires ordered points or ordered lines", detail={"selection": [entity.id for entity in entities]})
     if vertices[0] != vertices[-1]:

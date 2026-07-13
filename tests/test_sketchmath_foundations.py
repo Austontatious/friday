@@ -93,6 +93,24 @@ def test_detect_profiles_finds_stable_reversed_square() -> None:
     assert first[0]["area"] == pytest.approx(12.0)
 
 
+def test_profile_promotion_accepts_detected_order_with_reversed_first_edge() -> None:
+    sketch = session(
+        [
+            line("a", "a0", "a1", (0, 0), (10, 0)),
+            line("d", "d0", "d1", (0, 10), (0, 0)),
+            line("c", "c0", "c1", (10, 10), (0, 10)),
+            line("b", "b0", "b1", (10, 0), (10, 10)),
+        ]
+    )
+
+    result = sketch.execute(command("make_profile", "promote", selection=["a", "d", "c", "b"], parameters={"name": "profile_square"}))
+
+    profile = result.after.get_entity("profile_square")
+    assert profile.type == "profile_2d"
+    assert profile.closed is True
+    assert profile.area == pytest.approx(100.0)
+
+
 def test_detect_profiles_handles_disconnected_loops_and_excludes_open_or_branched_components() -> None:
     items: list[dict] = []
     for prefix, offset in (("a", 0), ("b", 10)):
