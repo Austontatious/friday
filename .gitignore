@@ -11,6 +11,7 @@ pip-cache/
 
 # Temp & cache
 tmp/
+artifacts/
 cache/
 logs/
 database/
