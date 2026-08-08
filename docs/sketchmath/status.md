@@ -53,7 +53,7 @@ The build still reports the repository-wide stale Browserslist database notice. 
 - Command `analyze_constraints` uses contract version `0.3`, is preview-only, and never enters history.
 - Exact rank-based analysis currently covers point-backed locked/fixed, horizontal, vertical, and coincident equations.
 - Nonlinear constraints and unmodeled geometry return honest partial/unknown results.
-- Current evidence: 106 focused Python tests, 43 semantic evals, 46 focused frontend tests, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- Current evidence: 106 focused Python tests, 43 semantic evals, 46 focused frontend tests, 9 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
 
 ## Gate A Outcome
 

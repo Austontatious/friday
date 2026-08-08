@@ -29,6 +29,7 @@
 - `PYTHONPATH=. python3 -m sketchmath.schemas.generate --check`.
 - `cd frontend && CI=true npm test -- --watchAll=false --runInBand App.test.tsx SketchMathWorkspace.test.tsx commandBuilders.test.ts` — 46 passed.
 - `cd frontend && npx tsc --noEmit && npm run build`.
+- `cd frontend && npm run test:e2e -- sketchmath.spec.ts` — 9 passed.
 - `python3 -m pytest -q tests/test_codex_standards.py --noconftest` — 13 passed.
 - `docker compose config -q`.
 
