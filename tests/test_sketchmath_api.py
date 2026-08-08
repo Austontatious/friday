@@ -358,6 +358,18 @@ def test_sketchmath_feature_flag_disables_routes(monkeypatch):
     client.close()
 
 
+def test_sketchmath_feature_flag_defaults_to_disabled(monkeypatch):
+    monkeypatch.delenv("FRIDAY_SKETCHMATH_ENABLED", raising=False)
+    app = create_app()
+    client = TestClient(app)
+
+    response = client.post("/api/sketchmath/sessions", json={})
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "sketchmath_disabled"
+    client.close()
+
+
 def test_sketchmath_rejects_undeclared_command_contract(monkeypatch, tmp_path):
     monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
     client = _client(monkeypatch)

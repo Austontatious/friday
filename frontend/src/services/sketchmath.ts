@@ -352,15 +352,11 @@ const fetchJson = async <T,>(path: string, body?: Record<string, unknown>): Prom
 export const isSketchMathEnabled = (): boolean => {
   const raw = process.env.REACT_APP_SKETCHMATH_ENABLED;
   if (raw == null || String(raw).trim() === "") {
-    return true;
-  }
-
-  const normalized = String(raw).trim().toLowerCase();
-  if (["0", "false", "disabled"].includes(normalized)) {
     return false;
   }
 
-  return true;
+  const normalized = String(raw).trim().toLowerCase();
+  return ["1", "true", "yes", "on"].includes(normalized);
 };
 
 export const sketchMathStepDownloadUrl = (stepPath: string): string =>

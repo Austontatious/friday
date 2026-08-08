@@ -54,6 +54,7 @@ services:
     environment:
       - FRIDAY_API_PORT=9001
       - FRIDAY_WEB_CONCURRENCY=1
+      - FRIDAY_SKETCHMATH_ENABLED=${FRIDAY_SKETCHMATH_ENABLED:-0}
       - FRIDAY_DATA_DIR=/data
       - FRIDAY_LOG_DIR=/logs
       - FRIDAY_CODER_AUTO_ROUTE=${FRIDAY_CODER_AUTO_ROUTE:-0}
@@ -89,6 +90,8 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
       target: prod
+      args:
+        REACT_APP_SKETCHMATH_ENABLED: ${REACT_APP_SKETCHMATH_ENABLED:-0}
     ports:
       - "${FRIDAY_HOST_WEB_PORT:-18080}:8080"
     depends_on:

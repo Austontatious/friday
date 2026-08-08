@@ -332,7 +332,6 @@ const SketchMathWorkspace = () => {
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [committedContext, setCommittedContext] = useState<SketchMathSelectionContext>(sketchmathInitialContext());
-  const [sessionMetadata, setSessionMetadata] = useState<Record<string, unknown>>({});
   const [history, setHistory] = useState<SketchMathHistoryEntry[]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -432,7 +431,6 @@ const SketchMathWorkspace = () => {
         setSessionId(snapshot.session_id);
         window.localStorage.setItem(SESSION_STORAGE_KEY, snapshot.session_id);
         setCommittedContext(snapshot.selection_context);
-        setSessionMetadata(snapshot.session_metadata || {});
         setHistory(snapshot.history);
         setPendingCommandText("");
         appendEvents([
@@ -456,7 +454,6 @@ const SketchMathWorkspace = () => {
           setSessionId(snapshot.session_id);
           window.localStorage.setItem(SESSION_STORAGE_KEY, snapshot.session_id);
           setCommittedContext(snapshot.selection_context);
-          setSessionMetadata(snapshot.session_metadata || {});
           setHistory(snapshot.history);
           setPendingCommandText("");
           appendEvents([
@@ -1016,7 +1013,6 @@ const SketchMathWorkspace = () => {
   const syncSnapshot = (snapshot: SketchMathSessionSnapshot) => {
     setCommittedContext(snapshot.selection_context);
     reconcileSelection(snapshot.selection_context.items);
-    setSessionMetadata(snapshot.session_metadata || {});
     setHistory(snapshot.history);
     setCanUndo(Boolean(snapshot.can_undo ?? snapshot.history_length > 0));
     setCanRedo(Boolean(snapshot.can_redo));
@@ -1026,7 +1022,6 @@ const SketchMathWorkspace = () => {
   const syncCommandResponse = (response: SketchMathCommandResponse) => {
     setCommittedContext(response.selection_context || response.result.after);
     reconcileSelection((response.selection_context || response.result.after).items);
-    setSessionMetadata(response.session_metadata || {});
     setHistory((current) => [
       ...current,
       {
@@ -2417,7 +2412,7 @@ const SketchMathWorkspace = () => {
       <Box className="sketchmath-shell" data-testid="sketchmath-workspace">
         <VStack align="start" spacing={4} className="sketchmath-disabled">
           <Heading>SketchMath is disabled</Heading>
-          <Text>Set <code>FRIDAY_SKETCHMATH_ENABLED=1</code> to open the drawing pad.</Text>
+          <Text>Set <code>FRIDAY_SKETCHMATH_ENABLED=1</code> and <code>REACT_APP_SKETCHMATH_ENABLED=1</code> to open the drawing pad.</Text>
           <Button as="a" href="/" variant="outline">
             Return to FRIDAY
           </Button>

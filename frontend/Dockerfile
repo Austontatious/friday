@@ -3,6 +3,9 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+ARG REACT_APP_SKETCHMATH_ENABLED=0
+ENV REACT_APP_SKETCHMATH_ENABLED=${REACT_APP_SKETCHMATH_ENABLED}
+
 COPY frontend/package.json frontend/package-lock.json /app/
 RUN npm ci --legacy-peer-deps
 

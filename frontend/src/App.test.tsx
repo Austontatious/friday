@@ -86,13 +86,13 @@ describe("FRIDAY shell", () => {
     });
   });
 
-  it("renders SketchMath by default and keeps Direct Friday visible", () => {
+  it("keeps SketchMath hidden by default and keeps Direct Friday visible", () => {
     renderApp();
 
     expect(screen.queryByRole("button", { name: "Althing" })).toBeNull();
     expect(screen.getByRole("button", { name: "Direct Friday" })).toBeVisible();
     expect(screen.getByRole("button", { name: "SUBMIT" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "SketchMath" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "SketchMath" })).toBeNull();
     expect(screen.getByTestId("friday-telemetry-panel")).toBeVisible();
     expect(screen.getByTestId("friday-session-map")).toBeVisible();
   });
