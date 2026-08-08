@@ -379,6 +379,113 @@
       "title": "CoincidentConstraint",
       "type": "object"
     },
+    "CollinearConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "collinear_constraint",
+          "default": "collinear_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "CollinearConstraint",
+      "type": "object"
+    },
+    "ConcentricConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Entities",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "concentric_constraint",
+          "default": "concentric_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "entities"
+      ],
+      "title": "ConcentricConstraint",
+      "type": "object"
+    },
     "ConstructionLine2DEntity": {
       "additionalProperties": false,
       "properties": {
@@ -999,6 +1106,63 @@
       "title": "Line2DEntity",
       "type": "object"
     },
+    "MidpointConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "line_points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Line Points",
+          "type": "array"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "point_id": {
+          "title": "Point Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "midpoint_constraint",
+          "default": "midpoint_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "point_id",
+        "line_points"
+      ],
+      "title": "MidpointConstraint",
+      "type": "object"
+    },
     "ParallelConstraint": {
       "additionalProperties": false,
       "properties": {
@@ -1328,6 +1492,125 @@
       "title": "RadiusConstraint",
       "type": "object"
     },
+    "SymmetricConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "symmetric_constraint",
+          "default": "symmetric_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "SymmetricConstraint",
+      "type": "object"
+    },
+    "TangentConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Entities",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "tangency": {
+          "default": "external",
+          "enum": [
+            "external",
+            "internal"
+          ],
+          "title": "Tangency",
+          "type": "string"
+        },
+        "type": {
+          "const": "tangent_constraint",
+          "default": "tangent_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "entities"
+      ],
+      "title": "TangentConstraint",
+      "type": "object"
+    },
     "VerticalConstraint": {
       "additionalProperties": false,
       "properties": {
@@ -1472,6 +1755,8 @@
           "mapping": {
             "angle_constraint": "#/$defs/AngleConstraint",
             "coincident_constraint": "#/$defs/CoincidentConstraint",
+            "collinear_constraint": "#/$defs/CollinearConstraint",
+            "concentric_constraint": "#/$defs/ConcentricConstraint",
             "diameter_constraint": "#/$defs/DiameterConstraint",
             "distance_constraint": "#/$defs/DistanceConstraint",
             "equal_angle_constraint": "#/$defs/EqualAngleConstraint",
@@ -1479,9 +1764,12 @@
             "fixed_point_constraint": "#/$defs/FixedPointConstraint",
             "horizontal_constraint": "#/$defs/HorizontalConstraint",
             "horizontal_distance_constraint": "#/$defs/HorizontalDistanceConstraint",
+            "midpoint_constraint": "#/$defs/MidpointConstraint",
             "parallel_constraint": "#/$defs/ParallelConstraint",
             "perpendicular_constraint": "#/$defs/PerpendicularConstraint",
             "radius_constraint": "#/$defs/RadiusConstraint",
+            "symmetric_constraint": "#/$defs/SymmetricConstraint",
+            "tangent_constraint": "#/$defs/TangentConstraint",
             "vertical_constraint": "#/$defs/VerticalConstraint",
             "vertical_distance_constraint": "#/$defs/VerticalDistanceConstraint"
           },
@@ -1529,6 +1817,21 @@
           },
           {
             "$ref": "#/$defs/CoincidentConstraint"
+          },
+          {
+            "$ref": "#/$defs/MidpointConstraint"
+          },
+          {
+            "$ref": "#/$defs/CollinearConstraint"
+          },
+          {
+            "$ref": "#/$defs/SymmetricConstraint"
+          },
+          {
+            "$ref": "#/$defs/ConcentricConstraint"
+          },
+          {
+            "$ref": "#/$defs/TangentConstraint"
           }
         ]
       },

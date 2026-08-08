@@ -5,11 +5,13 @@ from dataclasses import dataclass
 from sketchmath.geometry.tolerances import DEFAULT_TOLERANCE_POLICY, NumericalTolerancePolicy
 from sketchmath.geometry.units import normalize_length
 from sketchmath.models.constraints import (
+    ConcentricConstraint,
     CoincidentConstraint,
     DiameterConstraint,
     FixedPointConstraint,
     HorizontalConstraint,
     HorizontalDistanceConstraint,
+    MidpointConstraint,
     RadiusConstraint,
     VerticalConstraint,
     VerticalDistanceConstraint,
@@ -29,6 +31,12 @@ from sketchmath.models.solver_analysis import SolverAnalysis
 class _Equation:
     coefficients: dict[str, float]
     right_hand_side: float
+
+
+def _difference_equation(first: str, second: str) -> _Equation:
+    coefficients = {first: 1.0}
+    coefficients[second] = coefficients.get(second, 0.0) - 1.0
+    return _Equation(coefficients, 0.0)
 
 
 def _matrix_rank(rows: list[list[float]], width: int, tolerance: float) -> int:
@@ -168,6 +176,28 @@ def _linear_equations(
                 invalid.append(constraint.id)
                 continue
             equations = [_Equation({f"{constraint.circle_id}.radius": 1.0}, target)]
+        elif isinstance(constraint, MidpointConstraint):
+            if constraint.point_id not in points or any(point_id not in points for point_id in constraint.line_points):
+                invalid.append(constraint.id)
+                continue
+            start, end = constraint.line_points
+            equations = [
+                _Equation({f"{constraint.point_id}.x": 1.0, f"{start}.x": -0.5, f"{end}.x": -0.5}, 0.0),
+                _Equation({f"{constraint.point_id}.y": 1.0, f"{start}.y": -0.5, f"{end}.y": -0.5}, 0.0),
+            ]
+        elif isinstance(constraint, ConcentricConstraint):
+            if any(entity_id not in circles for entity_id in constraint.entities):
+                unsupported.append(constraint.id)
+                continue
+            reference, target = (circles[entity_id] for entity_id in constraint.entities)
+            reference_x = f"{reference.center_point_id}.x" if reference.center_point_id in points else f"{reference.id}.center_x"
+            reference_y = f"{reference.center_point_id}.y" if reference.center_point_id in points else f"{reference.id}.center_y"
+            target_x = f"{target.center_point_id}.x" if target.center_point_id in points else f"{target.id}.center_x"
+            target_y = f"{target.center_point_id}.y" if target.center_point_id in points else f"{target.id}.center_y"
+            equations = [
+                _difference_equation(reference_x, target_x),
+                _difference_equation(reference_y, target_y),
+            ]
         else:
             unsupported.append(constraint.id)
             continue

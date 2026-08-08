@@ -20,6 +20,11 @@ from .constraints import (
     PerpendicularConstraint,
     RadiusConstraint,
     VerticalDistanceConstraint,
+    CollinearConstraint,
+    ConcentricConstraint,
+    MidpointConstraint,
+    SymmetricConstraint,
+    TangentConstraint,
 )
 from .geometry_command import GeometryCommand
 from .cad_export import CadExportArtifacts, CadExportMeasurements, CadExportResult
@@ -36,6 +41,8 @@ __all__ = [
     "CadExportResult",
     "ConstructionLine2DEntity",
     "ConstraintEntity",
+    "CollinearConstraint",
+    "ConcentricConstraint",
     "DiameterConstraint",
     "DistanceConstraint",
     "EqualAngleConstraint",
@@ -44,6 +51,7 @@ __all__ = [
     "Line2DEntity",
     "FixedPointConstraint",
     "HorizontalDistanceConstraint",
+    "MidpointConstraint",
     "ParallelConstraint",
     "PerpendicularConstraint",
     "RadiusConstraint",
@@ -54,5 +62,7 @@ __all__ = [
     "SelectionEntity",
     "SolverCoordinatePatch",
     "SolverRunResult",
+    "SymmetricConstraint",
+    "TangentConstraint",
     "VerticalDistanceConstraint",
 ]

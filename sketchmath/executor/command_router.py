@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from sketchmath.geometry.arcs import arc_endpoints, center_arc_geometry, normalize_angle_degrees, three_point_arc_geometry
 from sketchmath.geometry.intersections import intersect_lines
+from sketchmath.geometry.tolerances import DEFAULT_TOLERANCE_POLICY
 from sketchmath.geometry.profiles import analyze_closed_polygon
 from sketchmath.geometry.projections import project_point_to_line
 from sketchmath.geometry.transforms import (
@@ -21,6 +22,8 @@ from sketchmath.geometry.units import denormalize_angle, denormalize_length, nor
 from sketchmath.geometry.vectors import Point2D, add, distance, normalize, rotate_point, scale, subtract
 from sketchmath.models.constraints import (
     AngleConstraint,
+    CollinearConstraint,
+    ConcentricConstraint,
     ConstraintEntity,
     DiameterConstraint,
     DistanceConstraint,
@@ -29,7 +32,10 @@ from sketchmath.models.constraints import (
     FixedPointConstraint,
     HorizontalConstraint,
     HorizontalDistanceConstraint,
+    MidpointConstraint,
     RadiusConstraint,
+    SymmetricConstraint,
+    TangentConstraint,
     VerticalConstraint,
     VerticalDistanceConstraint,
     CoincidentConstraint,
@@ -147,6 +153,12 @@ def apply_geometry_command(
         "make_perpendicular": _handle_make_perpendicular,
         "make_equal_length": _handle_make_equal_length,
         "make_equal_angle": _handle_make_equal_angle,
+        "make_fixed": _handle_make_fixed,
+        "make_midpoint": _handle_make_midpoint,
+        "make_collinear": _handle_make_collinear,
+        "make_symmetric": _handle_make_symmetric,
+        "make_concentric": _handle_make_concentric,
+        "make_tangent": _handle_make_tangent,
         "solve_constraints": _handle_solve_constraints,
         "analyze_constraints": _handle_analyze_constraints,
         "make_profile": _handle_make_profile,
@@ -283,16 +295,7 @@ def _handle_delete_entity(command: GeometryCommand, state: SelectionContext) -> 
     if not command.selection:
         raise MissingParameterError("delete_entity requires a selection list", detail={"command_type": command.command_type, "parameter": "selection"})
     cascade = bool(command.parameters.get("cascade", False))
-    referenced_entities = {
-        constraint_point
-        for constraint in state.constraints
-        for constraint_point in getattr(constraint, "points", [])
-    }
-    referenced_entities.update(
-        constraint.circle_id
-        for constraint in state.constraints
-        if getattr(constraint, "circle_id", None) is not None
-    )
+    referenced_entities = {entity_id for constraint in state.constraints for entity_id in _constraint_reference_ids(constraint)}
     named_entities = set(state.named_references.values())
     deleted: list[str] = []
     for entity_id in command.selection:
@@ -313,8 +316,7 @@ def _handle_delete_entity(command: GeometryCommand, state: SelectionContext) -> 
         state.constraints = [
             constraint
             for constraint in state.constraints
-            if not any(point_id in command.selection for point_id in getattr(constraint, "points", []))
-            and getattr(constraint, "circle_id", None) not in command.selection
+            if not set(command.selection).intersection(_constraint_reference_ids(constraint))
         ]
     for name, entity_id in list(state.named_references.items()):
         if entity_id in command.selection:
@@ -326,14 +328,39 @@ def _handle_delete_entity(command: GeometryCommand, state: SelectionContext) -> 
 def _entity_dependencies(state: SelectionContext, entity_id: str) -> list[dict[str, str]]:
     dependencies: list[dict[str, str]] = []
     for constraint in state.constraints:
-        if entity_id in getattr(constraint, "points", []):
-            dependencies.append({"kind": "constraint", "id": constraint.id})
-        if entity_id == getattr(constraint, "circle_id", None):
+        if entity_id in _constraint_reference_ids(constraint):
             dependencies.append({"kind": "constraint", "id": constraint.id})
     for name, mapped_id in state.named_references.items():
         if mapped_id == entity_id:
             dependencies.append({"kind": "named_reference", "id": name})
     return dependencies
+
+
+def _constraint_reference_ids(constraint: ConstraintEntity) -> set[str]:
+    references = set(getattr(constraint, "points", ()))
+    references.update(getattr(constraint, "line_points", ()))
+    references.update(getattr(constraint, "entities", ()))
+    for field in ("point_id", "circle_id"):
+        value = getattr(constraint, field, None)
+        if value is not None:
+            references.add(str(value))
+    return references
+
+
+def _constraint_linked_point_ids(constraint: ConstraintEntity, state: SelectionContext) -> set[str]:
+    point_ids = set(_constraint_reference_ids(constraint))
+    for entity_id in getattr(constraint, "entities", ()):
+        entity = state.get_entity(entity_id)
+        for field in ("start_point_id", "end_point_id", "center_point_id"):
+            point_id = getattr(entity, field, None)
+            if point_id is not None:
+                point_ids.add(str(point_id))
+    return point_ids
+
+
+def _require_distinct_selection(command: GeometryCommand, expected_count: int, description: str) -> None:
+    if len(command.selection) != expected_count or len(set(command.selection)) != expected_count:
+        raise SelectionResolutionError(description, detail={"selection": command.selection, "distinct_required": True})
 
 
 def _handle_set_distance(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
@@ -784,6 +811,65 @@ def _handle_make_coincident(command: GeometryCommand, state: SelectionContext) -
     return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id}
 
 
+def _handle_make_fixed(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    if len(command.selection) != 1:
+        raise SelectionResolutionError("make_fixed requires one point", detail={"selection": command.selection})
+    point = _resolve_point(state, command.selection[0], "point")
+    constraint = FixedPointConstraint(id=f"constraint_{command.command_id}", point_id=point.id, coords=point.coords)
+    state.replace_constraint(constraint)
+    return state, [], None, None, {"constraint_id": constraint.id, "fixed_coords": list(point.coords)}
+
+
+def _handle_make_midpoint(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    _require_distinct_selection(command, 3, "make_midpoint requires three distinct points: midpoint, line start, and line end")
+    midpoint, start, end = (_resolve_point(state, entity_id, role) for entity_id, role in zip(command.selection, ("midpoint", "line_start", "line_end"), strict=True))
+    constraint = MidpointConstraint(id=f"constraint_{command.command_id}", point_id=midpoint.id, line_points=(start.id, end.id))
+    outcome = _apply_midpoint_constraint(constraint, state)
+    state.replace_constraint(constraint)
+    return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id}
+
+
+def _handle_make_collinear(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    _require_distinct_selection(command, 3, "make_collinear requires three distinct points")
+    points = tuple(_resolve_point(state, entity_id, role) for entity_id, role in zip(command.selection, ("line_start", "line_end", "moving"), strict=True))
+    constraint = CollinearConstraint(id=f"constraint_{command.command_id}", points=tuple(point.id for point in points))
+    outcome = _apply_collinear_constraint(constraint, state)
+    state.replace_constraint(constraint)
+    return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id}
+
+
+def _handle_make_symmetric(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    _require_distinct_selection(command, 4, "make_symmetric requires four distinct points: reference, target, axis start, and axis end")
+    points = tuple(_resolve_point(state, entity_id, role) for entity_id, role in zip(command.selection, ("reference", "target", "axis_start", "axis_end"), strict=True))
+    constraint = SymmetricConstraint(id=f"constraint_{command.command_id}", points=tuple(point.id for point in points))
+    outcome = _apply_symmetric_constraint(constraint, state)
+    state.replace_constraint(constraint)
+    return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id}
+
+
+def _handle_make_concentric(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    _require_distinct_selection(command, 2, "make_concentric requires two distinct circles or arcs")
+    constraint = ConcentricConstraint(id=f"constraint_{command.command_id}", entities=(command.selection[0], command.selection[1]))
+    outcome = _apply_concentric_constraint(constraint, state)
+    state.replace_constraint(constraint)
+    return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id}
+
+
+def _handle_make_tangent(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    _require_distinct_selection(command, 2, "make_tangent requires distinct reference and target entities")
+    tangency = str(command.parameters.get("tangency", "external"))
+    if tangency not in {"external", "internal"}:
+        raise SelectionResolutionError("tangency must be external or internal", detail={"tangency": tangency})
+    constraint = TangentConstraint(
+        id=f"constraint_{command.command_id}",
+        entities=(command.selection[0], command.selection[1]),
+        tangency=tangency,  # type: ignore[arg-type]
+    )
+    outcome = _apply_tangent_constraint(constraint, state)
+    state.replace_constraint(constraint)
+    return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id, "tangency": constraint.tangency}
+
+
 def _handle_move_point(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
     if len(command.selection) != 1:
         raise SelectionResolutionError("move_point requires one point", detail={"selection": command.selection})
@@ -821,6 +907,16 @@ def _handle_move_point(command: GeometryCommand, state: SelectionContext) -> tup
             changed.extend(outcome.get("changed_entity_ids", []))
         elif isinstance(constraint, (HorizontalConstraint, VerticalConstraint, CoincidentConstraint)):
             outcome = _apply_constraint(constraint, state)
+            changed.extend(outcome.get("changed_entity_ids", []))
+        elif isinstance(constraint, (MidpointConstraint, CollinearConstraint, SymmetricConstraint)) and coincident_ids.intersection(_constraint_reference_ids(constraint)):
+            outcome = _apply_constraint(constraint, state)
+            changed.extend(outcome.get("changed_entity_ids", []))
+        elif isinstance(constraint, (ConcentricConstraint, TangentConstraint)) and coincident_ids.intersection(
+            _constraint_linked_point_ids(constraint, state)
+        ):
+            _sync_linked_geometry(state)
+            outcome = _apply_constraint(constraint, state)
+            _sync_linked_geometry(state)
             changed.extend(outcome.get("changed_entity_ids", []))
     return state, _dedupe(changed), None, None, {"dragged_point_id": point.id, "constraints_preserved": True}
 
@@ -1556,6 +1652,16 @@ def _apply_constraint(constraint: ConstraintEntity, state: SelectionContext) -> 
         return _apply_vertical_constraint(constraint, state)
     if isinstance(constraint, CoincidentConstraint):
         return _apply_coincident_constraint(constraint, state)
+    if isinstance(constraint, MidpointConstraint):
+        return _apply_midpoint_constraint(constraint, state)
+    if isinstance(constraint, CollinearConstraint):
+        return _apply_collinear_constraint(constraint, state)
+    if isinstance(constraint, SymmetricConstraint):
+        return _apply_symmetric_constraint(constraint, state)
+    if isinstance(constraint, ConcentricConstraint):
+        return _apply_concentric_constraint(constraint, state)
+    if isinstance(constraint, TangentConstraint):
+        return _apply_tangent_constraint(constraint, state)
     raise SolverError("Unsupported constraint type", detail={"constraint_id": constraint.id})
 
 
@@ -1613,6 +1719,113 @@ def _apply_coincident_constraint(constraint: CoincidentConstraint, state: Select
     moving, anchor = (a, b) if b.locked else (b, a)
     state.replace_entity(_replace_point(moving, anchor.coords))
     return {"status": "changed", "changed_entity_ids": [moving.id]}
+
+
+def _apply_midpoint_constraint(constraint: MidpointConstraint, state: SelectionContext) -> dict[str, Any]:
+    midpoint = _resolve_point(state, constraint.point_id, "midpoint")
+    start, end = _resolve_points(state, list(constraint.line_points))
+    target = ((start.coords[0] + end.coords[0]) / 2.0, (start.coords[1] + end.coords[1]) / 2.0)
+    if midpoint.coords == target:
+        return {"status": "ok", "changed_entity_ids": []}
+    _ensure_mutable(state, [midpoint.id], "midpoint_constraint")
+    state.replace_entity(_replace_point(midpoint, target))
+    return {"status": "changed", "changed_entity_ids": [midpoint.id]}
+
+
+def _apply_collinear_constraint(constraint: CollinearConstraint, state: SelectionContext) -> dict[str, Any]:
+    start, end, moving = (_resolve_point(state, entity_id, role) for entity_id, role in zip(constraint.points, ("line_start", "line_end", "moving"), strict=True))
+    try:
+        target = project_point_to_line(moving.coords, start.coords, end.coords)
+    except ValueError as exc:
+        raise SolverError("Collinear reference is degenerate", detail={"constraint_id": constraint.id}) from exc
+    if moving.coords == target:
+        return {"status": "ok", "changed_entity_ids": []}
+    _ensure_mutable(state, [moving.id], "collinear_constraint")
+    state.replace_entity(_replace_point(moving, target))
+    return {"status": "changed", "changed_entity_ids": [moving.id]}
+
+
+def _apply_symmetric_constraint(constraint: SymmetricConstraint, state: SelectionContext) -> dict[str, Any]:
+    reference, target, axis_start, axis_end = (
+        _resolve_point(state, entity_id, role)
+        for entity_id, role in zip(constraint.points, ("reference", "target", "axis_start", "axis_end"), strict=True)
+    )
+    try:
+        projected = project_point_to_line(reference.coords, axis_start.coords, axis_end.coords)
+    except ValueError as exc:
+        raise SolverError("Symmetry axis is degenerate", detail={"constraint_id": constraint.id}) from exc
+    reflected = (2.0 * projected[0] - reference.coords[0], 2.0 * projected[1] - reference.coords[1])
+    if target.coords == reflected:
+        return {"status": "ok", "changed_entity_ids": []}
+    _ensure_mutable(state, [target.id], "symmetric_constraint")
+    state.replace_entity(_replace_point(target, reflected))
+    return {"status": "changed", "changed_entity_ids": [target.id]}
+
+
+def _center_entity(state: SelectionContext, entity_id: str, role: str) -> Circle2DEntity | Arc2DEntity:
+    entity = state.get_entity(entity_id)
+    if not isinstance(entity, (Circle2DEntity, Arc2DEntity)):
+        raise WrongEntityTypeError(
+            "Expected circle_2d or arc_2d",
+            detail={"entity_id": entity_id, "role": role, "expected": ["circle_2d", "arc_2d"], "actual": entity.type},
+        )
+    return entity
+
+
+def _move_center_entity(state: SelectionContext, entity: Circle2DEntity | Arc2DEntity, target: Point2D, command_type: str) -> list[str]:
+    if entity.center == target:
+        return []
+    _ensure_mutable(state, [entity.id], command_type)
+    center_point_id = entity.center_point_id
+    if center_point_id:
+        center_point = _resolve_point(state, center_point_id, "center")
+        _ensure_mutable(state, [center_point.id], command_type)
+        state.replace_entity(_replace_point(center_point, target))
+        return [center_point.id, entity.id]
+    state.replace_entity(type(entity)(**{**entity.model_dump(), "center": target}))
+    return [entity.id]
+
+
+def _apply_concentric_constraint(constraint: ConcentricConstraint, state: SelectionContext) -> dict[str, Any]:
+    reference = _center_entity(state, constraint.entities[0], "reference")
+    target = _center_entity(state, constraint.entities[1], "target")
+    changed = _move_center_entity(state, target, reference.center, "concentric_constraint")
+    return {"status": "changed" if changed else "ok", "changed_entity_ids": changed}
+
+
+def _apply_tangent_constraint(constraint: TangentConstraint, state: SelectionContext) -> dict[str, Any]:
+    reference = state.get_entity(constraint.entities[0])
+    target = state.get_entity(constraint.entities[1])
+    if isinstance(target, Arc2DEntity) or isinstance(reference, Arc2DEntity):
+        raise SelectionResolutionError(
+            "Finite-arc tangency is not yet supported",
+            detail={"constraint_id": constraint.id, "entities": list(constraint.entities), "error_code": "unsupported_arc_tangency"},
+        )
+    target_circle = target if isinstance(target, Circle2DEntity) else None
+    if isinstance(reference, (Line2DEntity, ConstructionLine2DEntity)) and target_circle is not None:
+        start, end = _line_points(reference)
+        line_vector = subtract(end, start)
+        line_length = distance(start, end)
+        if line_length <= DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm:
+            raise SolverError("Tangent reference line is degenerate", detail={"constraint_id": constraint.id})
+        projected = project_point_to_line(target_circle.center, start, end)
+        side = 1.0 if _cross(line_vector, subtract(target_circle.center, start)) >= 0.0 else -1.0
+        normal = (-line_vector[1] / line_length, line_vector[0] / line_length)
+        desired = add(projected, scale(normal, target_circle.radius * side))
+        changed = _move_center_entity(state, target_circle, desired, "tangent_constraint")
+        return {"status": "changed" if changed else "ok", "changed_entity_ids": changed}
+    if isinstance(reference, Circle2DEntity) and target_circle is not None:
+        target_distance = reference.radius + target_circle.radius if constraint.tangency == "external" else abs(reference.radius - target_circle.radius)
+        if target_distance <= DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm:
+            raise SolverError("Internal tangency is undefined for equal radii", detail={"constraint_id": constraint.id})
+        direction = normalize(subtract(target_circle.center, reference.center))
+        desired = add(reference.center, scale(direction, target_distance))
+        changed = _move_center_entity(state, target_circle, desired, "tangent_constraint")
+        return {"status": "changed" if changed else "ok", "changed_entity_ids": changed}
+    raise WrongEntityTypeError(
+        "Tangent currently supports line-to-circle or circle-to-circle selection order",
+        detail={"constraint_id": constraint.id, "entities": list(constraint.entities)},
+    )
 
 
 def _apply_distance_constraint(constraint: DistanceConstraint, state: SelectionContext) -> dict[str, Any]:

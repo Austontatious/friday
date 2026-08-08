@@ -101,6 +101,33 @@ class CoincidentConstraint(_ConstraintBase):
     points: tuple[str, str]
 
 
+class MidpointConstraint(_ConstraintBase):
+    type: Literal["midpoint_constraint"] = "midpoint_constraint"
+    point_id: str
+    line_points: tuple[str, str]
+
+
+class CollinearConstraint(_ConstraintBase):
+    type: Literal["collinear_constraint"] = "collinear_constraint"
+    points: tuple[str, str, str]
+
+
+class SymmetricConstraint(_ConstraintBase):
+    type: Literal["symmetric_constraint"] = "symmetric_constraint"
+    points: tuple[str, str, str, str]
+
+
+class ConcentricConstraint(_ConstraintBase):
+    type: Literal["concentric_constraint"] = "concentric_constraint"
+    entities: tuple[str, str]
+
+
+class TangentConstraint(_ConstraintBase):
+    type: Literal["tangent_constraint"] = "tangent_constraint"
+    entities: tuple[str, str]
+    tangency: Literal["external", "internal"] = "external"
+
+
 ConstraintEntity = Annotated[
     FixedPointConstraint
     | DistanceConstraint
@@ -115,6 +142,11 @@ ConstraintEntity = Annotated[
     | EqualAngleConstraint
     | HorizontalConstraint
     | VerticalConstraint
-    | CoincidentConstraint,
+    | CoincidentConstraint
+    | MidpointConstraint
+    | CollinearConstraint
+    | SymmetricConstraint
+    | ConcentricConstraint
+    | TangentConstraint,
     Field(discriminator="type"),
 ]
