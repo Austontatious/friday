@@ -2,7 +2,7 @@
 
 SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 
-The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`; canonical arc commands use version `0.5`. Undeclared versions and command types are rejected as `invalid_command` before execution.
+The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`; canonical arc commands use version `0.5`; the additional Gate B constraint families use version `0.6`. Undeclared versions and command types are rejected as `invalid_command` before execution.
 
 ## Execution Loop
 
@@ -69,12 +69,25 @@ The canonical machine-readable contracts are generated from the Pydantic models 
   - Aligns two addressable points vertically and persists a vertical constraint.
 - `make_coincident`
   - Makes two point identities coincident without merging their stable IDs.
+- `make_fixed`
+  - Version `0.6`; stores the selected point's current coordinates as a fixed-point constraint and rejects later conflicting drags without partial mutation.
+- `make_midpoint`
+  - Version `0.6`; selection order is midpoint, segment start, segment end. Moves the midpoint to the exact average and participates in exact linear DOF analysis.
+- `make_collinear`
+  - Version `0.6`; selection order is reference start, reference end, moving point. Projects the moving point onto the infinite reference line.
+- `make_symmetric`
+  - Version `0.6`; selection order is reference point, target point, axis start, axis end. Reflects the target across the infinite axis.
+- `make_concentric`
+  - Version `0.6`; moves the second selected circle or arc center onto the first. Circle-to-circle concentricity participates in exact linear DOF analysis; arc participation remains partial.
+- `make_tangent`
+  - Version `0.6`; supports line-to-circle and circle-to-circle closed-form tangency with external or internal circle tangency.
+  - Finite-arc tangency is explicitly rejected with `error_code=unsupported_arc_tangency`; it is not approximated as full-circle tangency.
 - `solve_constraints`
   - Runs the conservative 2D solver over stored constraints through the unified `SolverRunResult` path.
   - Applies only an accepted `solved` coordinate patch. Under-constrained, inconsistent, redundant, and failed proposals return structured errors with the run result and do not commit partial geometry.
 - `analyze_constraints`
   - Version `0.3`, preview-only, and non-mutating.
-  - Reports exact DOF for the covered linear subset: point and circle scalar variables; locked/fixed points/circles; horizontal, vertical, coincident, horizontal/vertical distance, radius, and diameter constraints.
+  - Reports exact DOF for the covered linear subset: point and circle scalar variables; locked/fixed points/circles; horizontal, vertical, coincident, midpoint, circle concentricity, horizontal/vertical distance, radius, and diameter constraints.
   - Returns explicit `partial` or `unknown` coverage instead of inventing DOF for nonlinear distance/angle/relation constraints, coordinate-only legacy geometry, or other unmodeled entities.
   - Reports consistency and proven redundancy separately; a deterministic conflict ID is not claimed to be a minimal conflict set.
   - Returns the same unified `solver_run` envelope as solve mode while retaining `solver_analysis` compatibility metadata for live status.
@@ -143,6 +156,11 @@ The canonical machine-readable contracts are generated from the Pydantic models 
 - `vertical_constraint`
 - `coincident_constraint`
 - `fixed_point_constraint`
+- `midpoint_constraint`
+- `collinear_constraint`
+- `symmetric_constraint`
+- `concentric_constraint`
+- `tangent_constraint`
 
 Locked entities act as fixed anchors. The production solver only moves unlocked points, and it prefers closed-form cases over iterative search. Solver analysis uses the versioned numerical policy in `sketchmath/geometry/tolerances.py`; those values are computational tolerances, not manufacturing tolerances.
 Profile hole validation is strict: holes must be closed polygons, strictly inside the outer profile, non-touching, and non-overlapping.

@@ -60,7 +60,10 @@ The build still reports the repository-wide stale Browserslist database notice. 
 - SciPy `least_squares` benchmarked successfully for covered nondegenerate systems, but remains unadopted because optimizer termination can mask infeasible residuals and an analytic zero-length seed failed.
 - Analysis and solve now share a typed backend-neutral run result with before/after analysis, feasibility, residual availability, deterministic entity patches, termination reason, and diagnostics.
 - Canonical center and three-point arcs now share one persisted `arc_2d` model, v0.5 typed commands, stable source points, SVG rendering, structured degeneracy errors, and reload-stable history.
-- Current evidence: 127 focused Python tests, 47 semantic evals, 57 focused frontend tests, 10 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- Gate B fixed, midpoint, collinear, symmetric, concentric, and tangent constraints now use typed v0.6 commands, deterministic closed-form mutation, persistence/dependency handling, constrained drag where linked geometry is addressable, and selection-aware workspace controls.
+- Fixed, midpoint, and circle concentricity extend exact linear analysis. Collinearity, symmetry, and tangency remain explicitly partial until their nonlinear equations are modeled.
+- A live mixed line/circle workflow now proves remaining-DOF drag, full constraint, dimensional edit, unified solve, undo/redo, and identical reload recovery without browser errors.
+- Current evidence: 140 focused Python tests, 49 semantic evals, 59 focused frontend tests, 11 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
 
 ## Gate A Outcome
 
@@ -77,6 +80,7 @@ Completed and published:
 ## Known Limitations
 
 - Arc solver equations, arc-aware dimensions/constraints, and arc participation in general planar topology are not implemented; solver coverage is explicitly partial.
+- Finite-arc tangency is rejected rather than approximated as full-circle tangency.
 - Production solve remains a conservative closed-form subset. Exact analysis covers its linear point/circle families; Euclidean distance, angle, parallel/perpendicular, and equality relations remain partial/unknown.
 - Topology recognizes deterministic simple line cycles, not general planar regions.
 - The product lacks a canonical multi-body/feature document model and downstream rebuild graph.
@@ -98,7 +102,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Implement the remaining Gate B tangent/concentric/collinear/midpoint/symmetric/fixed families, then execute the mixed-geometry full-constraint acceptance scenario.
+Complete the remaining Gate B geometry/editing envelope (construction geometry, polyline/center rectangle, slot/polygon, and safe trim/extend/split/offset/pattern flows), then expand exact solver coverage for nonlinear and arc systems.
 
 ## Release Status
 

@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-08 - SketchMath Gate B Constraint Families and Mixed-Geometry Acceptance
+
+### What Changed
+- Added typed v0.6 fixed, midpoint, collinear, symmetric, concentric, and tangent constraints across canonical models, generated schemas, executor persistence/dependencies, API, semantic evals, and the workspace.
+- Added deterministic closed-form application and constrained-drag preservation for linked point/line/circle geometry. Repeated-identity selections and degenerate references fail structurally without partial commits.
+- Extended exact linear solver analysis for fixed points, midpoint equations, and circle-to-circle concentricity. Collinear, symmetric, tangent, arc-concentric, and all arc geometry remain explicitly partial.
+- Added a live mixed line/circle browser scenario covering observable remaining DOF, drag, full constraint, radius/diameter edit, unified solve, undo/redo, reload identity, and browser error capture.
+
+### Why
+- Gate B requires the standard sketch constraint vocabulary and one product-level lifecycle proving that dimensions, constraints, solver status, history, and persistence agree.
+- Finite-arc tangency is rejected with `unsupported_arc_tangency` instead of silently applying infinite/full-circle semantics.
+
+### New Env Flags
+- None. The slice remains behind the existing default-off SketchMath feature gate.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 140 passed.
+- `PYTHONPATH=. python3 -m sketchmath.evals.run_sketchmath_evals` — 49 passed.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand --runTestsByPath src/App.test.tsx src/components/sketchmath/SketchMathWorkspace.test.tsx src/components/sketchmath/commandBuilders.test.ts src/components/sketchmath/arcGeometry.test.ts` — 59 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npx playwright test e2e/sketchmath.spec.ts` — TypeScript/build and 11 browser workflows passed.
+- `PYTHONPATH=. python3 -m sketchmath.schemas.generate --check`, `docker compose config -q`, and `python3 -m pytest -q tests/test_codex_standards.py` passed.
+
+### Remaining Phase 1 Work
+- Complete the remaining Gate B geometry/editing envelope and expand exact nonlinear/arc solver coverage. This slice does not make the full Gate B or product release-ready.
+
+---
+
 ## 2026-08-08 - SketchMath Canonical Arc Geometry
 
 ### What Changed
