@@ -1,0 +1,31 @@
+{
+  "name": "sketchmath_v06_make_midpoint",
+  "input": {
+    "command": {
+      "version": "0.6",
+      "command_id": "cmd_eval_midpoint",
+      "mode": "commit",
+      "command_type": "make_midpoint",
+      "selection": ["mid", "a", "b"],
+      "parameters": {}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_midpoint",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "mid", "type": "point_2d", "coords": [9, 9]},
+        {"id": "a", "type": "point_2d", "coords": [0, 0]},
+        {"id": "b", "type": "point_2d", "coords": [8, 4]}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "changed_entity_ids": ["mid"],
+    "after": {"mid": [4.0, 2.0]},
+    "metadata": {"constraint_id": "constraint_cmd_eval_midpoint"}
+  }
+}

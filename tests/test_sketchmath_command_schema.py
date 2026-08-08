@@ -83,6 +83,9 @@ def test_geometry_command_schema_matches_runtime_command_contract() -> None:
     assert "define_arc" in command_types
     assert "update_arc" in command_types
     assert "0.5" in schema["properties"]["version"]["enum"]
+    for command_type in ("make_fixed", "make_midpoint", "make_collinear", "make_symmetric", "make_concentric", "make_tangent"):
+        assert command_type in command_types
+    assert "0.6" in schema["properties"]["version"]["enum"]
 
 
 def test_checked_in_sketchmath_schemas_match_canonical_models() -> None:
@@ -132,6 +135,11 @@ def test_selection_context_schema_declares_current_entities_and_constraints() ->
         "vertical_distance_constraint",
         "radius_constraint",
         "diameter_constraint",
+        "midpoint_constraint",
+        "collinear_constraint",
+        "symmetric_constraint",
+        "concentric_constraint",
+        "tangent_constraint",
         "start_point_id",
         "source_circle_id",
     ):

@@ -323,6 +323,48 @@ def test_arc_entity_upsert_uses_the_canonical_v05_command_path(monkeypatch, tmp_
     client.close()
 
 
+def test_v06_gate_b_constraints_round_trip_with_typed_solver_analysis(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = _client(monkeypatch)
+    created = client.post(
+        "/api/sketchmath/sessions",
+        json={
+            "selection_context": _selection_context(
+                [
+                    {"id": "a", "type": "point_2d", "coords": [0, 0], "locked": True},
+                    {"id": "b", "type": "point_2d", "coords": [8, 4], "locked": True},
+                    {"id": "mid", "type": "point_2d", "coords": [9, 9], "locked": False},
+                    {"id": "reference", "type": "circle_2d", "center": [2, 3], "radius": 4},
+                    {"id": "target", "type": "circle_2d", "center": [12, 7], "radius": 2},
+                ]
+            )
+        },
+    )
+    session_id = created.json()["session_id"]
+    commands = [
+        _command("make_midpoint", "midpoint_api", mode="commit", selection=["mid", "a", "b"]),
+        _command("make_concentric", "concentric_api", mode="commit", selection=["reference", "target"]),
+    ]
+    for command in commands:
+        command["version"] = "0.6"
+        response = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": command})
+        assert response.status_code == 200
+
+    snapshot = client.get(f"/api/sketchmath/sessions/{session_id}").json()
+    assert next(item for item in snapshot["selection_context"]["items"] if item["id"] == "mid")["coords"] == [4.0, 2.0]
+    assert next(item for item in snapshot["selection_context"]["items"] if item["id"] == "target")["center"] == [2.0, 3.0]
+    assert [constraint["type"] for constraint in snapshot["selection_context"]["constraints"]] == ["midpoint_constraint", "concentric_constraint"]
+
+    analysis_command = _command("analyze_constraints", "analyze_v06")
+    analysis_command["version"] = "0.3"
+    analysis = client.post(f"/api/sketchmath/sessions/{session_id}/commands/preview", json={"command": analysis_command})
+    assert analysis.status_code == 200
+    payload = analysis.json()["result"]["metadata"]["solver_analysis"]
+    assert payload["coverage"] == "exact"
+    assert payload["supported_constraint_ids"] == ["constraint_concentric_api", "constraint_midpoint_api"]
+    client.close()
+
+
 def test_sketchmath_rectangle_dimension_preview_and_commit(monkeypatch):
     client = _client(monkeypatch)
     created = client.post(

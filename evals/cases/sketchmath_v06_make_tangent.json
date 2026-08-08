@@ -1,0 +1,30 @@
+{
+  "name": "sketchmath_v06_make_tangent",
+  "input": {
+    "command": {
+      "version": "0.6",
+      "command_id": "cmd_eval_tangent",
+      "mode": "commit",
+      "command_type": "make_tangent",
+      "selection": ["line", "circle"],
+      "parameters": {"tangency": "external"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_tangent",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "line", "type": "line_2d", "start": [0, 0], "end": [10, 0]},
+        {"id": "circle", "type": "circle_2d", "center": [4, 7], "radius": 2}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "changed_entity_ids": ["circle"],
+    "after": {"circle": {"center": [4.0, 2.0], "radius": 2.0}},
+    "metadata": {"constraint_id": "constraint_cmd_eval_tangent", "tangency": "external"}
+  }
+}
