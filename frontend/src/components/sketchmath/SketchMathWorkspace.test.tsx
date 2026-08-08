@@ -1234,6 +1234,26 @@ describe("SketchMath workspace", () => {
     expect(within(workbench).getByRole("button", { name: "Extrude" })).toBeEnabled();
   });
 
+  it("creates a canonical rectangle bundle from a center and corner", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: /^Center rectangle$/ }));
+    clickCanvasAt(canvas, 280, 170);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: Profile"));
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Rectangle 240 mm x 100 mm");
+    expect(screen.getByTestId(`entity-${baseId}_a`).querySelector("circle")).toHaveAttribute("cx", "160");
+    expect(screen.getByTestId(`entity-${baseId}_c`).querySelector("circle")).toHaveAttribute("cx", "400");
+    expect(screen.getByTestId(`entity-${baseId}_a`).querySelector("circle")).toHaveAttribute("cy", "120");
+    expect(screen.getByTestId(`entity-${baseId}_c`).querySelector("circle")).toHaveAttribute("cy", "220");
+  });
+
   it("exposes rectangle dimensions that drive grouped rectangle geometry", async () => {
     const { fetchMock } = createSketchmathMock();
     global.fetch = fetchMock as unknown as typeof fetch;

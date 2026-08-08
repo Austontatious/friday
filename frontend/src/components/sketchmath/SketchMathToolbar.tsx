@@ -16,6 +16,7 @@ const SketchMathToolbar = ({ mode, onModeChange, theme, onToggleTheme }: SketchM
         {[
           ["select", "Select"],
           ["rectangle", "Draw rectangle"],
+          ["center_rectangle", "Center rectangle"],
           ["hole", "Add hole"],
           ["pan", "Pan / view"],
           ["point", "Point"],

@@ -372,6 +372,17 @@ const clampRectanglePoint = (anchor: Point, point: Point, forceSquare: boolean):
   return { x: anchor.x + sx * size, y: anchor.y + sy * size };
 };
 
+const centerRectangleCorner = (center: Point, corner: Point, forceSquare: boolean): Point => {
+  if (!forceSquare) return corner;
+  const deltaX = corner.x - center.x;
+  const deltaY = corner.y - center.y;
+  const magnitude = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+  return {
+    x: center.x + Math.sign(deltaX || 1) * magnitude,
+    y: center.y + Math.sign(deltaY || 1) * magnitude,
+  };
+};
+
 const SketchMathWorkspace = () => {
   const { colorMode, toggleColorMode } = useColorMode();
   const toast = useToast();
@@ -1544,6 +1555,14 @@ const SketchMathWorkspace = () => {
     setTranslationOutcome(null);
   };
 
+  const commitCenterRectangle = async (center: Point, rawCorner: Point, forceSquare: boolean) => {
+    const corner = centerRectangleCorner(center, rawCorner, forceSquare);
+    const deltaX = corner.x - center.x;
+    const deltaY = corner.y - center.y;
+    const anchor = { x: center.x - deltaX, y: center.y - deltaY };
+    await commitRectangle(anchor, corner, false);
+  };
+
   const handleCanvasClick = (point: Point) => {
     if (ignoreNextCanvasClickRef.current) {
       ignoreNextCanvasClickRef.current = false;
@@ -1673,15 +1692,19 @@ const SketchMathWorkspace = () => {
       })();
       return;
     }
-    if (tool === "rectangle") {
+    if (tool === "rectangle" || tool === "center_rectangle") {
       if (!rectangleDraft) {
         setRectangleDraft({ anchor: point, current: point });
         clearErrorState();
         canvasDragRef.current = null;
         return;
       }
-      const resolvedCurrent = clampRectanglePoint(rectangleDraft.anchor, point, false);
-      void commitRectangle(rectangleDraft.anchor, resolvedCurrent, false);
+      if (tool === "center_rectangle") {
+        void commitCenterRectangle(rectangleDraft.anchor, point, false);
+      } else {
+        const resolvedCurrent = clampRectanglePoint(rectangleDraft.anchor, point, false);
+        void commitRectangle(rectangleDraft.anchor, resolvedCurrent, false);
+      }
       clearRectangleInteraction();
       setTool("select");
       return;
@@ -1701,7 +1724,7 @@ const SketchMathWorkspace = () => {
       viewPanRef.current = { last: point };
       return;
     }
-    if (tool !== "rectangle" || event.button !== 0) {
+    if ((tool !== "rectangle" && tool !== "center_rectangle") || event.button !== 0) {
       return;
     }
     canvasDragRef.current = { start: point, moved: false, forceSquare: event.shiftKey };
@@ -1746,12 +1769,14 @@ const SketchMathWorkspace = () => {
       setArcDraft({ ...arcDraft, current: point });
       return;
     }
-    if (tool !== "rectangle") {
+    if (tool !== "rectangle" && tool !== "center_rectangle") {
       return;
     }
     if (canvasDragRef.current) {
       const drag = canvasDragRef.current;
-      const resolvedPoint = clampRectanglePoint(drag.start, point, event.shiftKey || drag.forceSquare);
+      const resolvedPoint = tool === "center_rectangle"
+        ? centerRectangleCorner(drag.start, point, event.shiftKey || drag.forceSquare)
+        : clampRectanglePoint(drag.start, point, event.shiftKey || drag.forceSquare);
       if (!drag.moved && distanceBetween(drag.start, point) < RECTANGLE_DRAG_THRESHOLD) {
         return;
       }
@@ -1760,7 +1785,12 @@ const SketchMathWorkspace = () => {
       return;
     }
     if (rectangleDraft) {
-      setRectangleDraft({ anchor: rectangleDraft.anchor, current: clampRectanglePoint(rectangleDraft.anchor, point, event.shiftKey) });
+      setRectangleDraft({
+        anchor: rectangleDraft.anchor,
+        current: tool === "center_rectangle"
+          ? centerRectangleCorner(rectangleDraft.anchor, point, event.shiftKey)
+          : clampRectanglePoint(rectangleDraft.anchor, point, event.shiftKey),
+      });
     }
   };
 
@@ -1796,7 +1826,7 @@ const SketchMathWorkspace = () => {
       clearErrorState();
       return;
     }
-    if (tool !== "rectangle") {
+    if (tool !== "rectangle" && tool !== "center_rectangle") {
       return;
     }
     const drag = canvasDragRef.current;
@@ -1805,7 +1835,11 @@ const SketchMathWorkspace = () => {
     }
     if (drag.moved || distanceBetween(drag.start, point) >= RECTANGLE_DRAG_THRESHOLD) {
       ignoreNextCanvasClickRef.current = true;
-      void commitRectangle(drag.start, point, event.shiftKey || drag.forceSquare);
+      if (tool === "center_rectangle") {
+        void commitCenterRectangle(drag.start, point, event.shiftKey || drag.forceSquare);
+      } else {
+        void commitRectangle(drag.start, point, event.shiftKey || drag.forceSquare);
+      }
       clearRectangleInteraction();
       setTool("select");
       return;
@@ -1814,7 +1848,7 @@ const SketchMathWorkspace = () => {
   };
 
   const handleCanvasContextMenu = () => {
-    if (tool === "rectangle") {
+    if (tool === "rectangle" || tool === "center_rectangle") {
       clearRectangleInteraction();
       clearErrorState();
     }
@@ -2760,6 +2794,8 @@ const SketchMathWorkspace = () => {
     ? "Click inside the selected profile to place the hole, or add it at the profile center from the workflow panel."
     : tool === "rectangle"
       ? "Drag on the canvas to draw a rectangle profile. Hold Shift while dragging for a square."
+      : tool === "center_rectangle"
+        ? "Click or drag from the rectangle center to a corner. Hold Shift for a centered square."
       : tool === "hole"
         ? "Select a profile, then click inside it to place a circular hole."
         : tool === "pan"
@@ -2885,7 +2921,15 @@ const SketchMathWorkspace = () => {
                         : null
                   }
                   draftPoint={draftPoint}
-                  rectangleDraft={rectangleDraft}
+                  rectangleDraft={rectangleDraft && tool === "center_rectangle"
+                    ? {
+                        anchor: {
+                          x: 2 * rectangleDraft.anchor.x - rectangleDraft.current.x,
+                          y: 2 * rectangleDraft.anchor.y - rectangleDraft.current.y,
+                        },
+                        current: rectangleDraft.current,
+                      }
+                    : rectangleDraft}
                   circleDraft={circleDraft}
                   arcDraft={arcDraft}
                   dragPreviewPoint={dragPreviewPoint}
@@ -2920,7 +2964,7 @@ const SketchMathWorkspace = () => {
               ) : null}
               <Box className="sketchmath-workflow-step" data-testid="sketchmath-tool-mode">
                 <Text className="sketchmath-step-label">Current mode</Text>
-                <Text fontWeight="600">{tool === "select" ? "Select" : tool === "rectangle" ? "Draw rectangle" : tool === "hole" ? "Add hole" : tool === "pan" ? "Pan / view" : tool}</Text>
+                <Text fontWeight="600">{tool === "select" ? "Select" : tool === "rectangle" ? "Draw rectangle" : tool === "center_rectangle" ? "Center rectangle" : tool === "hole" ? "Add hole" : tool === "pan" ? "Pan / view" : tool}</Text>
                 <Text fontSize="sm" opacity={0.8}>
                   {canvasHelperText}
                 </Text>
@@ -3003,6 +3047,9 @@ const SketchMathWorkspace = () => {
                 <HStack spacing={2} flexWrap="wrap" mt={2}>
                   <Button size="sm" onClick={() => handleToolChange("rectangle")} variant={tool === "rectangle" ? "solid" : "outline"}>
                     Start rectangle
+                  </Button>
+                  <Button size="sm" onClick={() => handleToolChange("center_rectangle")} variant={tool === "center_rectangle" ? "solid" : "outline"}>
+                    Start center rectangle
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => void handleClearSketch()}>
                     Clear sketch

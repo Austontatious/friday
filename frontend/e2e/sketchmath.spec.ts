@@ -286,6 +286,36 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-selection-inspector")).toContainText("extrude_profile");
   });
 
+  test("creates a center-defined rectangle through the canonical rectangle bundle", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Center rectangle", exact: true }).click();
+    await clickSvgViewBoxPoint(page, 260, 180);
+    await clickSvgViewBoxPoint(page, 340, 230);
+
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+    const widthBeforeReload = Number(await page.getByLabel("Rectangle width").inputValue());
+    const heightBeforeReload = Number(await page.getByLabel("Rectangle height").inputValue());
+    expect(Math.abs(widthBeforeReload - 160)).toBeLessThan(3);
+    expect(Math.abs(heightBeforeReload - 100)).toBeLessThan(3);
+    const rectanglePoints = page.locator('[data-testid^="entity-rect_"][data-entity-type="point_2d"] circle');
+    await expect(rectanglePoints).toHaveCount(4);
+    const coordinates = await rectanglePoints.evaluateAll((points) => points.map((point) => ({
+      x: Number(point.getAttribute("cx")),
+      y: Number(point.getAttribute("cy")),
+    })));
+    expect(Math.abs((Math.min(...coordinates.map((point) => point.x)) + Math.max(...coordinates.map((point) => point.x))) / 2 - 260)).toBeLessThan(2);
+    expect(Math.abs((Math.min(...coordinates.map((point) => point.y)) + Math.max(...coordinates.map((point) => point.y))) / 2 - 180)).toBeLessThan(2);
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" })).toBeEnabled();
+
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    const restoredCoordinates = await page.locator('[data-testid^="entity-rect_"][data-entity-type="point_2d"] circle').evaluateAll((points) => points.map((point) => ({
+      x: Number(point.getAttribute("cx")),
+      y: Number(point.getAttribute("cy")),
+    })));
+    expect(restoredCoordinates).toEqual(coordinates);
+  });
+
   test("handles referenced rectangle edge delete and clean sketch reset in the normal UI", async ({ page }) => {
     await openSketchMath(page);
 
