@@ -1,5 +1,6 @@
 import React from "react";
 import type { SketchMathEntity, SketchMathProfileCandidate } from "../../services/sketchmath";
+import { arcSvgPath } from "./arcGeometry";
 
 type EntityLayerProps = {
   entities: SketchMathEntity[];
@@ -22,6 +23,7 @@ const isLine = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, {
 const isProfile = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "profile_2d" }> =>
   entity.type === "profile_2d";
 const isCircle = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "circle_2d" }> => entity.type === "circle_2d";
+const isArc = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "arc_2d" }> => entity.type === "arc_2d";
 
 const formatDimension = (value: number): string => Number(value.toFixed(2)).toString();
 const DIMENSION_GUIDE_OFFSET = 34;
@@ -209,6 +211,26 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
             onEntityClick(entity.id, event);
           }}
         />
+      );
+    })}
+    {entities.filter(isArc).map((entity) => {
+      const selected = selectedEntityIds.includes(entity.id);
+      return (
+        <g
+          key={entity.id}
+          data-testid={`entity-${entity.id}`}
+          data-entity-id={entity.id}
+          data-entity-type={entity.type}
+          role="button"
+          tabIndex={0}
+          onClick={(event) => {
+            event.stopPropagation();
+            onEntityClick(entity.id, event);
+          }}
+        >
+          <path d={arcSvgPath(entity)} fill="none" className="sketchmath-line-hit-target" />
+          <path d={arcSvgPath(entity)} fill="none" className={selected ? "sketchmath-line sketchmath-line-selected" : "sketchmath-line"} />
+        </g>
       );
     })}
     {entities.filter(isPoint).map((entity) => {

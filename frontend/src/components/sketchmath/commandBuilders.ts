@@ -53,6 +53,55 @@ export const buildDefineCircleCommand = (center: Point, radius: number, name: st
 export const buildUpdateCircleCommand = (circleId: string, center: Point, radius: number): SketchMathCommand =>
   baseCommand("update_circle", [circleId], { center: [center.x, center.y], radius });
 
+const arcCommand = (parameters: Record<string, unknown>): SketchMathCommand => ({
+  ...baseCommand("define_arc", [], parameters),
+  version: "0.5",
+});
+
+export const buildDefineCenterArcCommand = (
+  center: Point,
+  start: Point,
+  end: Point,
+  name: string,
+  pointIds: { center: string; start: string; end: string },
+): SketchMathCommand => {
+  const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+  const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
+  const clockwiseSweep = ((endAngle - startAngle) * 180) / Math.PI % 360;
+  const normalizedClockwiseSweep = clockwiseSweep < 0 ? clockwiseSweep + 360 : clockwiseSweep;
+  return arcCommand({
+    name,
+    construction: "center",
+    center: [center.x, center.y],
+    start: [start.x, start.y],
+    end: [end.x, end.y],
+    direction: normalizedClockwiseSweep <= 180 ? "clockwise" : "counterclockwise",
+    center_point_id: pointIds.center,
+    start_point_id: pointIds.start,
+    end_point_id: pointIds.end,
+    label: name,
+  });
+};
+
+export const buildDefineThreePointArcCommand = (
+  start: Point,
+  through: Point,
+  end: Point,
+  name: string,
+  pointIds: { start: string; through: string; end: string },
+): SketchMathCommand =>
+  arcCommand({
+    name,
+    construction: "three_point",
+    start: [start.x, start.y],
+    through: [through.x, through.y],
+    end: [end.x, end.y],
+    start_point_id: pointIds.start,
+    through_point_id: pointIds.through,
+    end_point_id: pointIds.end,
+    label: name,
+  });
+
 export const buildMakeCircleProfileCommand = (circleId: string, profileId?: string): SketchMathCommand =>
   baseCommand("make_circle_profile", [circleId], profileId ? { name: profileId } : {});
 

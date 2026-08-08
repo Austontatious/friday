@@ -18,6 +18,7 @@ type SketchCanvas2DProps = {
   draftPoint: Point | null;
   rectangleDraft: { anchor: Point; current: Point } | null;
   circleDraft?: { center: Point; current: Point } | null;
+  arcDraft?: { points: Point[]; current: Point } | null;
   dragPreviewPoint: { id: string; point: Point } | null;
   holePlacementPreview?: { center: Point; diameter: number } | null;
   holePlacementActive?: boolean;
@@ -44,6 +45,7 @@ const SketchCanvas2D = ({
   draftPoint,
   rectangleDraft,
   circleDraft,
+  arcDraft,
   dragPreviewPoint,
   holePlacementPreview,
   holePlacementActive = false,
@@ -123,6 +125,14 @@ const SketchCanvas2D = ({
       <GridLayer width={width} height={height} />
       {rectangleDraft ? <polygon points={rectanglePoints} className="sketchmath-draft-rectangle" data-testid="sketchmath-rectangle-draft" /> : null}
       {circleDraft ? <circle cx={circleDraft.center.x} cy={circleDraft.center.y} r={Math.hypot(circleDraft.current.x - circleDraft.center.x, circleDraft.current.y - circleDraft.center.y)} fill="none" className="sketchmath-draft-rectangle" data-testid="sketchmath-circle-draft" /> : null}
+      {arcDraft ? (
+        <polyline
+          points={[...arcDraft.points, arcDraft.current].map((point) => `${point.x},${point.y}`).join(" ")}
+          fill="none"
+          className="sketchmath-draft-rectangle"
+          data-testid="sketchmath-arc-draft"
+        />
+      ) : null}
       {dragPreviewPoint ? <circle cx={dragPreviewPoint.point.x} cy={dragPreviewPoint.point.y} r={7} className="sketchmath-draft-point" data-testid={`sketchmath-drag-${dragPreviewPoint.id}`} /> : null}
       {holePlacementPreview ? (
         <circle

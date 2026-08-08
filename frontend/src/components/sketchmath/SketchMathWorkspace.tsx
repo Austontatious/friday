@@ -46,6 +46,8 @@ import {
   buildDefineLineCommand,
   buildDefinePointCommand,
   buildDefineCircleCommand,
+  buildDefineCenterArcCommand,
+  buildDefineThreePointArcCommand,
   buildMakeCircleProfileCommand,
   buildExtrudeProfileCommand,
   buildBatchCommand,
@@ -91,6 +93,7 @@ type HolePlacementState = { profileId: string; baseId: string | null; center: Po
 type HoleSelectionSummary = { holeId: string; profileId: string; diameter: number; center: Point };
 type WorkspaceViewMode = "sketch" | "solid";
 type CircleDraft = { center: Point; current: Point };
+type ArcDraft = { points: Point[]; current: Point };
 type CadExportArtifact = {
   stepPath: string;
   filename: string;
@@ -101,7 +104,7 @@ type CadExportArtifact = {
   extrusionDepthUnit: string | null;
 };
 type SelectionRef = {
-  kind: "none" | "rectangle_edge" | "rectangle_corner" | "rectangle_profile" | "profile" | "profile_hole" | "rectangle" | "circle" | "one_line" | "two_lines" | "one_point" | "two_points" | "mixed";
+  kind: "none" | "rectangle_edge" | "rectangle_corner" | "rectangle_profile" | "profile" | "profile_hole" | "rectangle" | "circle" | "arc" | "one_line" | "two_lines" | "one_point" | "two_points" | "mixed";
   summary: string;
   parentSummary?: string;
   detail?: string;
@@ -176,6 +179,7 @@ const isClosedProfileEntity = (entity: SketchMathEntity): entity is Extract<Sket
   entity.type === "profile_2d" && entity.closed !== false;
 
 const isCircleEntity = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "circle_2d" }> => entity.type === "circle_2d";
+const isArcEntity = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "arc_2d" }> => entity.type === "arc_2d";
 
 const pointsMatch = (point: SketchMathEntity | undefined, coords: [number, number]): point is Extract<SketchMathEntity, { type: "point_2d" }> =>
   !!point && isPointEntity(point) && point.coords[0] === coords[0] && point.coords[1] === coords[1];
@@ -376,6 +380,7 @@ const SketchMathWorkspace = () => {
   const [draftPoint, setDraftPoint] = useState<Point | null>(null);
   const [rectangleDraft, setRectangleDraft] = useState<RectangleDraft | null>(null);
   const [circleDraft, setCircleDraft] = useState<CircleDraft | null>(null);
+  const [arcDraft, setArcDraft] = useState<ArcDraft | null>(null);
   const [profileCandidates, setProfileCandidates] = useState<SketchMathProfileCandidate[]>([]);
   const [solverOutcome, setSolverOutcome] = useState<"Conflict" | "Solve failed" | null>(null);
   const [solverAnalysis, setSolverAnalysis] = useState<SketchMathSolverAnalysis | null>(null);
@@ -1137,6 +1142,14 @@ const SketchMathWorkspace = () => {
     if (selectedEntities.length === 1 && isCircleEntity(selectedEntities[0])) {
       return { ...base, kind: "circle", summary: "Selected: Circle", detail: `Radius: ${selectedEntities[0].radius} mm` };
     }
+    if (selectedEntities.length === 1 && isArcEntity(selectedEntities[0])) {
+      return {
+        ...base,
+        kind: "arc",
+        summary: `Selected: ${selectedEntities[0].construction === "three_point" ? "3-point arc" : "Arc"}`,
+        detail: `Radius: ${Number(selectedEntities[0].radius.toFixed(2))} mm; sweep: ${Number(Math.abs(selectedEntities[0].sweep_angle_deg).toFixed(2))} deg`,
+      };
+    }
     return { ...base, kind: "mixed", summary: `Selected: ${selectedEntityIds.length} entities` };
   }, [rectangleDimensions, rectangleSelectionDetail, selectedEntities, selectedEntityIds.length, selectedHoleSummary, selectedLineEntities, selectedPointEntities]);
 
@@ -1411,6 +1424,7 @@ const SketchMathWorkspace = () => {
     setPreviewResult(null);
     setDraftPoint(null);
     setCircleDraft(null);
+    setArcDraft(null);
     clearRectangleInteraction();
     setTranslationOutcome(null);
     setPendingCommandText("");
@@ -1491,6 +1505,7 @@ const SketchMathWorkspace = () => {
       void commitCommand(nextCommand);
       setDraftPoint(null);
       setCircleDraft(null);
+      setArcDraft(null);
       setSelectedEntityIds([pointId]);
       setTool("select");
       setTranslationOutcome(null);
@@ -1543,6 +1558,46 @@ const SketchMathWorkspace = () => {
         const result = await commitCommand(buildBatchCommand(commands));
         if (result) {
           setSelectedEntityIds([circleId]);
+          setTool("select");
+        }
+      })();
+      return;
+    }
+    if (tool === "arc" || tool === "three_point_arc") {
+      if (!arcDraft) {
+        setArcDraft({ points: [point], current: point });
+        clearErrorState();
+        return;
+      }
+      if (arcDraft.points.length === 1) {
+        if (distanceBetween(arcDraft.points[0], point) <= 0.01) return;
+        setArcDraft({ points: [...arcDraft.points, point], current: point });
+        return;
+      }
+      const [first, second] = arcDraft.points;
+      const stamp = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+      const arcId = `arc_${stamp}`;
+      const startId = `${arcId}_start`;
+      const endId = `${arcId}_end`;
+      const pointCommands = [buildDefinePointCommand(first, startId, "Arc start")];
+      let arcCommand: SketchMathCommand;
+      if (tool === "arc") {
+        const centerId = `${arcId}_center`;
+        pointCommands[0] = buildDefinePointCommand(first, centerId, "Arc center");
+        pointCommands.push(buildDefinePointCommand(second, startId, "Arc start"));
+        pointCommands.push(buildDefinePointCommand(point, endId, "Arc end"));
+        arcCommand = buildDefineCenterArcCommand(first, second, point, arcId, { center: centerId, start: startId, end: endId });
+      } else {
+        const throughId = `${arcId}_through`;
+        pointCommands.push(buildDefinePointCommand(second, throughId, "Arc through"));
+        pointCommands.push(buildDefinePointCommand(point, endId, "Arc end"));
+        arcCommand = buildDefineThreePointArcCommand(first, second, point, arcId, { start: startId, through: throughId, end: endId });
+      }
+      setArcDraft(null);
+      void (async () => {
+        const result = await commitCommand(buildBatchCommand([...pointCommands, arcCommand]));
+        if (result) {
+          setSelectedEntityIds([arcId]);
           setTool("select");
         }
       })();
@@ -1615,6 +1670,10 @@ const SketchMathWorkspace = () => {
     }
     if (tool === "circle" && circleDraft) {
       setCircleDraft({ ...circleDraft, current: point });
+      return;
+    }
+    if ((tool === "arc" || tool === "three_point_arc") && arcDraft) {
+      setArcDraft({ ...arcDraft, current: point });
       return;
     }
     if (tool !== "rectangle") {
@@ -2373,6 +2432,7 @@ const SketchMathWorkspace = () => {
         setHolePlacement(null);
         setDraftPoint(null);
         setCircleDraft(null);
+        setArcDraft(null);
         setTool("select");
         clearErrorState();
         return;
@@ -2537,6 +2597,7 @@ const SketchMathWorkspace = () => {
       setHolePlacement(null);
       setDraftPoint(null);
       setCircleDraft(null);
+      setArcDraft(null);
     }
     if (nextTool === "solve") {
       setTool(nextTool);
@@ -2609,6 +2670,18 @@ const SketchMathWorkspace = () => {
           ? draftPoint
             ? "Click the line end point."
             : "Click the line start point. The Line tool stays active for repeated placement; press Escape to return to Select."
+          : tool === "arc"
+            ? !arcDraft
+              ? "Click the arc center."
+              : arcDraft.points.length === 1
+                ? "Click the arc start point."
+                : "Click the arc end point; the shorter sweep is used."
+          : tool === "three_point_arc"
+            ? !arcDraft
+              ? "Click the arc start point."
+              : arcDraft.points.length === 1
+                ? "Click a point on the arc."
+                : "Click the arc end point."
           : tool === "point"
             ? "Click the canvas to plot a point."
             : selectedHoleSummary
@@ -2714,6 +2787,7 @@ const SketchMathWorkspace = () => {
                   draftPoint={draftPoint}
                   rectangleDraft={rectangleDraft}
                   circleDraft={circleDraft}
+                  arcDraft={arcDraft}
                   dragPreviewPoint={dragPreviewPoint}
                   holePlacementPreview={holePlacementPreview}
                   holePlacementActive={Boolean(holePlacement)}

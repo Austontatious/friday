@@ -1,5 +1,6 @@
 import React from "react";
 import type { SketchMathEntity, SketchMathOperationResult } from "../../services/sketchmath";
+import { arcSvgPath } from "./arcGeometry";
 
 type PreviewLayerProps = {
   previewResult: SketchMathOperationResult | null;
@@ -25,6 +26,9 @@ const previewEntity = (entity: SketchMathEntity, previewed: boolean) => {
   if (entity.type === "profile_2d") {
     const points = entity.vertices.map((vertex) => vertex.join(",")).join(" ");
     return <polygon key={entity.id} points={points} className="sketchmath-preview-profile" />;
+  }
+  if (entity.type === "arc_2d") {
+    return <path key={entity.id} d={arcSvgPath(entity)} fill="none" className="sketchmath-preview-line" />;
   }
   return null;
 };

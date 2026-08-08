@@ -11,6 +11,7 @@ export type SketchMathMode =
   | "pan"
   | "circle"
   | "arc"
+  | "three_point_arc"
   | "dimension"
   | "horizontal"
   | "vertical"
@@ -50,6 +51,22 @@ export type SketchMathCircleEntity = {
   label?: string | null;
 };
 
+export type SketchMathArcEntity = {
+  id: string;
+  type: "arc_2d";
+  center: [number, number];
+  radius: number;
+  start_angle_deg: number;
+  sweep_angle_deg: number;
+  construction: "center" | "three_point";
+  center_point_id?: string | null;
+  start_point_id?: string | null;
+  through_point_id?: string | null;
+  end_point_id?: string | null;
+  locked?: boolean;
+  label?: string | null;
+};
+
 export type SketchMathProfileEntity = {
   id: string;
   type: "profile_2d";
@@ -69,6 +86,7 @@ export type SketchMathEntity =
   | SketchMathPointEntity
   | SketchMathLineEntity
   | SketchMathCircleEntity
+  | SketchMathArcEntity
   | SketchMathProfileEntity;
 
 export type SketchMathSelectionContext = {
@@ -151,6 +169,8 @@ export const SKETCHMATH_COMMAND_TYPES = [
   "make_profile",
   "define_circle",
   "update_circle",
+  "define_arc",
+  "update_arc",
   "make_circle_profile",
   "add_profile_hole",
   "update_profile_hole",
@@ -167,7 +187,7 @@ export const SKETCHMATH_COMMAND_TYPES = [
 export type SketchMathCommandType = typeof SKETCHMATH_COMMAND_TYPES[number];
 
 export type SketchMathCommand = {
-  version: "0.1" | "0.2" | "0.3" | "0.4";
+  version: "0.1" | "0.2" | "0.3" | "0.4" | "0.5";
   command_id: string;
   mode?: "preview" | "commit";
   command_type: SketchMathCommandType;
