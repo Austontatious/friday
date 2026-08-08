@@ -63,6 +63,7 @@
 - `backend/core/llm.py`
 
 ## Temporary Prompt Exceptions
+- `backend/core/prompt_builder.py`
 - `agents/refactor.py`
 - `huginn/core.py`
 - `tools/eval/verify_lexi_vllm.py`
