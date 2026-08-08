@@ -250,6 +250,79 @@ def test_v04_driving_axis_and_circle_dimensions_round_trip_through_api(monkeypat
     client.close()
 
 
+def test_v05_arc_preview_commit_and_disk_reload_round_trip(monkeypatch, tmp_path):
+    from backend.sketchmath.service import SESSION_STORE
+
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = _client(monkeypatch)
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": _selection_context()})
+    assert created.status_code == 200
+    session_id = created.json()["session_id"]
+    arc_command = _command(
+        "define_arc",
+        "arc_api",
+        parameters={
+            "name": "arc_api",
+            "construction": "three_point",
+            "start": [0, 0],
+            "through": [5, -5],
+            "end": [10, 0],
+        },
+    )
+    arc_command["version"] = "0.5"
+
+    preview = client.post(f"/api/sketchmath/sessions/{session_id}/commands/preview", json={"command": arc_command})
+    assert preview.status_code == 200
+    assert preview.json()["result"]["after"]["items"][0]["type"] == "arc_2d"
+    assert client.get(f"/api/sketchmath/sessions/{session_id}").json()["selection_context"]["items"] == []
+
+    arc_command["mode"] = "commit"
+    committed = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": arc_command})
+    assert committed.status_code == 200
+    canonical = committed.json()["selection_context"]["items"][0]
+    assert canonical["construction"] == "three_point"
+    assert canonical["radius"] == 5.0
+    assert committed.json()["history_length"] == 1
+
+    SESSION_STORE._sessions.pop(session_id, None)
+    reloaded = client.get(f"/api/sketchmath/sessions/{session_id}")
+    assert reloaded.status_code == 200
+    assert reloaded.json()["selection_context"]["items"][0] == canonical
+    assert reloaded.json()["history_length"] == 1
+    client.close()
+
+
+def test_arc_entity_upsert_uses_the_canonical_v05_command_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = _client(monkeypatch)
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": _selection_context()})
+    session_id = created.json()["session_id"]
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/entities",
+        json={
+            "mode": "commit",
+            "entity": {
+                "id": "arc_imported",
+                "type": "arc_2d",
+                "center": [10, 10],
+                "radius": 4,
+                "start_angle_deg": 30,
+                "sweep_angle_deg": -120,
+                "construction": "center",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    arc = response.json()["selection_context"]["items"][0]
+    assert arc["type"] == "arc_2d"
+    assert arc["start_angle_deg"] == 30.0
+    assert arc["sweep_angle_deg"] == -120.0
+    assert response.json()["result"]["command"]["version"] == "0.5"
+    client.close()
+
+
 def test_sketchmath_rectangle_dimension_preview_and_commit(monkeypatch):
     client = _client(monkeypatch)
     created = client.post(

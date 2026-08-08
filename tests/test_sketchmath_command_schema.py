@@ -80,7 +80,9 @@ def test_geometry_command_schema_matches_runtime_command_contract() -> None:
     assert "set_vertical_distance" in command_types
     assert "set_radius" in command_types
     assert "set_diameter" in command_types
-    assert "define_arc" not in command_types
+    assert "define_arc" in command_types
+    assert "update_arc" in command_types
+    assert "0.5" in schema["properties"]["version"]["enum"]
 
 
 def test_checked_in_sketchmath_schemas_match_canonical_models() -> None:
@@ -122,6 +124,7 @@ def test_selection_context_schema_declares_current_entities_and_constraints() ->
 
     for declared_type in (
         "circle_2d",
+        "arc_2d",
         "horizontal_constraint",
         "vertical_constraint",
         "coincident_constraint",

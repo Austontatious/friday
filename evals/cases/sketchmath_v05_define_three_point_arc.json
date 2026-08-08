@@ -1,0 +1,42 @@
+{
+  "name": "sketchmath_v05_define_three_point_arc",
+  "input": {
+    "command": {
+      "version": "0.5",
+      "command_id": "cmd_eval_define_three_point_arc",
+      "mode": "commit",
+      "command_type": "define_arc",
+      "selection": [],
+      "parameters": {
+        "name": "arc_three_eval",
+        "construction": "three_point",
+        "start": [0, 0],
+        "through": [5, -5],
+        "end": [10, 0]
+      }
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_three_point_arc",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "changed_entity_ids": ["arc_three_eval"],
+    "value": 5.0,
+    "unit": "mm",
+    "after": {
+      "arc_three_eval": {
+        "center": [5.0, 0.0],
+        "radius": 5.0,
+        "start_angle_deg": 180.0,
+        "sweep_angle_deg": 180.0,
+        "construction": "three_point"
+      }
+    }
+  }
+}

@@ -7,9 +7,9 @@ from sketchmath.models.geometry_command import GeometryCommand
 from sketchmath.models.selection_context import SelectionContext
 
 
-def command(command_type: str, command_id: str, *, selection: list[str] | None = None, parameters: dict | None = None, mode: str = "commit") -> GeometryCommand:
+def command(command_type: str, command_id: str, *, selection: list[str] | None = None, parameters: dict | None = None, mode: str = "commit", version: str = "0.2") -> GeometryCommand:
     return GeometryCommand(
-        version="0.2",
+        version=version,
         command_id=command_id,
         mode=mode,
         command_type=command_type,
@@ -162,6 +162,162 @@ def test_circle_can_be_edited_and_adapted_to_extrusion_profile() -> None:
     assert circle.radius == 4
     assert profile.area == pytest.approx(3.141592653589793 * 16, rel=0.01)
     assert result.metadata["source_circle_id"] == "circle_1"
+
+
+def test_center_arc_is_canonical_and_replayable() -> None:
+    sketch = session([])
+    result = sketch.execute(
+        command(
+            "define_arc",
+            "arc",
+            version="0.5",
+            parameters={
+                "name": "arc_1",
+                "construction": "center",
+                "center": [0, 0],
+                "start": [5, 0],
+                "end": [0, 5],
+                "direction": "clockwise",
+            },
+        )
+    )
+
+    arc = result.after.get_entity("arc_1")
+    assert arc.type == "arc_2d"
+    assert arc.radius == pytest.approx(5.0)
+    assert arc.start_angle_deg == pytest.approx(0.0)
+    assert arc.sweep_angle_deg == pytest.approx(90.0)
+    sketch.revert()
+    assert sketch.state.items == []
+    sketch.redo()
+    assert sketch.state.get_entity("arc_1").model_dump() == arc.model_dump()
+
+
+def test_three_point_arc_selects_the_sweep_through_the_middle_point() -> None:
+    sketch = session([])
+    sketch.execute(
+        command(
+            "define_arc",
+            "arc_three",
+            version="0.5",
+            parameters={
+                "name": "arc_three",
+                "construction": "three_point",
+                "start": [1, 0],
+                "through": [0, 1],
+                "end": [-1, 0],
+            },
+        )
+    )
+
+    arc = sketch.state.get_entity("arc_three")
+    assert arc.center == pytest.approx((0.0, 0.0))
+    assert arc.radius == pytest.approx(1.0)
+    assert arc.sweep_angle_deg == pytest.approx(180.0)
+
+
+def test_degenerate_arc_is_structured_and_does_not_enter_history() -> None:
+    sketch = session([])
+    with pytest.raises(Exception) as error:
+        sketch.execute(
+            command(
+                "define_arc",
+                "bad_arc",
+                version="0.5",
+                parameters={
+                    "name": "bad_arc",
+                    "construction": "three_point",
+                    "start": [0, 0],
+                    "through": [1, 0],
+                    "end": [2, 0],
+                },
+            )
+        )
+    payload = error.value.to_dict()
+    assert payload["code"] == "selection_resolution_error"
+    assert payload["detail"]["error_code"] == "invalid_arc_geometry"
+    assert sketch.history.records == []
+
+
+def test_arc_updates_and_linked_point_moves_refresh_canonical_geometry() -> None:
+    sketch = session([point("center", 0, 0), point("start", 2, 0), point("end", 0, 2)])
+    sketch.execute(
+        command(
+            "define_arc",
+            "linked_arc",
+            version="0.5",
+            parameters={
+                "name": "linked_arc",
+                "construction": "center",
+                "center": [0, 0],
+                "start": [2, 0],
+                "end": [0, 2],
+                "direction": "clockwise",
+                "center_point_id": "center",
+                "start_point_id": "start",
+                "end_point_id": "end",
+            },
+        )
+    )
+    sketch.execute(command("move_point", "move_end", selection=["end"], parameters={"coords": [-2, 0]}))
+    arc = sketch.state.get_entity("linked_arc")
+    assert arc.radius == pytest.approx(2.0)
+    assert arc.sweep_angle_deg == pytest.approx(180.0)
+
+    with pytest.raises(Exception) as error:
+        sketch.execute(command("move_point", "degenerate_start", selection=["start"], parameters={"coords": [0, 0]}))
+    assert error.value.to_dict()["code"] == "solver_error"
+    assert sketch.state.get_entity("start").coords == (2.0, 0.0)
+
+    sketch.execute(
+        command(
+            "update_arc",
+            "detach_and_update",
+            version="0.5",
+            selection=["linked_arc"],
+            parameters={
+                "radius": 3,
+                "start_angle_deg": 405,
+                "sweep_angle_deg": -90,
+                "center_point_id": None,
+                "start_point_id": None,
+                "end_point_id": None,
+            },
+        )
+    )
+    updated = sketch.state.get_entity("linked_arc")
+    assert updated.radius == pytest.approx(3.0)
+    assert updated.start_angle_deg == pytest.approx(45.0)
+    assert updated.sweep_angle_deg == pytest.approx(-90.0)
+
+
+def test_arc_transform_and_copy_preserve_canonical_sweep() -> None:
+    sketch = session(
+        [
+            {
+                "id": "arc",
+                "type": "arc_2d",
+                "center": [0, 0],
+                "radius": 2,
+                "start_angle_deg": 0,
+                "sweep_angle_deg": 90,
+                "construction": "center",
+            }
+        ]
+    )
+    sketch.execute(command("translate", "move_arc", selection=["arc"], parameters={"vector": [3, -1]}))
+    sketch.execute(command("rotate", "rotate_arc", selection=["arc"], parameters={"angle": 90, "angle_unit": "deg", "origin": [0, 0]}))
+    sketch.execute(command("mirror", "mirror_arc", selection=["arc"], parameters={"axis_x": 0}))
+    arc = sketch.state.get_entity("arc")
+    assert arc.center == pytest.approx((-1.0, 3.0))
+    assert arc.start_angle_deg == pytest.approx(90.0)
+    assert arc.sweep_angle_deg == pytest.approx(-90.0)
+
+    sketch.execute(command("copy_linear", "copy_arc", selection=["arc"], parameters={"vector": [2, 0], "count": 1}))
+    copied = sketch.state.get_entity("copy_copy_arc_1_arc")
+    assert copied.center == pytest.approx((1.0, 3.0))
+    assert copied.sweep_angle_deg == pytest.approx(-90.0)
+    assert copied.start_point_id is None
 
 
 def test_history_supports_multistep_undo_redo_and_branch_truncation() -> None:

@@ -1,0 +1,43 @@
+{
+  "name": "sketchmath_v05_define_center_arc",
+  "input": {
+    "command": {
+      "version": "0.5",
+      "command_id": "cmd_eval_define_center_arc",
+      "mode": "commit",
+      "command_type": "define_arc",
+      "selection": [],
+      "parameters": {
+        "name": "arc_center_eval",
+        "construction": "center",
+        "center": [0, 0],
+        "start": [10, 0],
+        "end": [0, 10],
+        "direction": "clockwise"
+      }
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_center_arc",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "changed_entity_ids": ["arc_center_eval"],
+    "value": 10.0,
+    "unit": "mm",
+    "after": {
+      "arc_center_eval": {
+        "center": [0.0, 0.0],
+        "radius": 10.0,
+        "start_angle_deg": 0.0,
+        "sweep_angle_deg": 90.0,
+        "construction": "center"
+      }
+    }
+  }
+}

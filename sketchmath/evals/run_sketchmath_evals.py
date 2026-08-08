@@ -72,6 +72,15 @@ def _extract_state_snapshot(state: SelectionContext) -> dict[str, Any]:
                 "radius": item.radius,
                 "center_point_id": getattr(item, "center_point_id", None),
             }
+            if hasattr(item, "start_angle_deg"):
+                snapshot[item.id].update(
+                    start_angle_deg=item.start_angle_deg,
+                    sweep_angle_deg=item.sweep_angle_deg,
+                    construction=item.construction,
+                    start_point_id=getattr(item, "start_point_id", None),
+                    through_point_id=getattr(item, "through_point_id", None),
+                    end_point_id=getattr(item, "end_point_id", None),
+                )
         elif hasattr(item, "vertices"):
             snapshot[item.id] = {
                 "vertices": [list(vertex) for vertex in item.vertices],

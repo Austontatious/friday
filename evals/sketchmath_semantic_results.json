@@ -1,7 +1,7 @@
 {
-  "case_count": 44,
+  "case_count": 46,
   "failed": 0,
-  "passed": 44,
+  "passed": 46,
   "results": [
     {
       "diagnostic": "ok",
@@ -3254,6 +3254,78 @@
         "status": "committed",
         "unit": null,
         "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v05_define_center_arc",
+      "path": "evals/cases/sketchmath_v05_define_center_arc.json",
+      "result": {
+        "after": {
+          "arc_center_eval": {
+            "center": [
+              0.0,
+              0.0
+            ],
+            "center_point_id": null,
+            "construction": "center",
+            "end_point_id": null,
+            "radius": 10.0,
+            "start_angle_deg": 0.0,
+            "start_point_id": null,
+            "sweep_angle_deg": 90.0,
+            "through_point_id": null
+          }
+        },
+        "changed_entity_ids": [
+          "arc_center_eval"
+        ],
+        "metadata": {
+          "construction": "center",
+          "history_length": 1,
+          "start_angle_deg": 0.0,
+          "sweep_angle_deg": 90.0
+        },
+        "status": "committed",
+        "unit": "mm",
+        "value": 10.0
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v05_define_three_point_arc",
+      "path": "evals/cases/sketchmath_v05_define_three_point_arc.json",
+      "result": {
+        "after": {
+          "arc_three_eval": {
+            "center": [
+              5.0,
+              0.0
+            ],
+            "center_point_id": null,
+            "construction": "three_point",
+            "end_point_id": null,
+            "radius": 5.0,
+            "start_angle_deg": 180.0,
+            "start_point_id": null,
+            "sweep_angle_deg": 180.0,
+            "through_point_id": null
+          }
+        },
+        "changed_entity_ids": [
+          "arc_three_eval"
+        ],
+        "metadata": {
+          "construction": "three_point",
+          "history_length": 1,
+          "start_angle_deg": 180.0,
+          "sweep_angle_deg": 180.0
+        },
+        "status": "committed",
+        "unit": "mm",
+        "value": 5.0
       },
       "status": "pass"
     }
