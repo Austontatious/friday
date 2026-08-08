@@ -2,9 +2,9 @@
 
 Updated: 2026-08-08
 
-Current phase: Phase 0 — stabilize and land
+Current phase: Phase 1 — canonical parametric architecture
 
-Gate: Gate A validated landing candidate; remote publication in progress
+Gate: Gate A passed
 
 ## Baseline
 
@@ -16,6 +16,7 @@ Gate: Gate A validated landing candidate; remote publication in progress
 - Local branch delta at program start: 68 commits ahead; 24 commits touch SketchMath code/docs/tests
 - Deliberate landing branch: `sketchmath-product-gate-a`
 - Validated landing code baseline: `54ff17e`
+- First published landing commit: `1a4c853`
 
 ## Implemented Capabilities
 
@@ -45,9 +46,9 @@ On 2026-08-08 at `54ff17e`:
 
 The build still reports the repository-wide stale Browserslist database notice. Updating frontend dependency metadata is intentionally deferred from the SketchMath-only Gate A slice.
 
-## Active Phase 0 Work
+## Gate A Outcome
 
-Completed locally:
+Completed and published:
 
 1. Reconciled v0.1/v0.2 runtime, generated JSON schemas, frontend command types, docs, and eval contracts.
 2. Corrected stale supported-envelope documentation.
@@ -55,9 +56,7 @@ Completed locally:
 4. Removed the unused SketchMath frontend state/build warning.
 5. Passed the complete Gate A regression suite.
 
-Remaining:
-
-6. Publish the deliberate branch and verify its remote ref. See `landing_manifest.md`.
+6. Published `sketchmath-product-gate-a` and verified the remote ref at `1a4c853` without rewriting `origin/phase0-stabilize`. See `landing_manifest.md`.
 
 ## Known Limitations
 
@@ -81,7 +80,7 @@ Remaining:
 
 ## Next Highest-Value Work
 
-Complete Gate A, then define the canonical document/solver boundary and implement the smallest defensible Phase 1 slice that improves real parametric behavior without creating a second model path.
+Define the canonical document/solver/topology boundary and implement the smallest defensible Phase 1 slice that improves real parametric behavior without creating a second model path.
 
 ## Release Status
 

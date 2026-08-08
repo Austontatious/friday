@@ -6,12 +6,12 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 
 | Requirement | Current state | Implementation / source | Tests and acceptance evidence | Commit |
 | --- | --- | --- | --- | --- |
-| SM-GA-001 contract agreement | Passed locally | `sketchmath/models/`, generated `sketchmath/schemas/`, executor handler discovery, closed frontend command union | 66 focused contract/executor/API tests; schema drift check; 42 semantic evals | `878374b` |
-| SM-GA-002 documentation truth | Passed locally | `docs/sketchmath/command_catalog.md`, `docs/sketchmath/ui_workspace.md`, translator contract prompt | Circle/topology/constraint contradiction scan; focused translation tests | `578b867` |
-| SM-GA-003 feature-gate agreement | Passed locally | `core/config.py`, `frontend/src/services/sketchmath.ts`, `.env.example`, Dockerfile, Compose, ADR 003 | Backend unset/off tests; frontend unset/off/on tests; Compose config | `0647568` |
-| SM-GA-004 clean build | Passed locally | Removed unused `sessionMetadata`; explicit frontend build flag | `npx tsc --noEmit`; production build compiled without SketchMath source warnings | `0647568` |
-| SM-GA-005 deliberate landing | Validated candidate; publication pending | `docs/sketchmath/landing_manifest.md` and reconstructed branch | Remote ref plus reproducible validation record | Code baseline `54ff17e` |
-| SM-GA-006 regression baseline | Passed locally on 2026-08-08 | Deliberate landing implementation | 99 Python, 42 semantic eval, 37 focused frontend, 9 Playwright, schema check, TypeScript, build, Compose, 13 standards | `54ff17e` |
+| SM-GA-001 contract agreement | Passed | `sketchmath/models/`, generated `sketchmath/schemas/`, executor handler discovery, closed frontend command union | 66 focused contract/executor/API tests; schema drift check; 42 semantic evals | `878374b` |
+| SM-GA-002 documentation truth | Passed | `docs/sketchmath/command_catalog.md`, `docs/sketchmath/ui_workspace.md`, translator contract prompt | Circle/topology/constraint contradiction scan; focused translation tests | `578b867` |
+| SM-GA-003 feature-gate agreement | Passed | `core/config.py`, `frontend/src/services/sketchmath.ts`, `.env.example`, Dockerfile, Compose, ADR 003 | Backend unset/off tests; frontend unset/off/on tests; Compose config | `0647568` |
+| SM-GA-004 clean build | Passed | Removed unused `sessionMetadata`; explicit frontend build flag | `npx tsc --noEmit`; production build compiled without SketchMath source warnings | `0647568` |
+| SM-GA-005 deliberate landing | Passed | `docs/sketchmath/landing_manifest.md` and dedicated remote branch | Verified `refs/heads/sketchmath-product-gate-a` without force-push or source-branch rewrite | Code baseline `54ff17e`; first published `1a4c853` |
+| SM-GA-006 regression baseline | Passed on 2026-08-08 | Deliberate landing implementation | 99 Python, 42 semantic eval, 37 focused frontend, 9 Playwright, schema check, TypeScript, build, Compose, 13 standards | `54ff17e` |
 
 ## Verified Existing Capability Ledger
 
@@ -35,7 +35,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | C-003 | Command catalog/UI docs say standalone circles are unsupported while runtime and acceptance tests support them. | Resolved | SM-GA-002 |
 | C-004 | Frontend treats an unset SketchMath flag as enabled; backend treats unset as disabled. | Resolved | SM-GA-003 |
 | C-005 | Production build reports unused `sessionMetadata`. | Resolved | SM-GA-004 |
-| C-006 | Local validated history is substantially ahead of the remote branch and includes unrelated FRIDAY commits. | Active | SM-GA-005 |
+| C-006 | Local validated history is substantially ahead of the remote branch and includes unrelated FRIDAY commits. | Resolved by dedicated branch | SM-GA-005 |
 | C-007 | Automated camera movement passes, but prior manual CAD-like pan/tilt concern was never explicitly closed. | Deferred | SM-VIEW-001 |
 | C-008 | Filesystem persistence plus process-local cache requires one backend worker. | Deferred | SM-DOC-002 |
 

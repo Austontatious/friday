@@ -12,6 +12,7 @@ Publish the validated SketchMath product without also publishing unrelated work 
 - Complete local safety/source branch: `phase0-stabilize`.
 - Deliberate branch: `sketchmath-product-gate-a`.
 - Validated reconstructed code baseline: `54ff17e`.
+- First published landing commit: `1a4c853` (`refs/heads/sketchmath-product-gate-a`, verified after push).
 - Delta: 39 commits over the remote base, versus 72 commits on the mixed source branch after Gate A documentation.
 
 ## Selection Rule
@@ -48,6 +49,10 @@ Cherry-picking changes commit identities; the original source hashes above remai
 - `git diff --check origin/phase0-stabilize..54ff17e` passed.
 
 The production build emits only the repository-wide stale Browserslist data notice, which is outside this product-only landing.
+
+## Publication
+
+The dedicated branch was created on the remote at `1a4c853` on 2026-08-08. `origin/phase0-stabilize` remained at `4ed99b3`; no force push, rebase, tag, release, or pull request was performed.
 
 ## Rollback
 

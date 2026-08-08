@@ -35,8 +35,10 @@
 - `docker compose config -q`.
 - `python3 -m pytest -q tests/test_codex_standards.py --noconftest` — 13 passed.
 
-### Remaining Gate A Work
-- Publish the deliberately reconstructed and revalidated SketchMath branch; record the resulting remote ref and commit before starting major geometry expansion.
+### Gate A Landing
+- Reconstructed the product from `origin/phase0-stabilize` at `4ed99b3` onto dedicated branch `sketchmath-product-gate-a`, excluding unrelated local history.
+- Revalidated the reconstructed code at `54ff17e` and published the branch at `1a4c853` without rewriting the source remote branch.
+- Full provenance and conflict decisions are recorded in `docs/sketchmath/landing_manifest.md`.
 
 ---
 
