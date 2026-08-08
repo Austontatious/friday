@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-08-08 - SketchMath Center Rectangle Tool
+
+### What Changed
+- Added a Center rectangle canvas/workflow tool with center-plus-corner click placement and center-origin drag placement; Shift-drag produces a centered square.
+- Center rectangles commit through the existing typed rectangle batch and persist the same four point IDs, four linked edge IDs, constraints, and profile shape as corner rectangles.
+- Added unit coverage for exact symmetric coordinates and a live browser workflow proving symmetry, CAD readiness, and identical reload recovery.
+- Replaced a layout-sensitive mixed-geometry pointer assertion with deterministic SVG view-box mouse events after the full serial browser gate exposed the flake.
+
+### Why
+- Gate B calls for center rectangles, but a second rectangle entity or UI-only geometry path would split dimension, profile, history, and extrusion behavior.
+- Reusing the canonical rectangle bundle makes center construction an interaction method rather than a competing data model.
+
+### New Env Flags
+- None. The tool remains behind the existing default-off SketchMath feature gate.
+
+### How To Test
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand --runTestsByPath src/App.test.tsx src/components/sketchmath/SketchMathWorkspace.test.tsx src/components/sketchmath/commandBuilders.test.ts src/components/sketchmath/arcGeometry.test.ts` — 62 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npx playwright test e2e/sketchmath.spec.ts` — TypeScript/build and 13 browser workflows passed.
+- The unchanged backend gate remains at 145 Python tests, 50 semantic cases, generated schema/Compose checks, and 13 standards tests.
+
+### Remaining Phase 1 Work
+- Add polyline and slot/polygon primitives, then the safe trim/extend/split/offset/pattern editing envelope and broader nonlinear/arc solver equations.
+
+---
+
 ## 2026-08-08 - SketchMath Canonical Construction Geometry
 
 ### What Changed

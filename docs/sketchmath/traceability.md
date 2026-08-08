@@ -24,6 +24,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | Fixed/midpoint/collinear/symmetric/concentric/tangent constraints | Passed for the deterministic v0.6 envelope | executor/schema/API/semantic/frontend tests; finite-arc tangency is structured unsupported behavior |
 | Mixed-geometry full-constraint lifecycle | Passed for exact point-backed line/circle subset | Playwright remaining-DOF drag, full constraint, dimension re-solve, undo/redo, reload identity, and browser-error assertion |
 | Construction/reference points and lines | Passed for canonical conversion envelope | v0.7 executor/schema/API/semantic/frontend tests plus live conversion/reload browser workflow; committed profile source lines are protected |
+| Center rectangle | Passed for canonical rectangle-bundle envelope | Center/corner unit test and live symmetric-coordinate/reload browser workflow; downstream dimensions/profile/extrusion reuse the corner-rectangle path |
 | Simple closed-loop profile detection | Passed for current deterministic simple-cycle envelope | topology foundation tests and Playwright detected-profile workflow |
 | Preview/commit/revert and persistent undo/redo | Passed | API/history tests and Playwright reload/history workflow |
 | Rectangle/circle/line-profile extrusion | Passed | CAD adapter/API tests and Playwright workflows |
@@ -47,7 +48,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 
 | Requirement family | State | Next proof |
 | --- | --- | --- |
-| SM-SK / SM-SOL parametric sketcher | Partial | Polyline/center rectangle, slot/polygon, remaining safe editing families, and nonlinear/arc solver coverage |
+| SM-SK / SM-SOL parametric sketcher | Partial | Polyline, slot/polygon, remaining safe editing families, and nonlinear/arc solver coverage |
 | SM-TOP general topology | Deferred | Adversarial planar-region fixtures and deterministic region selection |
 | SM-FEAT feature history | Deferred | Canonical document/feature model plus rebuild tests |
 | SM-REF reference stability | Deferred | Upstream-edit survival/repair tests |
