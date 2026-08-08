@@ -29,6 +29,7 @@ Gate: Gate A passed
 - Orbitable deterministic 3D preview plus FreeCAD-backed STEP export/download.
 - Persistent sessions and backend-authoritative undo/redo across reload.
 - Structured errors and Normal/Advanced UI separation.
+- Versioned, non-mutating solver analysis with exact linear point-backed DOF and explicit partial/unknown coverage.
 
 ## Current Gate A Validation
 
@@ -46,6 +47,14 @@ On 2026-08-08 at `54ff17e`:
 
 The build still reports the repository-wide stale Browserslist database notice. Updating frontend dependency metadata is intentionally deferred from the SketchMath-only Gate A slice.
 
+## Active Phase 1 Slice
+
+- ADRs 004-006 define the canonical document migration, solver/licensing, and async execution boundaries.
+- Command `analyze_constraints` uses contract version `0.3`, is preview-only, and never enters history.
+- Exact rank-based analysis currently covers point-backed locked/fixed, horizontal, vertical, and coincident equations.
+- Nonlinear constraints and unmodeled geometry return honest partial/unknown results.
+- Current evidence: 106 focused Python tests, 43 semantic evals, 46 focused frontend tests, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+
 ## Gate A Outcome
 
 Completed and published:
@@ -61,7 +70,7 @@ Completed and published:
 ## Known Limitations
 
 - Arc geometry is not implemented.
-- Solver coverage is a conservative closed-form subset with coarse status and no generalized exact DOF.
+- Production solve remains a conservative closed-form subset. Exact analysis currently covers only point-backed fixed/horizontal/vertical/coincident linear systems; nonlinear and circle DOF remain partial/unknown.
 - Topology recognizes deterministic simple line cycles, not general planar regions.
 - The product lacks a canonical multi-body/feature document model and downstream rebuild graph.
 - Multi-sketch, property editing, model tree, and stable face/edge references are not implemented.
@@ -77,10 +86,11 @@ Completed and published:
 - Manual and AI editing share versioned typed operations.
 - Major geometry expansion waits for Gate A.
 - Solver work must start with mathematically defensible subsets and explicit unknown/partial states.
+- Solver backend adoption is deferred behind the neutral contract; SolveSpace is reference-only due GPLv3, and SciPy is the leading permissive candidate pending benchmarks.
 
 ## Next Highest-Value Work
 
-Define the canonical document/solver/topology boundary and implement the smallest defensible Phase 1 slice that improves real parametric behavior without creating a second model path.
+Wire solver analysis into the live workspace, then extend the exact subset to radius/diameter and horizontal/vertical distance constraints before adding arcs.
 
 ## Release Status
 

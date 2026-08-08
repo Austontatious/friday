@@ -2,7 +2,7 @@
 
 SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 
-The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; current browser topology/circle commands use version `0.2`. Undeclared versions and command types are rejected as `invalid_command` before execution.
+The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`. Undeclared versions and command types are rejected as `invalid_command` before execution.
 
 ## Execution Loop
 
@@ -64,6 +64,11 @@ The canonical machine-readable contracts are generated from the Pydantic models 
   - Makes two point identities coincident without merging their stable IDs.
 - `solve_constraints`
   - Runs the conservative 2D solver over stored constraints.
+- `analyze_constraints`
+  - Version `0.3`, preview-only, and non-mutating.
+  - Reports exact DOF only for the covered point-backed linear subset: locked/fixed points, horizontal, vertical, and coincident constraints.
+  - Returns explicit `partial` or `unknown` coverage instead of inventing DOF for nonlinear constraints, coordinate-only legacy geometry, circles, or other unmodeled entities.
+  - Reports consistency and proven redundancy separately; a deterministic conflict ID is not claimed to be a minimal conflict set.
 - `move_point`
   - Drags one addressable point while preserving the currently supported linked constraints.
 - `detect_profiles`
@@ -120,7 +125,7 @@ The canonical machine-readable contracts are generated from the Pydantic models 
 - `coincident_constraint`
 - `fixed_point_constraint`
 
-Locked entities act as fixed anchors. The solver only moves unlocked points, and it prefers closed-form cases over iterative search.
+Locked entities act as fixed anchors. The production solver only moves unlocked points, and it prefers closed-form cases over iterative search. Solver analysis uses the versioned numerical policy in `sketchmath/geometry/tolerances.py`; those values are computational tolerances, not manufacturing tolerances.
 Profile hole validation is strict: holes must be closed polygons, strictly inside the outer profile, non-touching, and non-overlapping.
 
 ## Frontend Dimension Payloads

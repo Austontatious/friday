@@ -7,6 +7,36 @@
 
 ---
 
+## 2026-08-08 - SketchMath Phase 1 Solver Analysis Foundation
+
+### What Changed
+- Added a centralized, versioned numerical tolerance policy.
+- Added typed `SolverAnalysis` results and preview-only command version `0.3` `analyze_constraints`.
+- Implemented rank-based exact DOF, consistency, and redundancy analysis for point-backed fixed/horizontal/vertical/coincident linear systems.
+- Explicitly reports partial/unknown coverage for nonlinear constraints and unmodeled geometry instead of fabricating exact DOF.
+- Recorded canonical document, solver/licensing, and async solve/rebuild boundaries in ADRs 004-006.
+
+### Why
+- Gate B needs mathematically defensible solver state before adding arcs or a generalized nonlinear backend.
+- A solver-neutral contract prevents canonical model ownership from leaking into one library and makes licensing/rollback explicit.
+
+### New Env Flags
+- None. The analysis command is non-mutating and remains covered by the existing default-off SketchMath product gate.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 106 passed.
+- `PYTHONPATH=. python3 sketchmath/evals/run_sketchmath_evals.py --check` — 43 passed.
+- `PYTHONPATH=. python3 -m sketchmath.schemas.generate --check`.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand App.test.tsx SketchMathWorkspace.test.tsx commandBuilders.test.ts` — 46 passed.
+- `cd frontend && npx tsc --noEmit && npm run build`.
+- `python3 -m pytest -q tests/test_codex_standards.py --noconftest` — 13 passed.
+- `docker compose config -q`.
+
+### Remaining Phase 1 Work
+- Expose analysis in the workspace, expand exact coverage through validated nonlinear/Jacobian work, then add missing constraints and arcs in dependency order.
+
+---
+
 ## 2026-08-08 - SketchMath Gate A Local Stabilization Candidate
 
 ### What Changed

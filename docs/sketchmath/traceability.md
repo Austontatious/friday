@@ -52,3 +52,14 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | SM-ART artifacts | Partial | STL, revision association, lifecycle/cleanup, golden geometric properties |
 | SM-AI model-aware copilot | Early translator only | Structured model context, typed multi-step proposals, state-based semantic benchmark |
 | SM-QA / SM-OPS / SM-SEC hardening | Partial | Adversarial, performance, async jobs, instrumentation, kernel isolation |
+
+## Phase 1 Evidence Ledger
+
+| Requirement | Current state | Evidence | Limitation |
+| --- | --- | --- | --- |
+| SM-ARCH-001 canonical document boundary | Design accepted | ADR 004 | Document envelope and migration are not implemented. |
+| SM-ARCH-003 solver boundary | Initial implementation | ADR 005; `SolverAnalysis`; `analyze_constraints` v0.3 | Production mutation still uses the closed-form solver. |
+| SM-SOL-001 state reporting | Partial | Exact linear consistency/redundancy tests and semantic eval | Nonlinear redundancy and minimal conflict sets are unknown. |
+| SM-SOL-002 defensible DOF | Partial | Rank-based exact DOF for point-backed linear systems; explicit partial/unknown results | Circle, arc, standalone-coordinate, and nonlinear DOF are not exact. |
+| SM-UNIT-001 centralized tolerances | Initial implementation | Versioned `NumericalTolerancePolicy` | Unit expansion and display formatting remain open. |
+| SM-OPS-002 async boundary | Design accepted | ADR 006 | Job runtime is not implemented; current export remains synchronous. |
