@@ -1,0 +1,31 @@
+{
+  "name": "sketchmath_v04_set_diameter",
+  "input": {
+    "command": {
+      "version": "0.4",
+      "command_id": "cmd_eval_diameter",
+      "mode": "commit",
+      "command_type": "set_diameter",
+      "selection": ["circle_a"],
+      "parameters": {"diameter": 24.0, "unit": "mm"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_diameter",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "circle_a", "type": "circle_2d", "center": [3.0, 4.0], "radius": 2.0}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "value": 24.0,
+    "unit": "mm",
+    "changed_entity_ids": ["circle_a"],
+    "after": {"circle_a": {"center": [3.0, 4.0], "radius": 12.0}},
+    "metadata": {"constraint_id": "constraint_cmd_eval_diameter", "radius": 12.0, "diameter": 24.0}
+  }
+}

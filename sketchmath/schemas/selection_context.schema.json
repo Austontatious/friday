@@ -345,6 +345,59 @@
       "title": "ConstructionLine2DEntity",
       "type": "object"
     },
+    "DiameterConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "circle_id": {
+          "title": "Circle Id",
+          "type": "string"
+        },
+        "diameter": {
+          "exclusiveMinimum": 0,
+          "title": "Diameter",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "diameter_constraint",
+          "default": "diameter_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "circle_id",
+        "diameter"
+      ],
+      "title": "DiameterConstraint",
+      "type": "object"
+    },
     "DistanceConstraint": {
       "additionalProperties": false,
       "properties": {
@@ -646,6 +699,88 @@
         "points"
       ],
       "title": "HorizontalConstraint",
+      "type": "object"
+    },
+    "HorizontalDistanceConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "default": "midpoint",
+          "enum": [
+            "point_a",
+            "point_b",
+            "midpoint"
+          ],
+          "title": "Anchor",
+          "type": "string"
+        },
+        "direction": {
+          "default": 1,
+          "enum": [
+            -1,
+            1
+          ],
+          "title": "Direction",
+          "type": "integer"
+        },
+        "distance": {
+          "exclusiveMinimum": 0,
+          "title": "Distance",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "horizontal_distance_constraint",
+          "default": "horizontal_distance_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points",
+        "distance"
+      ],
+      "title": "HorizontalDistanceConstraint",
       "type": "object"
     },
     "Line2DEntity": {
@@ -1015,6 +1150,59 @@
       "title": "Profile2DEntity",
       "type": "object"
     },
+    "RadiusConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "circle_id": {
+          "title": "Circle Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "radius": {
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "type": {
+          "const": "radius_constraint",
+          "default": "radius_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "circle_id",
+        "radius"
+      ],
+      "title": "RadiusConstraint",
+      "type": "object"
+    },
     "VerticalConstraint": {
       "additionalProperties": false,
       "properties": {
@@ -1066,6 +1254,88 @@
       ],
       "title": "VerticalConstraint",
       "type": "object"
+    },
+    "VerticalDistanceConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "default": "midpoint",
+          "enum": [
+            "point_a",
+            "point_b",
+            "midpoint"
+          ],
+          "title": "Anchor",
+          "type": "string"
+        },
+        "direction": {
+          "default": 1,
+          "enum": [
+            -1,
+            1
+          ],
+          "title": "Direction",
+          "type": "integer"
+        },
+        "distance": {
+          "exclusiveMinimum": 0,
+          "title": "Distance",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "vertical_distance_constraint",
+          "default": "vertical_distance_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points",
+        "distance"
+      ],
+      "title": "VerticalDistanceConstraint",
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1077,14 +1347,18 @@
           "mapping": {
             "angle_constraint": "#/$defs/AngleConstraint",
             "coincident_constraint": "#/$defs/CoincidentConstraint",
+            "diameter_constraint": "#/$defs/DiameterConstraint",
             "distance_constraint": "#/$defs/DistanceConstraint",
             "equal_angle_constraint": "#/$defs/EqualAngleConstraint",
             "equal_length_constraint": "#/$defs/EqualLengthConstraint",
             "fixed_point_constraint": "#/$defs/FixedPointConstraint",
             "horizontal_constraint": "#/$defs/HorizontalConstraint",
+            "horizontal_distance_constraint": "#/$defs/HorizontalDistanceConstraint",
             "parallel_constraint": "#/$defs/ParallelConstraint",
             "perpendicular_constraint": "#/$defs/PerpendicularConstraint",
-            "vertical_constraint": "#/$defs/VerticalConstraint"
+            "radius_constraint": "#/$defs/RadiusConstraint",
+            "vertical_constraint": "#/$defs/VerticalConstraint",
+            "vertical_distance_constraint": "#/$defs/VerticalDistanceConstraint"
           },
           "propertyName": "type"
         },
@@ -1094,6 +1368,18 @@
           },
           {
             "$ref": "#/$defs/DistanceConstraint"
+          },
+          {
+            "$ref": "#/$defs/HorizontalDistanceConstraint"
+          },
+          {
+            "$ref": "#/$defs/VerticalDistanceConstraint"
+          },
+          {
+            "$ref": "#/$defs/RadiusConstraint"
+          },
+          {
+            "$ref": "#/$defs/DiameterConstraint"
           },
           {
             "$ref": "#/$defs/AngleConstraint"

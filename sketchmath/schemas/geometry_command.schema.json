@@ -15,6 +15,10 @@
         "define_profile",
         "delete_entity",
         "set_distance",
+        "set_horizontal_distance",
+        "set_vertical_distance",
+        "set_radius",
+        "set_diameter",
         "set_rectangle_dimension",
         "set_line_polar",
         "set_angle",
@@ -73,7 +77,8 @@
       "enum": [
         "0.1",
         "0.2",
-        "0.3"
+        "0.3",
+        "0.4"
       ],
       "title": "Version",
       "type": "string"

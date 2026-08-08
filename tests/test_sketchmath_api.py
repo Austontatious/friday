@@ -184,6 +184,57 @@ def test_sketchmath_session_preview_commit_and_revert(monkeypatch):
     client.close()
 
 
+def test_v04_driving_axis_and_circle_dimensions_round_trip_through_api(monkeypatch):
+    client = _client(monkeypatch)
+    created = client.post(
+        "/api/sketchmath/sessions",
+        json={
+            "selection_context": _selection_context(
+                [
+                    {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": True},
+                    {"id": "point_B", "type": "point_2d", "coords": [2, 3], "locked": False},
+                    {"id": "center", "type": "point_2d", "coords": [20, 20], "locked": True},
+                    {"id": "circle", "type": "circle_2d", "center": [20, 20], "radius": 2, "center_point_id": "center"},
+                ]
+            )
+        },
+    )
+    assert created.status_code == 200
+    session_id = created.json()["session_id"]
+
+    axis_command = _command(
+        "set_horizontal_distance",
+        "axis_distance",
+        mode="commit",
+        selection=["point_A", "point_B"],
+        parameters={"distance": 8, "unit": "mm", "anchor": "point_a"},
+    )
+    axis_command["version"] = "0.4"
+    axis = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": axis_command})
+    assert axis.status_code == 200
+    assert axis.json()["result"]["after"]["items"][1]["coords"] == [8.0, 3.0]
+    assert axis.json()["result"]["after"]["constraints"][0]["type"] == "horizontal_distance_constraint"
+
+    diameter_command = _command(
+        "set_diameter",
+        "circle_diameter",
+        mode="commit",
+        selection=["circle"],
+        parameters={"diameter": 30, "unit": "mm"},
+    )
+    diameter_command["version"] = "0.4"
+    diameter = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": diameter_command})
+    assert diameter.status_code == 200
+    circle = next(item for item in diameter.json()["result"]["after"]["items"] if item["id"] == "circle")
+    assert circle["radius"] == 15.0
+    assert diameter.json()["result"]["after"]["constraints"][1]["type"] == "diameter_constraint"
+
+    snapshot = client.get(f"/api/sketchmath/sessions/{session_id}")
+    assert snapshot.status_code == 200
+    assert snapshot.json()["history_length"] == 2
+    client.close()
+
+
 def test_sketchmath_rectangle_dimension_preview_and_commit(monkeypatch):
     client = _client(monkeypatch)
     created = client.post(

@@ -21,12 +21,16 @@ from sketchmath.geometry.vectors import Point2D, add, distance, normalize, rotat
 from sketchmath.models.constraints import (
     AngleConstraint,
     ConstraintEntity,
+    DiameterConstraint,
     DistanceConstraint,
     EqualAngleConstraint,
     EqualLengthConstraint,
     FixedPointConstraint,
     HorizontalConstraint,
+    HorizontalDistanceConstraint,
+    RadiusConstraint,
     VerticalConstraint,
+    VerticalDistanceConstraint,
     CoincidentConstraint,
     ParallelConstraint,
     PerpendicularConstraint,
@@ -129,6 +133,10 @@ def apply_geometry_command(
         "define_profile": _handle_define_profile,
         "delete_entity": _handle_delete_entity,
         "set_distance": _handle_set_distance,
+        "set_horizontal_distance": _handle_set_horizontal_distance,
+        "set_vertical_distance": _handle_set_vertical_distance,
+        "set_radius": _handle_set_radius,
+        "set_diameter": _handle_set_diameter,
         "set_rectangle_dimension": _handle_set_rectangle_dimension,
         "set_line_polar": _handle_set_line_polar,
         "set_angle": _handle_set_angle,
@@ -275,6 +283,11 @@ def _handle_delete_entity(command: GeometryCommand, state: SelectionContext) -> 
         for constraint in state.constraints
         for constraint_point in getattr(constraint, "points", [])
     }
+    referenced_entities.update(
+        constraint.circle_id
+        for constraint in state.constraints
+        if getattr(constraint, "circle_id", None) is not None
+    )
     named_entities = set(state.named_references.values())
     deleted: list[str] = []
     for entity_id in command.selection:
@@ -296,6 +309,7 @@ def _handle_delete_entity(command: GeometryCommand, state: SelectionContext) -> 
             constraint
             for constraint in state.constraints
             if not any(point_id in command.selection for point_id in getattr(constraint, "points", []))
+            and getattr(constraint, "circle_id", None) not in command.selection
         ]
     for name, entity_id in list(state.named_references.items()):
         if entity_id in command.selection:
@@ -308,6 +322,8 @@ def _entity_dependencies(state: SelectionContext, entity_id: str) -> list[dict[s
     dependencies: list[dict[str, str]] = []
     for constraint in state.constraints:
         if entity_id in getattr(constraint, "points", []):
+            dependencies.append({"kind": "constraint", "id": constraint.id})
+        if entity_id == getattr(constraint, "circle_id", None):
             dependencies.append({"kind": "constraint", "id": constraint.id})
     for name, mapped_id in state.named_references.items():
         if mapped_id == entity_id:
@@ -346,6 +362,147 @@ def _handle_set_distance(command: GeometryCommand, state: SelectionContext) -> t
         state.replace_constraint(constraint)
         return state, [start.id], None, None, {"constraint_id": constraint.id}
     raise SelectionResolutionError(f"Unsupported anchor for set_distance: {anchor}", detail={"command_type": command.command_type, "anchor": anchor})
+
+
+def _handle_set_axis_distance(
+    command: GeometryCommand,
+    state: SelectionContext,
+    *,
+    horizontal: bool,
+) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    start, end = _resolve_points(state, command.selection)
+    anchor = str(command.parameters.get("anchor", "midpoint")).strip().lower()
+    if anchor not in {"point_a", "point_b", "midpoint"}:
+        raise SelectionResolutionError(
+            f"Unsupported anchor for {command.command_type}: {anchor}",
+            detail={"command_type": command.command_type, "anchor": anchor},
+        )
+    try:
+        distance_value = float(_parameter(command, "distance"))
+    except (TypeError, ValueError) as exc:
+        raise SelectionResolutionError(
+            "Axis distance must be numeric",
+            detail={"command_type": command.command_type, "distance": command.parameters.get("distance")},
+        ) from exc
+    unit = str(_parameter(command, "unit", default=state.units))
+    try:
+        target_mm = normalize_length(distance_value, unit)
+    except ValueError as exc:
+        raise InvalidUnitsError(str(exc), detail={"command_type": command.command_type, "unit": unit}) from exc
+    if target_mm <= 0:
+        raise SelectionResolutionError(
+            "Axis distance must be positive",
+            detail={"command_type": command.command_type, "distance": distance_value, "unit": unit},
+        )
+    axis_index = 0 if horizontal else 1
+    direction = -1 if end.coords[axis_index] < start.coords[axis_index] else 1
+    signed_target = target_mm * direction
+    if anchor == "point_a":
+        _ensure_mutable(state, [end.id], command.command_type)
+        updated = list(end.coords)
+        updated[axis_index] = start.coords[axis_index] + signed_target
+        state.replace_entity(_replace_point(end, (updated[0], updated[1])))
+        changed = [end.id]
+    elif anchor == "point_b":
+        _ensure_mutable(state, [start.id], command.command_type)
+        updated = list(start.coords)
+        updated[axis_index] = end.coords[axis_index] - signed_target
+        state.replace_entity(_replace_point(start, (updated[0], updated[1])))
+        changed = [start.id]
+    else:
+        _ensure_mutable(state, [start.id, end.id], command.command_type)
+        midpoint_value = (start.coords[axis_index] + end.coords[axis_index]) / 2.0
+        start_coords = list(start.coords)
+        end_coords = list(end.coords)
+        start_coords[axis_index] = midpoint_value - signed_target / 2.0
+        end_coords[axis_index] = midpoint_value + signed_target / 2.0
+        state.replace_entity(_replace_point(start, (start_coords[0], start_coords[1])))
+        state.replace_entity(_replace_point(end, (end_coords[0], end_coords[1])))
+        changed = [start.id, end.id]
+    constraint_type = HorizontalDistanceConstraint if horizontal else VerticalDistanceConstraint
+    constraint = constraint_type(
+        id=f"constraint_{command.command_id}",
+        points=(start.id, end.id),
+        distance=distance_value,
+        unit=unit,
+        direction=direction,
+        anchor=anchor,
+    )
+    state.constraints = [
+        existing
+        for existing in state.constraints
+        if not isinstance(existing, constraint_type) or set(existing.points) != {start.id, end.id}
+    ]
+    state.replace_constraint(constraint)
+    return state, changed, None, None, {"constraint_id": constraint.id, "axis": "horizontal" if horizontal else "vertical"}
+
+
+def _handle_set_horizontal_distance(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    return _handle_set_axis_distance(command, state, horizontal=True)
+
+
+def _handle_set_vertical_distance(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    return _handle_set_axis_distance(command, state, horizontal=False)
+
+
+def _handle_set_circle_dimension(
+    command: GeometryCommand,
+    state: SelectionContext,
+    *,
+    diameter: bool,
+) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    if len(command.selection) != 1:
+        raise SelectionResolutionError(f"{command.command_type} requires one circle", detail={"selection": command.selection})
+    circle = state.get_entity(command.selection[0])
+    if not isinstance(circle, Circle2DEntity):
+        raise WrongEntityTypeError("Selected entity is not a circle", detail={"entity_id": circle.id})
+    _ensure_mutable(state, [circle.id], command.command_type)
+    parameter_name = "diameter" if diameter else "radius"
+    try:
+        value = float(_parameter(command, parameter_name))
+    except (TypeError, ValueError) as exc:
+        raise SelectionResolutionError(
+            f"Circle {parameter_name} must be numeric",
+            detail={"command_type": command.command_type, parameter_name: command.parameters.get(parameter_name)},
+        ) from exc
+    unit = str(_parameter(command, "unit", default=state.units))
+    try:
+        value_mm = normalize_length(value, unit)
+    except ValueError as exc:
+        raise InvalidUnitsError(str(exc), detail={"command_type": command.command_type, "unit": unit}) from exc
+    radius_mm = value_mm / 2.0 if diameter else value_mm
+    if radius_mm <= 0:
+        raise SelectionResolutionError(
+            f"Circle {parameter_name} must be positive",
+            detail={"command_type": command.command_type, parameter_name: value, "unit": unit},
+        )
+    updated = Circle2DEntity(**{**circle.model_dump(), "radius": radius_mm})
+    state.replace_entity(updated)
+    if diameter:
+        constraint: ConstraintEntity = DiameterConstraint(
+            id=f"constraint_{command.command_id}", circle_id=circle.id, diameter=value, unit=unit
+        )
+    else:
+        constraint = RadiusConstraint(id=f"constraint_{command.command_id}", circle_id=circle.id, radius=value, unit=unit)
+    state.constraints = [
+        existing
+        for existing in state.constraints
+        if not isinstance(existing, (RadiusConstraint, DiameterConstraint)) or existing.circle_id != circle.id
+    ]
+    state.replace_constraint(constraint)
+    return state, [updated.id], value, unit, {
+        "constraint_id": constraint.id,
+        "radius": denormalize_length(radius_mm, unit),
+        "diameter": denormalize_length(radius_mm * 2.0, unit),
+    }
+
+
+def _handle_set_radius(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    return _handle_set_circle_dimension(command, state, diameter=False)
+
+
+def _handle_set_diameter(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    return _handle_set_circle_dimension(command, state, diameter=True)
 
 
 def _handle_set_rectangle_dimension(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
@@ -654,6 +811,9 @@ def _handle_move_point(command: GeometryCommand, state: SelectionContext) -> tup
             direction = normalize(subtract(moving.coords, anchor.coords))
             state.replace_entity(_replace_point(moving, add(anchor.coords, scale(direction, target_mm))))
             changed.append(moving.id)
+        elif isinstance(constraint, (HorizontalDistanceConstraint, VerticalDistanceConstraint)) and coincident_ids.intersection(constraint.points):
+            outcome = _apply_axis_distance_constraint(constraint, state)
+            changed.extend(outcome.get("changed_entity_ids", []))
         elif isinstance(constraint, (HorizontalConstraint, VerticalConstraint, CoincidentConstraint)):
             outcome = _apply_constraint(constraint, state)
             changed.extend(outcome.get("changed_entity_ids", []))
@@ -1113,6 +1273,10 @@ def _apply_constraint(constraint: ConstraintEntity, state: SelectionContext) -> 
         return _apply_fixed_point_constraint(constraint, state)
     if isinstance(constraint, DistanceConstraint):
         return _apply_distance_constraint(constraint, state)
+    if isinstance(constraint, (HorizontalDistanceConstraint, VerticalDistanceConstraint)):
+        return _apply_axis_distance_constraint(constraint, state)
+    if isinstance(constraint, (RadiusConstraint, DiameterConstraint)):
+        return _apply_circle_dimension_constraint(constraint, state)
     if isinstance(constraint, AngleConstraint):
         return _apply_angle_constraint(constraint, state)
     if isinstance(constraint, ParallelConstraint):
@@ -1215,6 +1379,64 @@ def _apply_distance_constraint(constraint: DistanceConstraint, state: SelectionC
         state.replace_entity(_replace_point(a, add(b.coords, scale(direction, target_mm))))
         return {"status": "changed", "changed_entity_ids": [a.id]}
     return {"status": "ambiguous", "changed_entity_ids": [], "reason": "distance constraint needs one fixed point"}
+
+
+def _apply_axis_distance_constraint(
+    constraint: HorizontalDistanceConstraint | VerticalDistanceConstraint,
+    state: SelectionContext,
+) -> dict[str, Any]:
+    a, b = _resolve_points(state, list(constraint.points))
+    try:
+        signed_target = normalize_length(constraint.distance, constraint.unit) * constraint.direction
+    except ValueError as exc:
+        raise InvalidUnitsError(str(exc), detail={"constraint_id": constraint.id, "unit": constraint.unit}) from exc
+    axis_index = 0 if isinstance(constraint, HorizontalDistanceConstraint) else 1
+    current = b.coords[axis_index] - a.coords[axis_index]
+    if math.isclose(current, signed_target, rel_tol=1e-9, abs_tol=1e-9):
+        return {"status": "ok", "changed_entity_ids": []}
+    if a.locked and b.locked:
+        raise SolverError("Axis distance constraint conflicts with locked points", detail={"constraint_id": constraint.id})
+    if a.locked or constraint.anchor == "point_a":
+        if b.locked:
+            raise SolverError("Axis distance constraint cannot move its anchored point", detail={"constraint_id": constraint.id})
+        coords = list(b.coords)
+        coords[axis_index] = a.coords[axis_index] + signed_target
+        state.replace_entity(_replace_point(b, (coords[0], coords[1])))
+        return {"status": "changed", "changed_entity_ids": [b.id]}
+    if b.locked or constraint.anchor == "point_b":
+        if a.locked:
+            raise SolverError("Axis distance constraint cannot move its anchored point", detail={"constraint_id": constraint.id})
+        coords = list(a.coords)
+        coords[axis_index] = b.coords[axis_index] - signed_target
+        state.replace_entity(_replace_point(a, (coords[0], coords[1])))
+        return {"status": "changed", "changed_entity_ids": [a.id]}
+    midpoint_value = (a.coords[axis_index] + b.coords[axis_index]) / 2.0
+    a_coords = list(a.coords)
+    b_coords = list(b.coords)
+    a_coords[axis_index] = midpoint_value - signed_target / 2.0
+    b_coords[axis_index] = midpoint_value + signed_target / 2.0
+    state.replace_entity(_replace_point(a, (a_coords[0], a_coords[1])))
+    state.replace_entity(_replace_point(b, (b_coords[0], b_coords[1])))
+    return {"status": "changed", "changed_entity_ids": [a.id, b.id]}
+
+
+def _apply_circle_dimension_constraint(constraint: RadiusConstraint | DiameterConstraint, state: SelectionContext) -> dict[str, Any]:
+    circle = state.get_entity(constraint.circle_id)
+    if not isinstance(circle, Circle2DEntity):
+        raise WrongEntityTypeError("Circle dimension constraint references a non-circle", detail={"constraint_id": constraint.id, "entity_id": circle.id})
+    try:
+        target = normalize_length(
+            constraint.radius if isinstance(constraint, RadiusConstraint) else constraint.diameter / 2.0,
+            constraint.unit,
+        )
+    except ValueError as exc:
+        raise InvalidUnitsError(str(exc), detail={"constraint_id": constraint.id, "unit": constraint.unit}) from exc
+    if math.isclose(circle.radius, target, rel_tol=1e-9, abs_tol=1e-9):
+        return {"status": "ok", "changed_entity_ids": []}
+    if circle.locked:
+        raise SolverError("Circle dimension constraint conflicts with locked circle", detail={"constraint_id": constraint.id, "circle_id": circle.id})
+    state.replace_entity(Circle2DEntity(**{**circle.model_dump(), "radius": target}))
+    return {"status": "changed", "changed_entity_ids": [circle.id]}
 
 
 def _apply_angle_constraint(constraint: AngleConstraint, state: SelectionContext) -> dict[str, Any]:

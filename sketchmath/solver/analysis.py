@@ -3,11 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from sketchmath.geometry.tolerances import DEFAULT_TOLERANCE_POLICY, NumericalTolerancePolicy
+from sketchmath.geometry.units import normalize_length
 from sketchmath.models.constraints import (
     CoincidentConstraint,
+    DiameterConstraint,
     FixedPointConstraint,
     HorizontalConstraint,
+    HorizontalDistanceConstraint,
+    RadiusConstraint,
     VerticalConstraint,
+    VerticalDistanceConstraint,
 )
 from sketchmath.models.entities import (
     Circle2DEntity,
@@ -65,11 +70,17 @@ def _ranks(equations: list[_Equation], variable_keys: list[str], tolerance: floa
     )
 
 
-def _point_equations(
+def _linear_equations(
     state: SelectionContext,
 ) -> tuple[list[str], list[_Equation], list[str], list[str], list[str], list[str], dict[str, list[_Equation]]]:
     points = {entity.id: entity for entity in state.items if isinstance(entity, Point2DEntity)}
+    circles = {entity.id: entity for entity in state.items if isinstance(entity, Circle2DEntity)}
     variable_keys = [key for point_id in sorted(points) for key in (f"{point_id}.x", f"{point_id}.y")]
+    for circle_id in sorted(circles):
+        circle = circles[circle_id]
+        if circle.center_point_id not in points:
+            variable_keys.extend((f"{circle_id}.center_x", f"{circle_id}.center_y"))
+        variable_keys.append(f"{circle_id}.radius")
     implicit: list[_Equation] = []
     fixed_entity_ids: list[str] = []
     for point_id in sorted(points):
@@ -82,6 +93,20 @@ def _point_equations(
                     _Equation({f"{point_id}.y": 1.0}, point.coords[1]),
                 ]
             )
+    for circle_id in sorted(circles):
+        circle = circles[circle_id]
+        if not circle.locked:
+            continue
+        fixed_entity_ids.append(circle_id)
+        center_x_key = f"{circle.center_point_id}.x" if circle.center_point_id in points else f"{circle_id}.center_x"
+        center_y_key = f"{circle.center_point_id}.y" if circle.center_point_id in points else f"{circle_id}.center_y"
+        implicit.extend(
+            [
+                _Equation({center_x_key: 1.0}, circle.center[0]),
+                _Equation({center_y_key: 1.0}, circle.center[1]),
+                _Equation({f"{circle_id}.radius": 1.0}, circle.radius),
+            ]
+        )
 
     supported: list[str] = []
     unsupported: list[str] = []
@@ -118,6 +143,31 @@ def _point_equations(
                 _Equation({f"{a}.x": 1.0, f"{b}.x": -1.0}, 0.0),
                 _Equation({f"{a}.y": 1.0, f"{b}.y": -1.0}, 0.0),
             ]
+        elif isinstance(constraint, (HorizontalDistanceConstraint, VerticalDistanceConstraint)):
+            if any(point_id not in points for point_id in constraint.points):
+                invalid.append(constraint.id)
+                continue
+            try:
+                target = normalize_length(constraint.distance, constraint.unit) * constraint.direction
+            except ValueError:
+                invalid.append(constraint.id)
+                continue
+            a, b = constraint.points
+            axis = "x" if isinstance(constraint, HorizontalDistanceConstraint) else "y"
+            equations = [_Equation({f"{b}.{axis}": 1.0, f"{a}.{axis}": -1.0}, target)]
+        elif isinstance(constraint, (RadiusConstraint, DiameterConstraint)):
+            if constraint.circle_id not in circles:
+                invalid.append(constraint.id)
+                continue
+            try:
+                target = normalize_length(
+                    constraint.radius if isinstance(constraint, RadiusConstraint) else constraint.diameter / 2.0,
+                    constraint.unit,
+                )
+            except ValueError:
+                invalid.append(constraint.id)
+                continue
+            equations = [_Equation({f"{constraint.circle_id}.radius": 1.0}, target)]
         else:
             unsupported.append(constraint.id)
             continue
@@ -141,7 +191,7 @@ def _unmodeled_entities(state: SelectionContext) -> list[str]:
                 continue
             unmodeled.append(entity.id)
         elif isinstance(entity, Circle2DEntity):
-            unmodeled.append(entity.id)
+            continue
         else:
             unmodeled.append(entity.id)
     return sorted(unmodeled)
@@ -160,7 +210,7 @@ def analyze_constraint_system(
         unsupported,
         invalid,
         grouped,
-    ) = _point_equations(state)
+    ) = _linear_equations(state)
     unmodeled = _unmodeled_entities(state)
     redundant: list[str] = []
     conflicting: list[str] = []

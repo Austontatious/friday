@@ -1,7 +1,7 @@
 {
-  "case_count": 42,
+  "case_count": 44,
   "failed": 0,
-  "passed": 42,
+  "passed": 44,
   "results": [
     {
       "diagnostic": "ok",
@@ -2812,6 +2812,65 @@
           }
         },
         "status": "preview",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v04_set_diameter",
+      "path": "evals/cases/sketchmath_v04_set_diameter.json",
+      "result": {
+        "after": {
+          "circle_a": {
+            "center": [
+              3.0,
+              4.0
+            ],
+            "center_point_id": null,
+            "radius": 12.0
+          }
+        },
+        "changed_entity_ids": [
+          "circle_a"
+        ],
+        "metadata": {
+          "constraint_id": "constraint_cmd_eval_diameter",
+          "diameter": 24.0,
+          "history_length": 1,
+          "radius": 12.0
+        },
+        "status": "committed",
+        "unit": "mm",
+        "value": 24.0
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v04_set_horizontal_distance",
+      "path": "evals/cases/sketchmath_v04_set_horizontal_distance.json",
+      "result": {
+        "after": {
+          "point_a": [
+            0.0,
+            1.0
+          ],
+          "point_b": [
+            12.0,
+            7.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_b"
+        ],
+        "metadata": {
+          "axis": "horizontal",
+          "constraint_id": "constraint_cmd_eval_horizontal_distance",
+          "history_length": 1
+        },
+        "status": "committed",
         "unit": null,
         "value": null
       },

@@ -207,6 +207,61 @@ def test_over_constrained_solve_returns_structured_error() -> None:
     assert exc_info.value.to_dict()["code"] == "solver_error"
 
 
+def test_driving_axis_distances_update_geometry_and_resolve_exactly() -> None:
+    session = _session(
+        [
+            {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": True},
+            {"id": "point_B", "type": "point_2d", "coords": [2, 3], "locked": False},
+        ]
+    )
+
+    session.execute(
+        _command(
+            "set_horizontal_distance",
+            "horizontal",
+            mode="commit",
+            selection=["point_A", "point_B"],
+            parameters={"distance": 8, "unit": "mm", "anchor": "point_a"},
+        )
+    )
+    result = session.execute(
+        _command(
+            "set_vertical_distance",
+            "vertical",
+            mode="commit",
+            selection=["point_A", "point_B"],
+            parameters={"distance": 5, "unit": "mm", "anchor": "point_a"},
+        )
+    )
+
+    assert result.after.get_entity("point_B").coords == pytest.approx((8, 5))
+    assert [constraint.type for constraint in session.state.constraints] == [
+        "horizontal_distance_constraint",
+        "vertical_distance_constraint",
+    ]
+
+
+def test_radius_and_diameter_commands_drive_circle_and_replace_prior_dimension() -> None:
+    session = _session(
+        [
+            {"id": "center", "type": "point_2d", "coords": [0, 0], "locked": True},
+            {"id": "circle", "type": "circle_2d", "center": [0, 0], "radius": 2, "center_point_id": "center"},
+        ]
+    )
+
+    radius_result = session.execute(
+        _command("set_radius", "radius", mode="commit", selection=["circle"], parameters={"radius": 1.2, "unit": "cm"})
+    )
+    assert radius_result.after.get_entity("circle").radius == pytest.approx(12)
+    assert radius_result.after.constraints[0].type == "radius_constraint"
+
+    diameter_result = session.execute(
+        _command("set_diameter", "diameter", mode="commit", selection=["circle"], parameters={"diameter": 30, "unit": "mm"})
+    )
+    assert diameter_result.after.get_entity("circle").radius == pytest.approx(15)
+    assert [constraint.type for constraint in diameter_result.after.constraints] == ["diameter_constraint"]
+
+
 def test_locked_entity_mutation_rejected_by_solver_commands() -> None:
     session = _session(
         [

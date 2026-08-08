@@ -1,0 +1,30 @@
+{
+  "name": "sketchmath_v04_set_horizontal_distance",
+  "input": {
+    "command": {
+      "version": "0.4",
+      "command_id": "cmd_eval_horizontal_distance",
+      "mode": "commit",
+      "command_type": "set_horizontal_distance",
+      "selection": ["point_a", "point_b"],
+      "parameters": {"distance": 12.0, "unit": "mm", "anchor": "point_a"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_horizontal_distance",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_a", "type": "point_2d", "coords": [0.0, 1.0], "locked": true},
+        {"id": "point_b", "type": "point_2d", "coords": [4.0, 7.0]}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "changed_entity_ids": ["point_b"],
+    "after": {"point_b": [12.0, 7.0]},
+    "metadata": {"constraint_id": "constraint_cmd_eval_horizontal_distance", "axis": "horizontal"}
+  }
+}

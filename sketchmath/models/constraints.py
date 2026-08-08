@@ -27,6 +27,38 @@ class DistanceConstraint(_ConstraintBase):
     anchor: Literal["point_a", "point_b", "midpoint"] = "midpoint"
 
 
+class HorizontalDistanceConstraint(_ConstraintBase):
+    type: Literal["horizontal_distance_constraint"] = "horizontal_distance_constraint"
+    points: tuple[str, str]
+    distance: float = Field(gt=0)
+    unit: str = "mm"
+    direction: Literal[-1, 1] = 1
+    anchor: Literal["point_a", "point_b", "midpoint"] = "midpoint"
+
+
+class VerticalDistanceConstraint(_ConstraintBase):
+    type: Literal["vertical_distance_constraint"] = "vertical_distance_constraint"
+    points: tuple[str, str]
+    distance: float = Field(gt=0)
+    unit: str = "mm"
+    direction: Literal[-1, 1] = 1
+    anchor: Literal["point_a", "point_b", "midpoint"] = "midpoint"
+
+
+class RadiusConstraint(_ConstraintBase):
+    type: Literal["radius_constraint"] = "radius_constraint"
+    circle_id: str
+    radius: float = Field(gt=0)
+    unit: str = "mm"
+
+
+class DiameterConstraint(_ConstraintBase):
+    type: Literal["diameter_constraint"] = "diameter_constraint"
+    circle_id: str
+    diameter: float = Field(gt=0)
+    unit: str = "mm"
+
+
 class AngleConstraint(_ConstraintBase):
     type: Literal["angle_constraint"] = "angle_constraint"
     points: tuple[str, str, str]
@@ -72,6 +104,10 @@ class CoincidentConstraint(_ConstraintBase):
 ConstraintEntity = Annotated[
     FixedPointConstraint
     | DistanceConstraint
+    | HorizontalDistanceConstraint
+    | VerticalDistanceConstraint
+    | RadiusConstraint
+    | DiameterConstraint
     | AngleConstraint
     | ParallelConstraint
     | PerpendicularConstraint

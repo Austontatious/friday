@@ -9,12 +9,16 @@ from .entities import (
 from .constraints import (
     AngleConstraint,
     ConstraintEntity,
+    DiameterConstraint,
     DistanceConstraint,
     EqualAngleConstraint,
     EqualLengthConstraint,
     FixedPointConstraint,
+    HorizontalDistanceConstraint,
     ParallelConstraint,
     PerpendicularConstraint,
+    RadiusConstraint,
+    VerticalDistanceConstraint,
 )
 from .geometry_command import GeometryCommand
 from .cad_export import CadExportArtifacts, CadExportMeasurements, CadExportResult
@@ -29,17 +33,21 @@ __all__ = [
     "CadExportResult",
     "ConstructionLine2DEntity",
     "ConstraintEntity",
+    "DiameterConstraint",
     "DistanceConstraint",
     "EqualAngleConstraint",
     "EqualLengthConstraint",
     "GeometryCommand",
     "Line2DEntity",
     "FixedPointConstraint",
+    "HorizontalDistanceConstraint",
     "ParallelConstraint",
     "PerpendicularConstraint",
+    "RadiusConstraint",
     "OperationResult",
     "Profile2DEntity",
     "Point2DEntity",
     "SelectionContext",
     "SelectionEntity",
+    "VerticalDistanceConstraint",
 ]

@@ -115,6 +115,79 @@ def test_nonlinear_constraint_reports_partial_not_fabricated_dof() -> None:
     assert analysis.remaining_tracked_dof_upper_bound == 4
 
 
+def test_axis_distances_are_exact_linear_constraints() -> None:
+    state = _state(
+        items=[_point("a", 0, 0, locked=True), _point("b", 8, -3)],
+        constraints=[
+            {
+                "id": "horizontal_distance",
+                "type": "horizontal_distance_constraint",
+                "points": ["a", "b"],
+                "distance": 8,
+                "direction": 1,
+            },
+            {
+                "id": "vertical_distance",
+                "type": "vertical_distance_constraint",
+                "points": ["a", "b"],
+                "distance": 3,
+                "direction": -1,
+            },
+        ],
+    )
+
+    analysis = analyze_constraint_system(state)
+
+    assert analysis.coverage == "exact"
+    assert analysis.freedom_state == "fully_constrained"
+    assert analysis.consistency_state == "consistent"
+    assert analysis.independent_equation_count == 4
+    assert analysis.remaining_dof == 0
+
+
+def test_circle_radius_constraint_tracks_center_and_radius_dof() -> None:
+    state = _state(
+        items=[
+            _point("center", 2, 3, locked=True),
+            {"id": "circle", "type": "circle_2d", "center": [2, 3], "radius": 5, "center_point_id": "center"},
+            {
+                "id": "profile_circle",
+                "type": "profile_2d",
+                "vertices": [[7, 3], [2, 8], [-3, 3], [2, -2], [7, 3]],
+                "area": 78.5,
+                "winding": "counterclockwise",
+                "source_circle_id": "circle",
+            },
+        ],
+        constraints=[{"id": "radius", "type": "radius_constraint", "circle_id": "circle", "radius": 5}],
+    )
+
+    analysis = analyze_constraint_system(state)
+
+    assert analysis.coverage == "exact"
+    assert analysis.tracked_variable_count == 3
+    assert analysis.independent_equation_count == 3
+    assert analysis.remaining_dof == 0
+    assert analysis.unmodeled_entity_ids == []
+
+
+def test_equivalent_radius_and_diameter_constraints_are_redundant() -> None:
+    state = _state(
+        items=[{"id": "circle", "type": "circle_2d", "center": [0, 0], "radius": 4}],
+        constraints=[
+            {"id": "radius", "type": "radius_constraint", "circle_id": "circle", "radius": 4},
+            {"id": "diameter", "type": "diameter_constraint", "circle_id": "circle", "diameter": 8},
+        ],
+    )
+
+    analysis = analyze_constraint_system(state)
+
+    assert analysis.coverage == "exact"
+    assert analysis.redundancy_state == "redundant"
+    assert analysis.redundant_constraint_ids == ["radius"]
+    assert analysis.remaining_dof == 2
+
+
 def test_coordinate_only_line_prevents_whole_sketch_dof_claim() -> None:
     state = _state(items=[{"id": "legacy", "type": "line_2d", "start": [0, 0], "end": [5, 0]}])
 

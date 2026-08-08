@@ -76,6 +76,10 @@ def test_geometry_command_schema_matches_runtime_command_contract() -> None:
     assert "define_circle" in command_types
     assert "detect_profiles" in command_types
     assert "make_horizontal" in command_types
+    assert "set_horizontal_distance" in command_types
+    assert "set_vertical_distance" in command_types
+    assert "set_radius" in command_types
+    assert "set_diameter" in command_types
     assert "define_arc" not in command_types
 
 
@@ -114,6 +118,10 @@ def test_selection_context_schema_declares_current_entities_and_constraints() ->
         "horizontal_constraint",
         "vertical_constraint",
         "coincident_constraint",
+        "horizontal_distance_constraint",
+        "vertical_distance_constraint",
+        "radius_constraint",
+        "diameter_constraint",
         "start_point_id",
         "source_circle_id",
     ):
