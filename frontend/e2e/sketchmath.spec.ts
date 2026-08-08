@@ -96,6 +96,31 @@ const dragSvgEntityToViewBoxPoint = async (page: Page, target: string | Locator,
   await page.mouse.up();
 };
 
+const dispatchPointDragToViewBoxPoint = async (target: Locator, x: number, y: number) => {
+  await target.evaluate((element, coords) => {
+    const entity = element as SVGGraphicsElement;
+    const svg = entity.ownerSVGElement;
+    if (!svg) throw new Error("SVG owner not found");
+    const svgBox = svg.getBoundingClientRect();
+    const viewBox = svg.viewBox.baseVal;
+    const scale = Math.min(svgBox.width / viewBox.width, svgBox.height / viewBox.height);
+    const contentLeft = svgBox.left + (svgBox.width - viewBox.width * scale) / 2;
+    const contentTop = svgBox.top + (svgBox.height - viewBox.height * scale) / 2;
+    const source = entity.getBoundingClientRect();
+    const targetX = contentLeft + (coords.x - viewBox.x) * scale;
+    const targetY = contentTop + (coords.y - viewBox.y) * scale;
+    entity.dispatchEvent(new MouseEvent("mousedown", {
+      bubbles: true,
+      button: 0,
+      buttons: 1,
+      clientX: source.x + source.width / 2,
+      clientY: source.y + source.height / 2,
+    }));
+    svg.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, buttons: 1, clientX: targetX, clientY: targetY }));
+    svg.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0, clientX: targetX, clientY: targetY }));
+  }, { x, y });
+};
+
 const shiftClickEntity = async (page: Page, selector: string) => {
   await page.locator(selector).last().dispatchEvent("click", { shiftKey: true });
 };
@@ -559,10 +584,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
 
     const initialCenterX = Number(await points.nth(2).locator("circle").getAttribute("cx"));
-    await dragSvgEntityToViewBoxPoint(page, points.nth(2), 420, 230);
-    if (Math.abs(Number(await points.nth(2).locator("circle").getAttribute("cx")) - initialCenterX) < 5) {
-      await dragSvgEntityToViewBoxPoint(page, points.nth(2), 420, 230);
-    }
+    await dispatchPointDragToViewBoxPoint(points.nth(2), 420, 230);
     await expect.poll(async () => Math.abs(Number(await points.nth(2).locator("circle").getAttribute("cx")) - initialCenterX)).toBeGreaterThan(20);
     await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
     await points.nth(2).dispatchEvent("click");
