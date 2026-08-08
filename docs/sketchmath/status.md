@@ -24,6 +24,7 @@ Gate: Gate A passed
 - Point, line, rectangle, circle, and circular-hole workflows.
 - Existing closed-form distance/angle/parallel/perpendicular/equal constraints.
 - Horizontal, vertical, and coincident constraints with endpoint-aware dragging.
+- Driving horizontal/vertical distance and radius/diameter constraints through contract version `0.4`.
 - Simple deterministic line-loop profile detection and explicit promotion.
 - Rectangle, detected-line, circle, and holed-profile extrusion.
 - Orbitable deterministic 3D preview plus FreeCAD-backed STEP export/download.
@@ -52,10 +53,11 @@ The build still reports the repository-wide stale Browserslist database notice. 
 
 - ADRs 004-006 define the canonical document migration, solver/licensing, and async execution boundaries.
 - Command `analyze_constraints` uses contract version `0.3`, is preview-only, and never enters history.
-- Exact rank-based analysis currently covers point-backed locked/fixed, horizontal, vertical, and coincident equations.
+- Exact rank-based analysis currently covers point/circle variables plus locked/fixed, horizontal, vertical, coincident, horizontal/vertical distance, radius, and diameter equations.
 - Nonlinear constraints and unmodeled geometry return honest partial/unknown results.
 - The live workspace now refreshes non-mutating analysis after committed changes and reports Under/Fully/Over/Conflicting/Partially analyzed without exposing rank internals in Normal mode.
-- Current evidence: 106 focused Python tests, 43 semantic evals, 50 focused frontend tests, 9 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- Driving axis and circle dimensions update canonical geometry, replace same-semantic edits, persist through history/API replay, and remain exact in live solver state.
+- Current evidence: 112 focused Python tests, 45 semantic evals, 53 focused frontend tests, 9 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
 
 ## Gate A Outcome
 
@@ -72,7 +74,7 @@ Completed and published:
 ## Known Limitations
 
 - Arc geometry is not implemented.
-- Production solve remains a conservative closed-form subset. Exact analysis currently covers only point-backed fixed/horizontal/vertical/coincident linear systems; nonlinear and circle DOF remain partial/unknown.
+- Production solve remains a conservative closed-form subset. Exact analysis covers its linear point/circle families; Euclidean distance, angle, parallel/perpendicular, and equality relations remain partial/unknown.
 - Topology recognizes deterministic simple line cycles, not general planar regions.
 - The product lacks a canonical multi-body/feature document model and downstream rebuild graph.
 - Multi-sketch, property editing, model tree, and stable face/edge references are not implemented.
@@ -92,7 +94,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Extend the exact subset to radius/diameter and horizontal/vertical distance constraints, benchmark a permissive nonlinear backend, and converge analysis/mutation on one solve path before adding arcs.
+Benchmark a permissive nonlinear backend and converge analysis/mutation on one solve path before adding arcs.
 
 ## Release Status
 

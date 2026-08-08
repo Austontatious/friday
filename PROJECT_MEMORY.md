@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-08-08 - SketchMath Driving Axis and Circle Dimensions
+
+### What Changed
+- Added command contract version `0.4` operations for horizontal distance, vertical distance, radius, and diameter.
+- Added typed constraint primitives, deterministic mutation/solve handling, unit normalization, deletion dependencies, history replay, API coverage, generated schemas, and semantic evals.
+- Extended exact rank analysis from point-only geometry to circle center/radius variables and all four new linear dimension families.
+- Added Normal-mode axis-distance buttons and driving radius/diameter editors. Reapplying an axis dimension or switching a circle between radius and diameter replaces the same-semantic constraint instead of stacking duplicates.
+
+### Why
+- Phase 1 requires dimensions to drive geometry and solver state, not act as display-only labels.
+- These equation families are linear, so they can expand exact DOF reporting before adopting a nonlinear backend.
+
+### New Env Flags
+- None. The operations remain behind the existing default-off SketchMath product gate.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 112 passed.
+- `PYTHONPATH=. python3 sketchmath/evals/run_sketchmath_evals.py --check` — 45 passed.
+- `PYTHONPATH=. python3 -m sketchmath.schemas.generate --check`.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand App.test.tsx SketchMathWorkspace.test.tsx commandBuilders.test.ts` — 53 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npm run test:e2e -- sketchmath.spec.ts` — TypeScript/build and 9 browser workflows passed.
+- `docker compose config -q` and `python3 -m pytest -q tests/test_codex_standards.py --noconftest` — passed.
+
+### Remaining Phase 1 Work
+- Benchmark the permissive nonlinear solver candidate, unify solve/analysis, add canonical arcs, then implement the remaining Gate B constraints and acceptance scenario.
+
+---
+
 ## 2026-08-08 - SketchMath Live Solver State
 
 ### What Changed

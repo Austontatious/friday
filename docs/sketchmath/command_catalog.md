@@ -2,7 +2,7 @@
 
 SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 
-The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`. Undeclared versions and command types are rejected as `invalid_command` before execution.
+The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`. Undeclared versions and command types are rejected as `invalid_command` before execution.
 
 ## Execution Loop
 
@@ -40,6 +40,13 @@ The canonical machine-readable contracts are generated from the Pydantic models 
   - `parameters.cascade=true` is reserved for semantic parent-object deletion, such as deleting a whole rectangle bundle after the UI has warned the user.
 - `set_distance`
   - Repositions selected points to enforce a target distance.
+- `set_horizontal_distance` / `set_vertical_distance`
+  - Version `0.4` driving constraints over the selected point pair.
+  - The positive dimension preserves the pair's current axis direction and moves point A, point B, or both according to the stored anchor.
+  - Reapplying the same axis dimension to the same point pair replaces that axis constraint rather than stacking a duplicate.
+- `set_radius` / `set_diameter`
+  - Version `0.4` driving dimensions for one selected circle; values accept canonical length units and update the circle/profile geometry.
+  - A circle has one active radius-or-diameter dimension. Switching forms or editing the value replaces the prior circle dimension.
 - `set_rectangle_dimension`
   - Rebuilds a semantic rectangle bundle when the user edits width or height.
   - Updates the four corner points, four generated edges, and closed profile together.
@@ -66,8 +73,8 @@ The canonical machine-readable contracts are generated from the Pydantic models 
   - Runs the conservative 2D solver over stored constraints.
 - `analyze_constraints`
   - Version `0.3`, preview-only, and non-mutating.
-  - Reports exact DOF only for the covered point-backed linear subset: locked/fixed points, horizontal, vertical, and coincident constraints.
-  - Returns explicit `partial` or `unknown` coverage instead of inventing DOF for nonlinear constraints, coordinate-only legacy geometry, circles, or other unmodeled entities.
+  - Reports exact DOF for the covered linear subset: point and circle scalar variables; locked/fixed points/circles; horizontal, vertical, coincident, horizontal/vertical distance, radius, and diameter constraints.
+  - Returns explicit `partial` or `unknown` coverage instead of inventing DOF for nonlinear distance/angle/relation constraints, coordinate-only legacy geometry, or other unmodeled entities.
   - Reports consistency and proven redundancy separately; a deterministic conflict ID is not claimed to be a minimal conflict set.
 - `move_point`
   - Drags one addressable point while preserving the currently supported linked constraints.
@@ -115,6 +122,10 @@ The canonical machine-readable contracts are generated from the Pydantic models 
 ## Constraint Primitives
 
 - `distance_constraint`
+- `horizontal_distance_constraint`
+- `vertical_distance_constraint`
+- `radius_constraint`
+- `diameter_constraint`
 - `angle_constraint`
 - `parallel_constraint`
 - `perpendicular_constraint`

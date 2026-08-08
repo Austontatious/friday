@@ -64,14 +64,15 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Primary canvas modes: Select, Draw rectangle, Circle, Add hole, Pan / view.
 - Secondary/advanced canvas tools: Point, Line, Dimension, Delete. Arc remains visibly deferred.
 - Default guided actions: Start rectangle, Apply Rectangle Dimensions, Add center hole, Add Hole placement, selected-hole update, Fix corner, Delete, Extrude, Commit Preview, Revert Preview, Download STEP.
-- Advanced constraint actions: Set Length, Set Angle, Edit Width, Edit Height, Horizontal, Vertical, Coincident, Parallel, Perpendicular, Equal Length, Equal Angle, Solve.
+- Dimension actions: Set Length, Set horizontal distance, Set vertical distance, Edit Width, Edit Height, Apply radius, and Apply diameter.
+- Advanced constraint actions: Set Angle, Horizontal, Vertical, Coincident, Parallel, Perpendicular, Equal Length, Equal Angle, Solve.
 - Normal rectangle clicks select the profile by default. Edge and corner selection are available in Dimension mode, Advanced Constraints, or modifier-click so the MVP workflow does not accidentally land on raw child geometry.
 - Rectangle width/height controls commit typed `set_rectangle_dimension` commands directly and keep the rectangle/profile selected.
 - Add center hole commits a centered typed `add_profile_hole` command. Add Hole enters placement mode; `Add Centered Hole` or a click inside the selected profile commits the same command shape with the chosen center.
 - Existing holes can be selected on canvas. The workflow panel exposes diameter/center controls that commit a typed `update_profile_hole` command and immediately refresh the committed session state.
 - Selected rectangles show width/height dimension labels on canvas. Selected holes show a diameter label on canvas.
 - Profile and hole selection use friendly labels in the default UI. Raw entity IDs remain available only under Advanced / Debug.
-- Circle is a first-class selectable entity with direct drawing, radius editing, an extrusion profile adapter, and optional reuse as a profile hole. Arc remains labeled `coming soon` and is not part of the current contract.
+- Circle is a first-class selectable entity with direct drawing, driving radius/diameter editing, an extrusion profile adapter, exact center/radius DOF analysis, and optional reuse as a profile hole. Arc remains labeled `coming soon` and is not part of the current contract.
 
 ## View Controls
 

@@ -15,7 +15,7 @@ A solver replacement chosen before defining the product contract would couple ca
 - Keep the existing closed-form executor as the production mutation path while Phase 1 establishes a solver-neutral contract.
 - Solver analysis is separate from solving. It consumes an immutable sketch snapshot and returns typed coverage, freedom, consistency, redundancy, diagnostics, and tolerance policy.
 - Exact DOF is reported only for mathematically covered systems. Partial systems return no exact DOF and expose only a bound over explicitly tracked variables.
-- The first exact subset is point-backed linear equality geometry: locked/fixed points, horizontal, vertical, and coincident constraints.
+- The first exact subset is linear equality geometry: point coordinates, circle center/radius variables, locked/fixed points/circles, horizontal, vertical, coincident, horizontal/vertical distance, radius, and diameter constraints.
 - Nonlinear distance, angle, parallel, perpendicular, and equality constraints remain explicitly partial until a validated Jacobian-based backend exists.
 - Numerical comparisons use the centralized versioned policy in `sketchmath/geometry/tolerances.py`. These are computational tolerances, not manufacturing tolerances.
 - A future nonlinear solver must return a proposed coordinate patch, residual/Jacobian diagnostics, termination reason, and analysis; it must not mutate canonical state directly.
@@ -28,6 +28,10 @@ A solver replacement chosen before defining the product contract would couple ca
 - [Ceres Solver](https://ceres-solver.org/) is Apache-2.0 and production-proven, but adds a native integration surface that is not justified before the Python contract is benchmarked.
 
 No new solver dependency is adopted by this decision.
+
+## Phase 1 evolution
+
+Command version `0.4` adds driving horizontal/vertical distance and radius/diameter operations without changing the solver-neutral boundary. These constraints are linear in the tracked variables, so they extend exact rank analysis and the existing deterministic mutation path without selecting a generalized nonlinear backend. Circle dimensions replace the prior radius-or-diameter constraint for that circle; equivalent manually constructed constraints remain detectable as redundant.
 
 ## DOF semantics
 
