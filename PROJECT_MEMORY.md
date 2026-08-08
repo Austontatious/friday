@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-08 - SketchMath SciPy Nonlinear Solver Benchmark
+
+### What Changed
+- Added an optional, production-isolated benchmark for `scipy.optimize.least_squares` with analytic and finite-difference Jacobian paths.
+- Covered triangle distances, parallel-plus-length, near-tangent circles, inconsistent distances, and a zero-length analytic seed.
+- Recorded residuals, termination details, evaluations, timings, environment, installed-license metadata hash, and the adoption decision in a tracked JSON artifact and report.
+
+### Why
+- Phase 1 requires evidence before selecting a nonlinear backend.
+- The benchmark proves that optimizer termination cannot be used as constraint success and exposes a concrete analytic-Jacobian degeneracy that the adapter must handle.
+
+### Decision
+- SciPy is `promising_not_ready` and remains outside production requirements and execution.
+- Nondegenerate cases classified correctly; analytic Jacobians matched numerical probes; the inconsistent case returned optimizer success with a large residual; the analytic zero-length seed also returned success while infeasible.
+
+### New Env Flags
+- None.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_nonlinear_benchmark.py` — 3 passed with SciPy 1.15.3 installed.
+- `PYTHONPATH=. python3 -m sketchmath.solver.nonlinear_benchmark --repetitions 25 --output evals/sketchmath_nonlinear_solver_benchmark.json`.
+
+### Remaining Phase 1 Work
+- Define one solver proposal/result interface with residual-based feasibility, seed/degeneracy policy, stable variables, timeouts, and rollback-safe canonical patches before integrating any generalized backend.
+
+---
+
 ## 2026-08-08 - SketchMath Driving Axis and Circle Dimensions
 
 ### What Changed

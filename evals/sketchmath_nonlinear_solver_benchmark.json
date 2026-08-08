@@ -1,0 +1,254 @@
+{
+  "available": true,
+  "candidate": "scipy.optimize.least_squares",
+  "candidate_status": "benchmark_only_not_a_production_dependency",
+  "cases": [
+    {
+      "analytic": {
+        "classification_correct": true,
+        "constraint_feasible": true,
+        "function_evaluations": 6,
+        "jacobian_evaluations": 6,
+        "residual_norm": 0.0,
+        "solution": [
+          -2.869627515409141e-16,
+          3.0
+        ],
+        "termination_message": "`gtol` termination condition is satisfied.",
+        "termination_status": 1,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 1.5295101329684258,
+          "p95": 1.5807920135557652,
+          "repetitions": 25
+        }
+      },
+      "degeneracy": null,
+      "expected_feasible": true,
+      "finite_difference": {
+        "classification_correct": true,
+        "constraint_feasible": true,
+        "function_evaluations": 6,
+        "jacobian_evaluations": 6,
+        "residual_norm": 0.0,
+        "solution": [
+          -3.313599457440575e-16,
+          3.0
+        ],
+        "termination_message": "`gtol` termination condition is satisfied.",
+        "termination_status": 1,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 2.571302931755781,
+          "p95": 2.5871500838547945,
+          "repetitions": 25
+        }
+      },
+      "jacobian_max_abs_error": 1.6060912322313214e-10,
+      "name": "triangle_distances"
+    },
+    {
+      "analytic": {
+        "classification_correct": true,
+        "constraint_feasible": true,
+        "function_evaluations": 3,
+        "jacobian_evaluations": 3,
+        "residual_norm": 0.0,
+        "solution": [
+          5.0,
+          1.0
+        ],
+        "termination_message": "`gtol` termination condition is satisfied.",
+        "termination_status": 1,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 0.7657429669052362,
+          "p95": 0.7794417906552553,
+          "repetitions": 25
+        }
+      },
+      "degeneracy": null,
+      "expected_feasible": true,
+      "finite_difference": {
+        "classification_correct": true,
+        "constraint_feasible": true,
+        "function_evaluations": 3,
+        "jacobian_evaluations": 3,
+        "residual_norm": 0.0,
+        "solution": [
+          5.0,
+          1.0
+        ],
+        "termination_message": "`gtol` termination condition is satisfied.",
+        "termination_status": 1,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 1.2647630646824837,
+          "p95": 1.3038159813731909,
+          "repetitions": 25
+        }
+      },
+      "jacobian_max_abs_error": 1.3082607219772058e-10,
+      "name": "parallel_plus_length"
+    },
+    {
+      "analytic": {
+        "classification_correct": true,
+        "constraint_feasible": true,
+        "function_evaluations": 7,
+        "jacobian_evaluations": 7,
+        "residual_norm": 7.47740832523561e-12,
+        "solution": [
+          0.9999995,
+          0.0010000051623543082
+        ],
+        "termination_message": "`gtol` termination condition is satisfied.",
+        "termination_status": 1,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 1.7028958536684513,
+          "p95": 1.7405191902071238,
+          "repetitions": 25
+        }
+      },
+      "degeneracy": null,
+      "expected_feasible": true,
+      "finite_difference": {
+        "classification_correct": true,
+        "constraint_feasible": true,
+        "function_evaluations": 7,
+        "jacobian_evaluations": 7,
+        "residual_norm": 7.515718581227494e-12,
+        "solution": [
+          0.9999995,
+          0.0010000051893507822
+        ],
+        "termination_message": "`gtol` termination condition is satisfied.",
+        "termination_status": 1,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 2.892421092838049,
+          "p95": 2.912646858021617,
+          "repetitions": 25
+        }
+      },
+      "jacobian_max_abs_error": 1.510453984110427e-10,
+      "name": "near_tangent_circles"
+    },
+    {
+      "analytic": {
+        "classification_correct": true,
+        "constraint_feasible": false,
+        "function_evaluations": 23,
+        "jacobian_evaluations": 13,
+        "residual_norm": 5.6568542494924,
+        "solution": [
+          5.0,
+          -3.767765832738985e-07
+        ],
+        "termination_message": "`ftol` termination condition is satisfied.",
+        "termination_status": 2,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 6.776295835152268,
+          "p95": 6.830672966316342,
+          "repetitions": 25
+        }
+      },
+      "degeneracy": null,
+      "expected_feasible": false,
+      "finite_difference": {
+        "classification_correct": true,
+        "constraint_feasible": false,
+        "function_evaluations": 23,
+        "jacobian_evaluations": 13,
+        "residual_norm": 5.6568542494924,
+        "solution": [
+          5.000000005158337,
+          -3.768144678985014e-07
+        ],
+        "termination_message": "`ftol` termination condition is satisfied.",
+        "termination_status": 2,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 8.981077931821346,
+          "p95": 9.108354104682803,
+          "repetitions": 25
+        }
+      },
+      "jacobian_max_abs_error": 2.110550623157792e-10,
+      "name": "inconsistent_distances"
+    },
+    {
+      "analytic": {
+        "classification_correct": false,
+        "constraint_feasible": false,
+        "function_evaluations": 3,
+        "jacobian_evaluations": 2,
+        "residual_norm": 2.0,
+        "solution": [
+          -1.0,
+          0.0
+        ],
+        "termination_message": "`ftol` termination condition is satisfied.",
+        "termination_status": 2,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 1.2586340308189392,
+          "p95": 1.2711258605122566,
+          "repetitions": 25
+        }
+      },
+      "degeneracy": "The analytic distance Jacobian is undefined at a zero-length seed.",
+      "expected_feasible": true,
+      "finite_difference": {
+        "classification_correct": true,
+        "constraint_feasible": true,
+        "function_evaluations": 7,
+        "jacobian_evaluations": 7,
+        "residual_norm": 8.881784197001252e-16,
+        "solution": [
+          7.482206258202079e-16,
+          3.0
+        ],
+        "termination_message": "`gtol` termination condition is satisfied.",
+        "termination_status": 1,
+        "termination_success": true,
+        "timing_ms": {
+          "median": 3.270074026659131,
+          "p95": 3.2812259159982204,
+          "repetitions": 25
+        }
+      },
+      "jacobian_max_abs_error": 1.6361811905341028e-10,
+      "name": "zero_length_seed"
+    }
+  ],
+  "decision": "promising_not_ready",
+  "decision_detail": "SciPy is viable for the covered nondegenerate systems, but the analytic distance Jacobian can terminate with an infeasible residual at a zero-length seed. Keep it out of production until seed regularization, residual-based success classification, timeout behavior, and packaging are integrated behind the neutral contract.",
+  "environment": {
+    "numpy": "2.1.3",
+    "platform": "Linux-5.15.0-185-generic-x86_64-with-glibc2.35",
+    "python": "3.10.12",
+    "scipy": "1.15.3"
+  },
+  "gate": {
+    "analytic_jacobians_match_finite_difference": true,
+    "analytic_zero_length_seed_safe": false,
+    "finite_difference_zero_length_seed_safe": true,
+    "nondegenerate_classification_correct": true
+  },
+  "generated_at": "2026-08-08T19:50:45.042771+00:00",
+  "license": {
+    "family": "BSD-3-Clause",
+    "metadata_sha256": "72c0cfc896e69e165d6f5ad998c6cb85239af3b462dd05ed38cad592c97d2721",
+    "source": "installed scipy package metadata"
+  },
+  "policy": {
+    "feasible_residual_norm_max": 1e-07,
+    "jacobian_max_abs_error_max": 1e-05,
+    "termination_success_is_constraint_success": false,
+    "timings_are_acceptance_gates": false
+  },
+  "schema_version": "1.0"
+}

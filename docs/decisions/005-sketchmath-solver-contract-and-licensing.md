@@ -33,6 +33,8 @@ No new solver dependency is adopted by this decision.
 
 Command version `0.4` adds driving horizontal/vertical distance and radius/diameter operations without changing the solver-neutral boundary. These constraints are linear in the tracked variables, so they extend exact rank analysis and the existing deterministic mutation path without selecting a generalized nonlinear backend. Circle dimensions replace the prior radius-or-diameter constraint for that circle; equivalent manually constructed constraints remain detectable as redundant.
 
+The first SciPy benchmark keeps the candidate outside production. Covered nondegenerate cases and analytic Jacobian checks passed, but SciPy reported successful termination for both a deliberately inconsistent system and an analytic zero-length seed with unacceptable residual. Any future adapter must classify feasibility from scaled residuals, define a degeneracy policy, and return diagnostics through the neutral result contract.
+
 ## DOF semantics
 
 - `coverage=exact` means every mutable entity and active constraint is represented by the analyzer.

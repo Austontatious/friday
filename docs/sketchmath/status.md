@@ -57,7 +57,8 @@ The build still reports the repository-wide stale Browserslist database notice. 
 - Nonlinear constraints and unmodeled geometry return honest partial/unknown results.
 - The live workspace now refreshes non-mutating analysis after committed changes and reports Under/Fully/Over/Conflicting/Partially analyzed without exposing rank internals in Normal mode.
 - Driving axis and circle dimensions update canonical geometry, replace same-semantic edits, persist through history/API replay, and remain exact in live solver state.
-- Current evidence: 112 focused Python tests, 45 semantic evals, 53 focused frontend tests, 9 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- SciPy `least_squares` benchmarked successfully for covered nondegenerate systems, but remains unadopted because optimizer termination can mask infeasible residuals and an analytic zero-length seed failed.
+- Current evidence: 115 focused Python tests, 45 semantic evals, 53 focused frontend tests, 9 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
 
 ## Gate A Outcome
 
@@ -90,11 +91,12 @@ Completed and published:
 - Manual and AI editing share versioned typed operations.
 - Major geometry expansion waits for Gate A.
 - Solver work must start with mathematically defensible subsets and explicit unknown/partial states.
-- Solver backend adoption is deferred behind the neutral contract; SolveSpace is reference-only due GPLv3, and SciPy is the leading permissive candidate pending benchmarks.
+- Solver backend adoption is deferred behind the neutral contract; SolveSpace is reference-only due GPLv3, and SciPy remains the leading permissive candidate after its first benchmark.
+- The first SciPy benchmark decision is `promising_not_ready`; residual-based feasibility, degeneracy handling, timeout/cancellation, packaging, and broader adversarial cases are required before adoption.
 
 ## Next Highest-Value Work
 
-Benchmark a permissive nonlinear backend and converge analysis/mutation on one solve path before adding arcs.
+Define the unified solve proposal/result path and residual-based feasibility gate without yet making SciPy a production dependency, then add arcs.
 
 ## Release Status
 
