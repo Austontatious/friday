@@ -48,6 +48,21 @@ type Entity =
   | { id: string; type: "circle_2d"; center: [number, number]; radius: number; center_point_id?: string | null; locked: boolean; label?: string | null }
   | {
       id: string;
+      type: "arc_2d";
+      center: [number, number];
+      radius: number;
+      start_angle_deg: number;
+      sweep_angle_deg: number;
+      construction: "center" | "three_point";
+      center_point_id?: string | null;
+      start_point_id?: string | null;
+      through_point_id?: string | null;
+      end_point_id?: string | null;
+      locked: boolean;
+      label?: string | null;
+    }
+  | {
+      id: string;
       type: "profile_2d";
       vertices: [number, number][];
       area: number;
@@ -797,6 +812,31 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       }
       if (command.command_type === "define_circle") {
         const entity: Entity = { id: command.parameters.name, type: "circle_2d", center: command.parameters.center, radius: command.parameters.radius, center_point_id: command.parameters.center_point_id, locked: false, label: command.parameters.label };
+        return makeResponse(setSnapshot([...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity], [entity.id], command, mutate));
+      }
+      if (command.command_type === "define_arc") {
+        const [startX, startY] = command.parameters.start;
+        let center = command.parameters.center as [number, number] | undefined;
+        if (!center) {
+          const [endX, endY] = command.parameters.end;
+          center = [(startX + endX) / 2, (startY + endY) / 2];
+        }
+        const startAngle = Math.atan2(startY - center[1], startX - center[0]) * 180 / Math.PI;
+        const entity: Entity = {
+          id: command.parameters.name,
+          type: "arc_2d",
+          center,
+          radius: Math.max(1, Math.hypot(startX - center[0], startY - center[1])),
+          start_angle_deg: startAngle,
+          sweep_angle_deg: command.parameters.construction === "three_point" ? 180 : 90,
+          construction: command.parameters.construction,
+          center_point_id: command.parameters.center_point_id || null,
+          start_point_id: command.parameters.start_point_id || null,
+          through_point_id: command.parameters.through_point_id || null,
+          end_point_id: command.parameters.end_point_id || null,
+          locked: false,
+          label: command.parameters.label,
+        };
         return makeResponse(setSnapshot([...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity], [entity.id], command, mutate));
       }
       if (command.command_type === "update_circle") {
@@ -1890,7 +1930,7 @@ describe("SketchMath workspace", () => {
     );
   });
 
-  it("enables circles while keeping arcs explicitly deferred", async () => {
+  it("enables center and three-point arc tools", async () => {
     const { fetchMock } = createSketchmathMock();
     global.fetch = fetchMock as unknown as typeof fetch;
     renderWorkspace();
@@ -1898,8 +1938,31 @@ describe("SketchMath workspace", () => {
     await screen.findByText("SketchMath");
 
     expect(screen.getByRole("button", { name: "Circle" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Arc" })).toBeNull();
-    expect(screen.getByText("Arc: coming soon")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Arc" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "3-point arc" })).toBeVisible();
+    expect(screen.queryByText("Arc: coming soon")).toBeNull();
+  });
+
+  it("draws selectable center and three-point arcs through typed v0.5 batches", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Arc" }));
+    clickCanvasAt(canvas, 200, 200);
+    clickCanvasAt(canvas, 260, 200);
+    expect(screen.getByTestId("sketchmath-arc-draft")).toBeVisible();
+    clickCanvasAt(canvas, 200, 260);
+    await waitFor(() => expect(document.querySelectorAll('[data-entity-type="arc_2d"]')).toHaveLength(1));
+
+    await userEvent.click(screen.getByRole("button", { name: "3-point arc" }));
+    clickCanvasAt(canvas, 360, 220);
+    clickCanvasAt(canvas, 400, 180);
+    clickCanvasAt(canvas, 440, 220);
+    await waitFor(() => expect(document.querySelectorAll('[data-entity-type="arc_2d"]')).toHaveLength(2));
+    expect(screen.getByText("Selected: 3-point arc")).toBeVisible();
   });
 
   it("draws and edits a selectable circle backed by an extrusion profile", async () => {

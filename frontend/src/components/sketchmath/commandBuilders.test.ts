@@ -1,6 +1,8 @@
 import {
   buildAddProfileHoleCommand,
   buildAnalyzeConstraintsCommand,
+  buildDefineCenterArcCommand,
+  buildDefineThreePointArcCommand,
   buildDeleteEntityCommand,
   buildExtrudeProfileCommand,
   buildSetDiameterCommand,
@@ -53,6 +55,34 @@ describe("SketchMath command builders", () => {
       command_type: "set_diameter",
       selection: ["circle_A"],
       parameters: { diameter: 18, unit: "mm" },
+    });
+  });
+
+  it("generates v0.5 canonical center and three-point arc commands", () => {
+    const centerArc = buildDefineCenterArcCommand(
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 0, y: 10 },
+      "arc_center",
+      { center: "center", start: "start", end: "end" },
+    );
+    const threePoint = buildDefineThreePointArcCommand(
+      { x: 0, y: 0 },
+      { x: 5, y: -5 },
+      { x: 10, y: 0 },
+      "arc_three",
+      { start: "a", through: "b", end: "c" },
+    );
+
+    expect(centerArc).toMatchObject({
+      version: "0.5",
+      command_type: "define_arc",
+      parameters: { construction: "center", direction: "clockwise", center_point_id: "center" },
+    });
+    expect(threePoint).toMatchObject({
+      version: "0.5",
+      command_type: "define_arc",
+      parameters: { construction: "three_point", through_point_id: "b" },
     });
   });
 

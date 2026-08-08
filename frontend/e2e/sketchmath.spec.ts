@@ -465,6 +465,37 @@ test.describe("SketchMath workspace", () => {
     await page.screenshot({ path: screenshotPath("sketchmath-circle-profile-step.png"), fullPage: true });
   });
 
+  test("creates canonical center and three-point arcs and restores them after reload", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Arc", exact: true }).click();
+    await clickSvgViewBoxPoint(page, 200, 180);
+    await clickSvgViewBoxPoint(page, 250, 180);
+    await expect(page.getByTestId("sketchmath-arc-draft")).toHaveCount(1);
+    await clickSvgViewBoxPoint(page, 200, 230);
+    await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(1);
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Arc");
+
+    await page.getByRole("button", { name: "3-point arc", exact: true }).click();
+    await clickSvgViewBoxPoint(page, 340, 220);
+    await clickSvgViewBoxPoint(page, 390, 170);
+    await clickSvgViewBoxPoint(page, 440, 220);
+    await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(2);
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 3-point arc");
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Partially analyzed");
+
+    const pathsBeforeReload = await page.locator('[data-entity-type="arc_2d"] path.sketchmath-line').evaluateAll((paths) =>
+      paths.map((path) => path.getAttribute("d")),
+    );
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(2);
+    const pathsAfterReload = await page.locator('[data-entity-type="arc_2d"] path.sketchmath-line').evaluateAll((paths) =>
+      paths.map((path) => path.getAttribute("d")),
+    );
+    expect(pathsAfterReload).toEqual(pathsBeforeReload);
+    await page.screenshot({ path: screenshotPath("sketchmath-canonical-arcs.png"), fullPage: true });
+  });
+
   test("keeps multi-step undo and redo backend-authoritative across a branch edit", async ({ page }) => {
     await openSketchMath(page);
     await page.getByRole("button", { name: "Line" }).first().click();
@@ -488,7 +519,7 @@ test.describe("SketchMath workspace", () => {
 
     await undo.click();
     await undo.click();
-    await page.getByRole("button", { name: "Point" }).click();
+    await page.getByRole("button", { name: "Point", exact: true }).click();
     await clickSvgViewBoxPoint(page, 380, 220);
     await expect(redo).toBeDisabled();
 
