@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from sketchmath.geometry.arcs import arc_endpoints, center_arc_geometry, normalize_angle_degrees, three_point_arc_geometry
 from sketchmath.geometry.intersections import intersect_lines
 from sketchmath.geometry.profiles import analyze_closed_polygon
 from sketchmath.geometry.projections import project_point_to_line
@@ -39,6 +40,7 @@ from sketchmath.cad.adapter import CadAdapter
 from sketchmath.cad.profile_holes import validate_profile_holes
 from sketchmath.cad.preview_mesh import build_preview_mesh
 from sketchmath.models.entities import (
+    Arc2DEntity,
     Axis2DEntity,
     ConstructionLine2DEntity,
     Circle2DEntity,
@@ -150,6 +152,8 @@ def apply_geometry_command(
         "make_profile": _handle_make_profile,
         "add_profile_hole": _handle_add_profile_hole,
         "update_profile_hole": _handle_update_profile_hole,
+        "define_arc": _handle_define_arc,
+        "update_arc": _handle_update_arc,
         "extrude_profile": _handle_extrude_profile,
         "translate": _handle_translate,
         "rotate": _handle_rotate,
@@ -872,6 +876,114 @@ def _handle_update_circle(command: GeometryCommand, state: SelectionContext) -> 
     updated = Circle2DEntity(**{**circle.model_dump(), "center": center, "radius": radius})
     state.replace_entity(updated)
     return state, [updated.id], radius, state.units, {"radius": radius, "diameter": radius * 2}
+
+
+def _arc_geometry_from_definition(command: GeometryCommand) -> tuple[Point2D, float, float, float, str]:
+    construction = str(_parameter(command, "construction"))
+    try:
+        canonical_fields = ("center", "radius", "start_angle_deg", "sweep_angle_deg")
+        if all(field in command.parameters for field in canonical_fields) and "start" not in command.parameters:
+            center = _point_tuple(command.parameters["center"])
+            radius = float(command.parameters["radius"])
+            start_angle = normalize_angle_degrees(float(command.parameters["start_angle_deg"]))
+            sweep = float(command.parameters["sweep_angle_deg"])
+            Arc2DEntity(
+                id="arc_geometry_validation",
+                center=center,
+                radius=radius,
+                start_angle_deg=start_angle,
+                sweep_angle_deg=sweep,
+                construction=construction,  # type: ignore[arg-type]
+            )
+            return center, radius, start_angle, sweep, construction
+        if construction == "center":
+            center = _point_tuple(_parameter(command, "center"))
+            start = _point_tuple(_parameter(command, "start"))
+            end = _point_tuple(_parameter(command, "end"))
+            direction = str(_parameter(command, "direction", default="counterclockwise"))
+            if direction not in {"clockwise", "counterclockwise"}:
+                raise ValueError("arc direction must be clockwise or counterclockwise")
+            radius, start_angle, sweep = center_arc_geometry(center, start, end, direction=direction)  # type: ignore[arg-type]
+            return center, radius, start_angle, sweep, construction
+        if construction == "three_point":
+            start = _point_tuple(_parameter(command, "start"))
+            through = _point_tuple(_parameter(command, "through"))
+            end = _point_tuple(_parameter(command, "end"))
+            center, radius, start_angle, sweep = three_point_arc_geometry(start, through, end)
+            return center, radius, start_angle, sweep, construction
+        raise ValueError("arc construction must be center or three_point")
+    except ValueError as exc:
+        raise SelectionResolutionError(
+            str(exc),
+            detail={"command_type": command.command_type, "error_code": "invalid_arc_geometry", "construction": construction},
+        ) from exc
+
+
+def _handle_define_arc(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    name = str(_parameter(command, "name"))
+    center, radius, start_angle, sweep, construction = _arc_geometry_from_definition(command)
+    arc = Arc2DEntity(
+        id=name,
+        center=center,
+        radius=radius,
+        start_angle_deg=start_angle,
+        sweep_angle_deg=sweep,
+        construction=construction,  # type: ignore[arg-type]
+        center_point_id=command.parameters.get("center_point_id"),
+        start_point_id=command.parameters.get("start_point_id"),
+        through_point_id=command.parameters.get("through_point_id"),
+        end_point_id=command.parameters.get("end_point_id"),
+        locked=bool(command.parameters.get("locked", False)),
+        label=command.parameters.get("label"),
+    )
+    state.replace_entity(arc)
+    _sync_named_reference(state, arc.id, arc.label)
+    return state, [arc.id], arc.radius, state.units, {
+        "construction": arc.construction,
+        "start_angle_deg": arc.start_angle_deg,
+        "sweep_angle_deg": arc.sweep_angle_deg,
+    }
+
+
+def _handle_update_arc(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    if len(command.selection) != 1:
+        raise SelectionResolutionError("update_arc requires one arc", detail={"selection": command.selection})
+    arc = state.get_entity(command.selection[0])
+    if not isinstance(arc, Arc2DEntity):
+        raise WrongEntityTypeError("Expected arc_2d", detail={"entity_id": arc.id, "actual": arc.type})
+    _ensure_mutable(state, [arc.id], command.command_type)
+    payload = arc.model_dump()
+    if "construction" in command.parameters:
+        center, radius, start_angle, sweep, construction = _arc_geometry_from_definition(command)
+        payload.update(
+            center=center,
+            radius=radius,
+            start_angle_deg=start_angle,
+            sweep_angle_deg=sweep,
+            construction=construction,
+        )
+    else:
+        if "center" in command.parameters:
+            payload["center"] = _point_tuple(command.parameters["center"])
+        for key in ("radius", "start_angle_deg", "sweep_angle_deg"):
+            if key in command.parameters:
+                payload[key] = float(command.parameters[key])
+    for key in ("center_point_id", "start_point_id", "through_point_id", "end_point_id"):
+        if key in command.parameters:
+            payload[key] = command.parameters[key]
+    try:
+        updated = Arc2DEntity.model_validate(payload)
+    except ValidationError as exc:
+        raise SelectionResolutionError(
+            "Invalid arc update",
+            detail={"command_type": command.command_type, "error_code": "invalid_arc_geometry", "errors": exc.errors(include_url=False)},
+        ) from exc
+    state.replace_entity(updated)
+    return state, [updated.id], updated.radius, state.units, {
+        "construction": updated.construction,
+        "start_angle_deg": updated.start_angle_deg,
+        "sweep_angle_deg": updated.sweep_angle_deg,
+    }
 
 
 def _handle_make_circle_profile(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
@@ -1749,6 +1861,49 @@ def _sync_linked_geometry(state: SelectionContext) -> None:
             state.replace_entity(type(entity)(**payload))
         elif isinstance(entity, Circle2DEntity) and entity.center_point_id in points:
             state.replace_entity(Circle2DEntity(**{**entity.model_dump(), "center": points[entity.center_point_id].coords}))
+        elif isinstance(entity, Arc2DEntity):
+            canonical_start, canonical_end = arc_endpoints(entity.center, entity.radius, entity.start_angle_deg, entity.sweep_angle_deg)
+            start = points.get(entity.start_point_id or "")
+            through = points.get(entity.through_point_id or "")
+            end = points.get(entity.end_point_id or "")
+            center = points.get(entity.center_point_id or "")
+            if start is None and through is None and end is None and center is None:
+                continue
+            try:
+                if entity.construction == "three_point" and start is not None and through is not None and end is not None:
+                    next_center, radius, start_angle, sweep = three_point_arc_geometry(start.coords, through.coords, end.coords)
+                else:
+                    next_center = center.coords if center is not None else entity.center
+                    radius, start_angle, sweep = center_arc_geometry(
+                        next_center,
+                        start.coords if start is not None else canonical_start,
+                        end.coords if end is not None else canonical_end,
+                        direction="clockwise" if entity.sweep_angle_deg > 0 else "counterclockwise",
+                    )
+            except ValueError as exc:
+                raise SolverError(
+                    "Linked arc geometry became invalid",
+                    detail={
+                        "entity_id": entity.id,
+                        "source_point_ids": [
+                            point_id
+                            for point_id in (entity.center_point_id, entity.start_point_id, entity.through_point_id, entity.end_point_id)
+                            if point_id is not None
+                        ],
+                        "reason": str(exc),
+                    },
+                ) from exc
+            state.replace_entity(
+                Arc2DEntity(
+                    **{
+                        **entity.model_dump(),
+                        "center": next_center,
+                        "radius": radius,
+                        "start_angle_deg": start_angle,
+                        "sweep_angle_deg": sweep,
+                    }
+                )
+            )
     entity_map = state.entity_map()
     for entity in list(state.items):
         if isinstance(entity, Profile2DEntity) and entity.source_line_ids:
@@ -1774,6 +1929,10 @@ def _translate_entity(entity: SelectionEntity, delta: Point2D) -> SelectionEntit
         return Axis2DEntity(**{**entity.model_dump(), "origin": translate_point(entity.origin, delta)})
     if isinstance(entity, Profile2DEntity):
         return Profile2DEntity(**{**entity.model_dump(), "vertices": [translate_point(vertex, delta) for vertex in entity.vertices]})
+    if isinstance(entity, Circle2DEntity):
+        return Circle2DEntity(**{**entity.model_dump(), "center": translate_point(entity.center, delta)})
+    if isinstance(entity, Arc2DEntity):
+        return Arc2DEntity(**{**entity.model_dump(), "center": translate_point(entity.center, delta)})
     raise SketchMathError(f"Unsupported entity for translate: {entity.type}")
 
 
@@ -1791,6 +1950,17 @@ def _rotate_entity(entity: SelectionEntity, angle_value: float, origin: Point2D,
         return Axis2DEntity(**{**entity.model_dump(), "origin": rotated_origin, "direction": subtract(rotated_tip, rotated_origin)})
     if isinstance(entity, Profile2DEntity):
         return Profile2DEntity(**{**entity.model_dump(), "vertices": [rotate_point_around(vertex, angle_value, origin=origin, angle_unit=angle_unit) for vertex in entity.vertices]})
+    if isinstance(entity, Circle2DEntity):
+        return Circle2DEntity(**{**entity.model_dump(), "center": rotate_point_around(entity.center, angle_value, origin=origin, angle_unit=angle_unit)})
+    if isinstance(entity, Arc2DEntity):
+        rotation_degrees = math.degrees(normalize_angle(angle_value, angle_unit))
+        return Arc2DEntity(
+            **{
+                **entity.model_dump(),
+                "center": rotate_point_around(entity.center, angle_value, origin=origin, angle_unit=angle_unit),
+                "start_angle_deg": normalize_angle_degrees(entity.start_angle_deg + rotation_degrees),
+            }
+        )
     raise SketchMathError(f"Unsupported entity for rotate: {entity.type}")
 
 
@@ -1805,6 +1975,17 @@ def _mirror_entity(entity: SelectionEntity, axis_x: float) -> SelectionEntity:
         return Axis2DEntity(**{**entity.model_dump(), "origin": mirror_point_across_vertical_axis(entity.origin, axis_x), "direction": (-float(entity.direction[0]), float(entity.direction[1]))})
     if isinstance(entity, Profile2DEntity):
         return Profile2DEntity(**{**entity.model_dump(), "vertices": [mirror_point_across_vertical_axis(vertex, axis_x) for vertex in entity.vertices]})
+    if isinstance(entity, Circle2DEntity):
+        return Circle2DEntity(**{**entity.model_dump(), "center": mirror_point_across_vertical_axis(entity.center, axis_x)})
+    if isinstance(entity, Arc2DEntity):
+        return Arc2DEntity(
+            **{
+                **entity.model_dump(),
+                "center": mirror_point_across_vertical_axis(entity.center, axis_x),
+                "start_angle_deg": normalize_angle_degrees(180.0 - entity.start_angle_deg),
+                "sweep_angle_deg": -entity.sweep_angle_deg,
+            }
+        )
     raise SketchMathError(f"Unsupported entity for mirror: {entity.type}")
 
 
@@ -1819,6 +2000,20 @@ def _copy_entity(entity: SelectionEntity, delta: Point2D, copy_id: str) -> Selec
         return Axis2DEntity(**{**entity.model_dump(), "id": copy_id, "origin": translate_point(entity.origin, delta)})
     if isinstance(entity, Profile2DEntity):
         return Profile2DEntity(**{**entity.model_dump(), "id": copy_id, "vertices": [translate_point(vertex, delta) for vertex in entity.vertices]})
+    if isinstance(entity, Circle2DEntity):
+        return Circle2DEntity(**{**entity.model_dump(), "id": copy_id, "center": translate_point(entity.center, delta), "center_point_id": None})
+    if isinstance(entity, Arc2DEntity):
+        return Arc2DEntity(
+            **{
+                **entity.model_dump(),
+                "id": copy_id,
+                "center": translate_point(entity.center, delta),
+                "center_point_id": None,
+                "start_point_id": None,
+                "through_point_id": None,
+                "end_point_id": None,
+            }
+        )
     raise SketchMathError(f"Unsupported entity for copy_linear: {entity.type}")
 
 

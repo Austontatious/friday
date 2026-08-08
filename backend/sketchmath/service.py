@@ -86,6 +86,28 @@ def _command_from_entity(entity: dict[str, Any], *, command_id: str, mode: str) 
                 "label": entity.get("label"),
             },
         }
+    elif entity_type == "arc_2d":
+        payload = {
+            "version": "0.5",
+            "command_id": command_id,
+            "mode": mode,
+            "command_type": "define_arc",
+            "selection": [],
+            "parameters": {
+                "name": entity["id"],
+                "construction": entity["construction"],
+                "center": entity["center"],
+                "radius": entity["radius"],
+                "start_angle_deg": entity["start_angle_deg"],
+                "sweep_angle_deg": entity["sweep_angle_deg"],
+                "center_point_id": entity.get("center_point_id"),
+                "start_point_id": entity.get("start_point_id"),
+                "through_point_id": entity.get("through_point_id"),
+                "end_point_id": entity.get("end_point_id"),
+                "locked": entity.get("locked", False),
+                "label": entity.get("label"),
+            },
+        }
     elif entity_type in {"line_2d", "construction_line_2d"}:
         payload = {
             "version": "0.1",

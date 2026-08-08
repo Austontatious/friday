@@ -65,6 +65,131 @@
       "title": "AngleConstraint",
       "type": "object"
     },
+    "Arc2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "center": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center",
+          "type": "array"
+        },
+        "center_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Center Point Id"
+        },
+        "construction": {
+          "enum": [
+            "center",
+            "three_point"
+          ],
+          "title": "Construction",
+          "type": "string"
+        },
+        "end_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Point Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "radius": {
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "start_angle_deg": {
+          "title": "Start Angle Deg",
+          "type": "number"
+        },
+        "start_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Point Id"
+        },
+        "sweep_angle_deg": {
+          "title": "Sweep Angle Deg",
+          "type": "number"
+        },
+        "through_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Through Point Id"
+        },
+        "type": {
+          "const": "arc_2d",
+          "default": "arc_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "center",
+        "radius",
+        "start_angle_deg",
+        "sweep_angle_deg",
+        "construction"
+      ],
+      "title": "Arc2DEntity",
+      "type": "object"
+    },
     "Axis2DEntity": {
       "additionalProperties": false,
       "properties": {
@@ -1420,6 +1545,7 @@
       "items": {
         "discriminator": {
           "mapping": {
+            "arc_2d": "#/$defs/Arc2DEntity",
             "axis_2d": "#/$defs/Axis2DEntity",
             "circle_2d": "#/$defs/Circle2DEntity",
             "construction_line_2d": "#/$defs/ConstructionLine2DEntity",
@@ -1444,6 +1570,9 @@
           },
           {
             "$ref": "#/$defs/Circle2DEntity"
+          },
+          {
+            "$ref": "#/$defs/Arc2DEntity"
           },
           {
             "$ref": "#/$defs/Profile2DEntity"

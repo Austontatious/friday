@@ -1,4 +1,5 @@
 from .entities import (
+    Arc2DEntity,
     Axis2DEntity,
     ConstructionLine2DEntity,
     Line2DEntity,
@@ -27,6 +28,7 @@ from .selection_context import SelectionContext
 from .solver_run_result import SolverCoordinatePatch, SolverRunResult
 
 __all__ = [
+    "Arc2DEntity",
     "Axis2DEntity",
     "AngleConstraint",
     "CadExportArtifacts",
