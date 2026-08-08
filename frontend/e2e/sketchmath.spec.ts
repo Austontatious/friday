@@ -162,7 +162,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-canvas")).toBeVisible();
     await expect(page.getByTestId("sketchmath-workbench-panel")).toBeVisible();
     await expect(page.getByRole("button", { name: "Select" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Line" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Line", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Circle" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Dimension" }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Parallel" })).toHaveCount(0);
