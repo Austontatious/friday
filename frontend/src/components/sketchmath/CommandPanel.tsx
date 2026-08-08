@@ -48,7 +48,7 @@ const summarizeCommand = (command: SketchMathCommand | null): string => {
   if (!command) {
     return "No proposed command yet.";
   }
-  const pieces = [command.command_type];
+  const pieces: string[] = [command.command_type];
   if (command.selection.length > 0) {
     pieces.push(`selection: ${command.selection.join(", ")}`);
   }

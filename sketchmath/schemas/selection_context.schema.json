@@ -1,269 +1,1192 @@
 {
+  "$defs": {
+    "AngleConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "angle": {
+          "title": "Angle",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "angle_constraint",
+          "default": "angle_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "deg",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points",
+        "angle"
+      ],
+      "title": "AngleConstraint",
+      "type": "object"
+    },
+    "Axis2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Direction",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Origin",
+          "type": "array"
+        },
+        "type": {
+          "const": "axis_2d",
+          "default": "axis_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "origin",
+        "direction"
+      ],
+      "title": "Axis2DEntity",
+      "type": "object"
+    },
+    "Circle2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "center": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center",
+          "type": "array"
+        },
+        "center_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Center Point Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "radius": {
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "type": {
+          "const": "circle_2d",
+          "default": "circle_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "center",
+        "radius"
+      ],
+      "title": "Circle2DEntity",
+      "type": "object"
+    },
+    "CoincidentConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "coincident_constraint",
+          "default": "coincident_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "CoincidentConstraint",
+      "type": "object"
+    },
+    "ConstructionLine2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "End",
+          "type": "array"
+        },
+        "end_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Point Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "start": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Start",
+          "type": "array"
+        },
+        "start_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Point Id"
+        },
+        "type": {
+          "const": "construction_line_2d",
+          "default": "construction_line_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end"
+      ],
+      "title": "ConstructionLine2DEntity",
+      "type": "object"
+    },
+    "DistanceConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "default": "midpoint",
+          "enum": [
+            "point_a",
+            "point_b",
+            "midpoint"
+          ],
+          "title": "Anchor",
+          "type": "string"
+        },
+        "distance": {
+          "title": "Distance",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "distance_constraint",
+          "default": "distance_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points",
+        "distance"
+      ],
+      "title": "DistanceConstraint",
+      "type": "object"
+    },
+    "EqualAngleConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 6,
+          "minItems": 6,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "equal_angle_constraint",
+          "default": "equal_angle_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "EqualAngleConstraint",
+      "type": "object"
+    },
+    "EqualLengthConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "equal_length_constraint",
+          "default": "equal_length_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "EqualLengthConstraint",
+      "type": "object"
+    },
+    "FixedPointConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "coords": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coords",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "point_id": {
+          "title": "Point Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "fixed_point_constraint",
+          "default": "fixed_point_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "point_id",
+        "coords"
+      ],
+      "title": "FixedPointConstraint",
+      "type": "object"
+    },
+    "HorizontalConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "horizontal_constraint",
+          "default": "horizontal_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "HorizontalConstraint",
+      "type": "object"
+    },
+    "Line2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "End",
+          "type": "array"
+        },
+        "end_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Point Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "start": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Start",
+          "type": "array"
+        },
+        "start_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Point Id"
+        },
+        "type": {
+          "const": "line_2d",
+          "default": "line_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end"
+      ],
+      "title": "Line2DEntity",
+      "type": "object"
+    },
+    "ParallelConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "parallel_constraint",
+          "default": "parallel_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "ParallelConstraint",
+      "type": "object"
+    },
+    "PerpendicularConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "perpendicular_constraint",
+          "default": "perpendicular_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "PerpendicularConstraint",
+      "type": "object"
+    },
+    "Point2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "coords": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coords",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "point_2d",
+          "default": "point_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "coords"
+      ],
+      "title": "Point2DEntity",
+      "type": "object"
+    },
+    "Profile2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "title": "Area",
+          "type": "number"
+        },
+        "closed": {
+          "default": true,
+          "title": "Closed",
+          "type": "boolean"
+        },
+        "holes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Holes",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "source_circle_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Circle Id"
+        },
+        "source_line_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Line Ids",
+          "type": "array"
+        },
+        "type": {
+          "const": "profile_2d",
+          "default": "profile_2d",
+          "title": "Type",
+          "type": "string"
+        },
+        "vertices": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Vertices",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "winding": {
+          "enum": [
+            "clockwise",
+            "counterclockwise",
+            "degenerate"
+          ],
+          "title": "Winding",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "vertices",
+        "area",
+        "winding"
+      ],
+      "title": "Profile2DEntity",
+      "type": "object"
+    },
+    "VerticalConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "vertical_constraint",
+          "default": "vertical_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "VerticalConstraint",
+      "type": "object"
+    }
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "SelectionContext",
-  "type": "object",
   "additionalProperties": false,
-  "required": ["selection_set_id", "units", "frame", "items", "constraints", "named_references"],
   "properties": {
-    "selection_set_id": {"type": "string"},
-    "units": {"type": "string"},
-    "frame": {"type": "string", "enum": ["canvas_2d"], "default": "canvas_2d"},
-    "items": {
-      "type": "array",
-      "items": {
-        "oneOf": [
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "coords"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "point_2d"},
-              "coords": {
-                "type": "array",
-                "prefixItems": [{"type": "number"}, {"type": "number"}],
-                "minItems": 2,
-                "maxItems": 2
-              },
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "start", "end"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "line_2d"},
-              "start": {
-                "type": "array",
-                "prefixItems": [{"type": "number"}, {"type": "number"}],
-                "minItems": 2,
-                "maxItems": 2
-              },
-              "end": {
-                "type": "array",
-                "prefixItems": [{"type": "number"}, {"type": "number"}],
-                "minItems": 2,
-                "maxItems": 2
-              },
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "origin", "direction"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "axis_2d"},
-              "origin": {
-                "type": "array",
-                "prefixItems": [{"type": "number"}, {"type": "number"}],
-                "minItems": 2,
-                "maxItems": 2
-              },
-              "direction": {
-                "type": "array",
-                "prefixItems": [{"type": "number"}, {"type": "number"}],
-                "minItems": 2,
-                "maxItems": 2
-              },
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "start", "end"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "construction_line_2d"},
-              "start": {
-                "type": "array",
-                "prefixItems": [{"type": "number"}, {"type": "number"}],
-                "minItems": 2,
-                "maxItems": 2
-              },
-              "end": {
-                "type": "array",
-                "prefixItems": [{"type": "number"}, {"type": "number"}],
-                "minItems": 2,
-                "maxItems": 2
-              },
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "vertices", "area", "winding", "closed"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "profile_2d"},
-              "vertices": {
-                "type": "array",
-                "items": {
-                  "type": "array",
-                  "prefixItems": [{"type": "number"}, {"type": "number"}],
-                  "minItems": 2,
-                  "maxItems": 2
-                }
-              },
-              "area": {"type": "number"},
-              "winding": {"type": "string", "enum": ["clockwise", "counterclockwise", "degenerate"]},
-              "warnings": {"type": "array", "items": {"type": "string"}},
-              "closed": {"type": "boolean", "const": true},
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
-          }
-        ]
-      }
-    },
     "constraints": {
-      "type": "array",
       "items": {
+        "discriminator": {
+          "mapping": {
+            "angle_constraint": "#/$defs/AngleConstraint",
+            "coincident_constraint": "#/$defs/CoincidentConstraint",
+            "distance_constraint": "#/$defs/DistanceConstraint",
+            "equal_angle_constraint": "#/$defs/EqualAngleConstraint",
+            "equal_length_constraint": "#/$defs/EqualLengthConstraint",
+            "fixed_point_constraint": "#/$defs/FixedPointConstraint",
+            "horizontal_constraint": "#/$defs/HorizontalConstraint",
+            "parallel_constraint": "#/$defs/ParallelConstraint",
+            "perpendicular_constraint": "#/$defs/PerpendicularConstraint",
+            "vertical_constraint": "#/$defs/VerticalConstraint"
+          },
+          "propertyName": "type"
+        },
         "oneOf": [
           {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "point_id", "coords"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "fixed_point_constraint"},
-              "point_id": {"type": "string"},
-              "coords": {
-                "type": "array",
-                "prefixItems": [{"type": "number"}, {"type": "number"}],
-                "minItems": 2,
-                "maxItems": 2
-              },
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
+            "$ref": "#/$defs/FixedPointConstraint"
           },
           {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "points", "distance"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "distance_constraint"},
-              "points": {
-                "type": "array",
-                "prefixItems": [{"type": "string"}, {"type": "string"}],
-                "minItems": 2,
-                "maxItems": 2
-              },
-              "distance": {"type": "number"},
-              "unit": {"type": "string"},
-              "anchor": {"type": "string", "enum": ["point_a", "point_b", "midpoint"]},
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
+            "$ref": "#/$defs/DistanceConstraint"
           },
           {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "points", "angle"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "angle_constraint"},
-              "points": {
-                "type": "array",
-                "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "string"}],
-                "minItems": 3,
-                "maxItems": 3
-              },
-              "angle": {"type": "number"},
-              "unit": {"type": "string"},
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
+            "$ref": "#/$defs/AngleConstraint"
           },
           {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "points"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "parallel_constraint"},
-              "points": {
-                "type": "array",
-                "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "string"}, {"type": "string"}],
-                "minItems": 4,
-                "maxItems": 4
-              },
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
+            "$ref": "#/$defs/ParallelConstraint"
           },
           {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "points"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "perpendicular_constraint"},
-              "points": {
-                "type": "array",
-                "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "string"}, {"type": "string"}],
-                "minItems": 4,
-                "maxItems": 4
-              },
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
+            "$ref": "#/$defs/PerpendicularConstraint"
           },
           {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "points"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "equal_length_constraint"},
-              "points": {
-                "type": "array",
-                "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "string"}, {"type": "string"}],
-                "minItems": 4,
-                "maxItems": 4
-              },
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
+            "$ref": "#/$defs/EqualLengthConstraint"
           },
           {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "type", "points"],
-            "properties": {
-              "id": {"type": "string"},
-              "type": {"const": "equal_angle_constraint"},
-              "points": {
-                "type": "array",
-                "prefixItems": [
-                  {"type": "string"},
-                  {"type": "string"},
-                  {"type": "string"},
-                  {"type": "string"},
-                  {"type": "string"},
-                  {"type": "string"}
-                ],
-                "minItems": 6,
-                "maxItems": 6
-              },
-              "locked": {"type": "boolean", "default": false},
-              "label": {"type": ["string", "null"]}
-            }
+            "$ref": "#/$defs/EqualAngleConstraint"
+          },
+          {
+            "$ref": "#/$defs/HorizontalConstraint"
+          },
+          {
+            "$ref": "#/$defs/VerticalConstraint"
+          },
+          {
+            "$ref": "#/$defs/CoincidentConstraint"
           }
         ]
-      }
+      },
+      "title": "Constraints",
+      "type": "array"
     },
-    "named_references": {"type": "object", "additionalProperties": {"type": "string"}}
-  }
+    "frame": {
+      "const": "canvas_2d",
+      "default": "canvas_2d",
+      "title": "Frame",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "axis_2d": "#/$defs/Axis2DEntity",
+            "circle_2d": "#/$defs/Circle2DEntity",
+            "construction_line_2d": "#/$defs/ConstructionLine2DEntity",
+            "line_2d": "#/$defs/Line2DEntity",
+            "point_2d": "#/$defs/Point2DEntity",
+            "profile_2d": "#/$defs/Profile2DEntity"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/Point2DEntity"
+          },
+          {
+            "$ref": "#/$defs/Line2DEntity"
+          },
+          {
+            "$ref": "#/$defs/Axis2DEntity"
+          },
+          {
+            "$ref": "#/$defs/ConstructionLine2DEntity"
+          },
+          {
+            "$ref": "#/$defs/Circle2DEntity"
+          },
+          {
+            "$ref": "#/$defs/Profile2DEntity"
+          }
+        ]
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "named_references": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Named References",
+      "type": "object"
+    },
+    "selection_set_id": {
+      "title": "Selection Set Id",
+      "type": "string"
+    },
+    "units": {
+      "title": "Units",
+      "type": "string"
+    }
+  },
+  "required": [
+    "selection_set_id",
+    "units"
+  ],
+  "title": "SelectionContext",
+  "type": "object"
 }

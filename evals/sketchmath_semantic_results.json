@@ -1,7 +1,7 @@
 {
-  "case_count": 38,
+  "case_count": 41,
   "failed": 0,
-  "passed": 38,
+  "passed": 41,
   "results": [
     {
       "diagnostic": "ok",
@@ -176,6 +176,14 @@
             ],
             "warnings": [],
             "winding": "clockwise"
+          },
+          "hole_profile_rect_eval_cmd_add_profile_hole_eval_circle": {
+            "center": [
+              30.0,
+              32.5
+            ],
+            "center_point_id": null,
+            "radius": 4.0
           },
           "profile_rect_eval": {
             "area": 1000.0,
@@ -2568,6 +2576,190 @@
         "options": [],
         "reason": "No deterministic translator rule matched the utterance.",
         "status": "unsupported"
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v02_define_circle",
+      "path": "evals/cases/sketchmath_v02_define_circle.json",
+      "result": {
+        "after": {
+          "circle_eval": {
+            "center": [
+              12.5,
+              -3.0
+            ],
+            "center_point_id": "circle_eval_center",
+            "radius": 5.0
+          }
+        },
+        "changed_entity_ids": [
+          "circle_eval"
+        ],
+        "metadata": {
+          "diameter": 10.0,
+          "history_length": 1,
+          "radius": 5.0
+        },
+        "status": "committed",
+        "unit": "mm",
+        "value": 5.0
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v02_detect_profile",
+      "path": "evals/cases/sketchmath_v02_detect_profile.json",
+      "result": {
+        "after": {
+          "l1": {
+            "end": [
+              20.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "l2": {
+            "end": [
+              20.0,
+              10.0
+            ],
+            "start": [
+              20.0,
+              0.0
+            ]
+          },
+          "l3": {
+            "end": [
+              0.0,
+              10.0
+            ],
+            "start": [
+              20.0,
+              10.0
+            ]
+          },
+          "l4": {
+            "end": [
+              0.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              10.0
+            ]
+          },
+          "p1": [
+            0.0,
+            0.0
+          ],
+          "p2": [
+            20.0,
+            0.0
+          ],
+          "p3": [
+            20.0,
+            10.0
+          ],
+          "p4": [
+            0.0,
+            10.0
+          ]
+        },
+        "changed_entity_ids": [],
+        "metadata": {
+          "candidate_count": 1,
+          "history_length": 0,
+          "profile_candidates": [
+            {
+              "area": 200.0,
+              "candidate_id": "profile_candidate_l1_l2_l3_l4",
+              "line_ids": [
+                "l1",
+                "l2",
+                "l3",
+                "l4"
+              ],
+              "point_ids": [
+                "p1",
+                "p2",
+                "p3",
+                "p4"
+              ],
+              "valid": true,
+              "vertices": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  20.0,
+                  0.0
+                ],
+                [
+                  20.0,
+                  10.0
+                ],
+                [
+                  0.0,
+                  10.0
+                ],
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "warnings": [],
+              "winding": "counterclockwise"
+            }
+          ]
+        },
+        "status": "preview",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v02_horizontal_constraint",
+      "path": "evals/cases/sketchmath_v02_horizontal_constraint.json",
+      "result": {
+        "after": {
+          "line_eval": {
+            "end": [
+              4.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "point_a": [
+            0.0,
+            0.0
+          ],
+          "point_b": [
+            4.0,
+            0.0
+          ]
+        },
+        "changed_entity_ids": [
+          "point_b"
+        ],
+        "metadata": {
+          "constraint_id": "constraint_cmd_eval_horizontal",
+          "history_length": 1
+        },
+        "status": "committed",
+        "unit": null,
+        "value": null
       },
       "status": "pass"
     }

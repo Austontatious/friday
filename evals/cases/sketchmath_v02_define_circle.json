@@ -1,0 +1,39 @@
+{
+  "name": "sketchmath_v02_define_circle",
+  "input": {
+    "command": {
+      "version": "0.2",
+      "command_id": "cmd_eval_define_circle",
+      "mode": "commit",
+      "command_type": "define_circle",
+      "selection": [],
+      "parameters": {
+        "name": "circle_eval",
+        "center": [12.5, -3.0],
+        "radius": 5.0,
+        "center_point_id": "circle_eval_center"
+      }
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_circle",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "changed_entity_ids": ["circle_eval"],
+    "value": 5.0,
+    "unit": "mm",
+    "after": {
+      "circle_eval": {
+        "center": [12.5, -3.0],
+        "radius": 5.0,
+        "center_point_id": "circle_eval_center"
+      }
+    }
+  }
+}

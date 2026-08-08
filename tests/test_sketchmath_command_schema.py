@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
 
 def test_geometry_command_defaults_to_preview() -> None:
     from sketchmath.models.geometry_command import GeometryCommand
@@ -59,20 +65,59 @@ def test_geometry_command_accepts_extrude_profile_holes() -> None:
     assert command.parameters["holes"] == ["profile_inner"]
 
 
-def test_geometry_command_schema_lists_supported_mvp_commands() -> None:
-    import json
-    from pathlib import Path
+def test_geometry_command_schema_matches_runtime_command_contract() -> None:
+    from sketchmath.models.geometry_command import SUPPORTED_GEOMETRY_COMMAND_TYPES, SUPPORTED_GEOMETRY_COMMAND_VERSIONS
 
     schema = json.loads(Path("sketchmath/schemas/geometry_command.schema.json").read_text(encoding="utf-8"))
     command_types = set(schema["properties"]["command_type"]["enum"])
 
-    assert "delete_entity" in command_types
-    assert "set_rectangle_dimension" in command_types
-    assert "add_profile_hole" in command_types
-    assert "update_profile_hole" in command_types
-    assert "extrude_profile" in command_types
-    assert "define_circle" not in command_types
+    assert command_types == set(SUPPORTED_GEOMETRY_COMMAND_TYPES)
+    assert set(schema["properties"]["version"]["enum"]) == set(SUPPORTED_GEOMETRY_COMMAND_VERSIONS)
+    assert "define_circle" in command_types
+    assert "detect_profiles" in command_types
+    assert "make_horizontal" in command_types
     assert "define_arc" not in command_types
+
+
+def test_checked_in_sketchmath_schemas_match_canonical_models() -> None:
+    from sketchmath.schemas.generate import schema_drift
+
+    assert schema_drift() == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("version", "9.9"), ("command_type", "unsupported")],
+)
+def test_geometry_command_rejects_undeclared_contract_values(field: str, value: str) -> None:
+    from sketchmath.models.geometry_command import GeometryCommand
+
+    payload = {
+        "version": "0.2",
+        "command_id": "cmd_contract_reject",
+        "mode": "preview",
+        "command_type": "define_circle",
+        "selection": [],
+        "parameters": {"name": "circle_1", "center": [0, 0], "radius": 5},
+    }
+    payload[field] = value
+
+    with pytest.raises(ValidationError):
+        GeometryCommand.model_validate(payload)
+
+
+def test_selection_context_schema_declares_current_entities_and_constraints() -> None:
+    schema_text = Path("sketchmath/schemas/selection_context.schema.json").read_text(encoding="utf-8")
+
+    for declared_type in (
+        "circle_2d",
+        "horizontal_constraint",
+        "vertical_constraint",
+        "coincident_constraint",
+        "start_point_id",
+        "source_circle_id",
+    ):
+        assert declared_type in schema_text
 
 
 def test_selection_context_recognizes_2d_point_and_line_entities() -> None:

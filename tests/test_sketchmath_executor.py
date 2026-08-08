@@ -647,7 +647,6 @@ def test_revert_restores_prior_state() -> None:
         ("measure_distance", ["point_A", "line_B"], {"unit": "mm"}, "wrong_entity_type"),
         ("set_line_polar", ["point_A", "point_B"], {"start": "point_A", "end": "point_B", "angle": 0.0, "angle_unit": "deg"}, "missing_parameter"),
         ("set_distance", ["point_A", "point_B"], {"distance": 4.0, "unit": "furlong", "anchor": "point_A"}, "invalid_units"),
-        ("unsupported", ["point_A"], {}, "unsupported_command_type"),
     ],
 )
 def test_structured_errors_cover_validation_failures(command_type, selection, parameters, error_code) -> None:
@@ -659,26 +658,33 @@ def test_structured_errors_cover_validation_failures(command_type, selection, pa
         ]
     )
 
-    if command_type == "unsupported":
-        from sketchmath.models.geometry_command import GeometryCommand
-
-        command = GeometryCommand.model_validate(
-            {
-                "version": "0.1",
-                "command_id": "cmd_unsupported",
-                "command_type": "unsupported",
-                "selection": selection,
-                "parameters": parameters,
-            }
-        )
-    else:
-        command = _command(command_type, "cmd_error", selection=selection, parameters=parameters)
+    command = _command(command_type, "cmd_error", selection=selection, parameters=parameters)
 
     with pytest.raises(Exception) as exc_info:
         session.execute(command)
 
     assert hasattr(exc_info.value, "to_dict")
     assert exc_info.value.to_dict()["code"] == error_code
+
+
+def test_executor_defensively_rejects_unvalidated_command_type() -> None:
+    from sketchmath.models.geometry_command import GeometryCommand
+
+    session = _session([])
+    command = GeometryCommand.model_construct(
+        version="0.1",
+        command_id="cmd_unsupported",
+        mode="preview",
+        command_type="unsupported",
+        selection=[],
+        parameters={},
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        session.execute(command)
+
+    assert hasattr(exc_info.value, "to_dict")
+    assert exc_info.value.to_dict()["code"] == "unsupported_command_type"
 
 
 def test_locked_entity_mutation_raises_structured_error() -> None:

@@ -1,10 +1,10 @@
-import type { SketchMathCommand } from "../../services/sketchmath";
+import type { SketchMathCommand, SketchMathCommandType } from "../../services/sketchmath";
 
 type Point = { x: number; y: number };
 
 const nextCommandId = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
-const baseCommand = (commandType: string, selection: string[], parameters: Record<string, unknown>): SketchMathCommand => ({
+const baseCommand = (commandType: SketchMathCommandType, selection: string[], parameters: Record<string, unknown>): SketchMathCommand => ({
   version: "0.2",
   command_id: nextCommandId(commandType),
   mode: "preview",

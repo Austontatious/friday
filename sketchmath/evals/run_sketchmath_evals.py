@@ -66,6 +66,12 @@ def _extract_state_snapshot(state: SelectionContext) -> dict[str, Any]:
             snapshot[item.id] = {"start": list(item.start), "end": list(item.end)}
         elif hasattr(item, "origin") and hasattr(item, "direction"):
             snapshot[item.id] = {"origin": list(item.origin), "direction": list(item.direction)}
+        elif hasattr(item, "center") and hasattr(item, "radius"):
+            snapshot[item.id] = {
+                "center": list(item.center),
+                "radius": item.radius,
+                "center_point_id": getattr(item, "center_point_id", None),
+            }
         elif hasattr(item, "vertices"):
             snapshot[item.id] = {
                 "vertices": [list(vertex) for vertex in item.vertices],

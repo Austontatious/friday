@@ -22,6 +22,10 @@ class UnsupportedCommandError(SketchMathError):
     code = "unsupported_command_type"
 
 
+class CommandValidationError(SketchMathError):
+    code = "invalid_command"
+
+
 class SelectionResolutionError(SketchMathError):
     code = "selection_resolution_error"
 

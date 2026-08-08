@@ -8,12 +8,15 @@ from threading import Lock
 from typing import Any
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from core.config import SketchMathConfig
 from sketchmath.executor.command_router import GeometrySession
 from sketchmath.executor.errors import (
     CadAdapterUnavailableError,
     CadExportError,
     ClarificationRequiredError,
+    CommandValidationError,
     InvalidUnitsError,
     LockedEntityMutationError,
     MissingEntityError,
@@ -125,13 +128,31 @@ def _command_from_entity(entity: dict[str, Any], *, command_id: str, mode: str) 
             "Unsupported entity type",
             detail={"entity_type": entity_type, "entity_id": entity.get("id")},
         )
-    return GeometryCommand.model_validate(payload)
+    return _validate_command_payload(payload)
+
+
+def _validate_command_payload(payload: dict[str, Any]) -> GeometryCommand:
+    try:
+        return GeometryCommand.model_validate(payload)
+    except ValidationError as exc:
+        errors = [
+            {
+                "type": error["type"],
+                "location": [str(part) for part in error["loc"]],
+                "message": error["msg"],
+            }
+            for error in exc.errors(include_url=False)
+        ]
+        raise CommandValidationError(
+            "Geometry command failed contract validation",
+            detail={"errors": errors},
+        ) from exc
 
 
 def _error_status(exc: SketchMathError) -> int:
     if isinstance(exc, MissingEntityError):
         return 404
-    if isinstance(exc, (MissingParameterError, WrongEntityTypeError, UnsupportedCommandError, InvalidUnitsError, SelectionResolutionError)):
+    if isinstance(exc, (CommandValidationError, MissingParameterError, WrongEntityTypeError, UnsupportedCommandError, InvalidUnitsError, SelectionResolutionError)):
         return 422
     if isinstance(exc, UnsupportedCadFormatError):
         return 422
@@ -157,7 +178,7 @@ def _history_record_from_payload(payload: dict[str, Any]):  # noqa: ANN001
     from sketchmath.executor.history import OperationRecord
 
     return OperationRecord(
-        command=GeometryCommand.model_validate(payload["command"]),
+        command=_validate_command_payload(payload["command"]),
         before=SelectionContext.model_validate(payload["before"]),
         after=SelectionContext.model_validate(payload["after"]),
         committed=bool(payload.get("committed", False)),
@@ -283,7 +304,7 @@ class SketchMathSessionStore:
         payload = dict(command_payload)
         if mode is not None:
             payload["mode"] = mode
-        command = GeometryCommand.model_validate(payload)
+        command = _validate_command_payload(payload)
         result = session.execute(command)
         if command.mode == "commit":
             stored.metadata["updated_at"] = _now_iso()

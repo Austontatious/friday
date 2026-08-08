@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import math
 from typing import Any
 
+from pydantic import ValidationError
+
 from sketchmath.geometry.intersections import intersect_lines
 from sketchmath.geometry.profiles import analyze_closed_polygon
 from sketchmath.geometry.projections import project_point_to_line
@@ -42,13 +44,14 @@ from sketchmath.models.entities import (
     SelectionEntity,
 )
 from sketchmath.geometry.topology import detect_line_profiles
-from sketchmath.models.geometry_command import GeometryCommand
+from sketchmath.models.geometry_command import GeometryCommand, SUPPORTED_GEOMETRY_COMMAND_TYPES
 from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
 
 from .errors import (
     CadExportError,
     ClarificationRequiredError,
+    CommandValidationError,
     InvalidUnitsError,
     LockedEntityMutationError,
     MissingParameterError,
@@ -155,6 +158,13 @@ def apply_geometry_command(
         "make_circle_profile": _handle_make_circle_profile,
         "move_point": _handle_move_point,
     })
+    declared = set(SUPPORTED_GEOMETRY_COMMAND_TYPES)
+    implemented = set(handlers)
+    if declared != implemented:
+        raise RuntimeError(
+            "SketchMath command contract is out of sync with executor handlers: "
+            f"missing={sorted(declared - implemented)}, unexpected={sorted(implemented - declared)}"
+        )
     handler = handlers.get(command.command_type)
     if handler is None:
         raise UnsupportedCommandError(
@@ -1053,7 +1063,23 @@ def _handle_batch(command: GeometryCommand, state: SelectionContext) -> tuple[Se
     changed: list[str] = []
     subresults: list[dict[str, Any]] = []
     for index, raw_command in enumerate(raw_commands):
-        subcommand = GeometryCommand.model_validate(raw_command)
+        try:
+            subcommand = GeometryCommand.model_validate(raw_command)
+        except ValidationError as exc:
+            raise CommandValidationError(
+                "Batch subcommand failed contract validation",
+                detail={
+                    "index": index,
+                    "errors": [
+                        {
+                            "type": error["type"],
+                            "location": [str(part) for part in error["loc"]],
+                            "message": error["msg"],
+                        }
+                        for error in exc.errors(include_url=False)
+                    ],
+                },
+            ) from exc
         working, sub_changed, value, unit, metadata = apply_geometry_command(subcommand, working)
         changed.extend(sub_changed)
         subresults.append(

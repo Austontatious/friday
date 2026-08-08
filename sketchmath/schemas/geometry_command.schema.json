@@ -1,15 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GeometryCommand",
-  "type": "object",
   "additionalProperties": false,
-  "required": ["version", "command_id", "mode", "command_type", "selection", "parameters"],
   "properties": {
-    "version": {"type": "string", "default": "0.1"},
-    "command_id": {"type": "string"},
-    "mode": {"type": "string", "enum": ["preview", "commit"], "default": "preview"},
+    "command_id": {
+      "title": "Command Id",
+      "type": "string"
+    },
     "command_type": {
-      "type": "string",
       "enum": [
         "measure_distance",
         "measure_angle",
@@ -25,27 +22,65 @@
         "make_perpendicular",
         "make_equal_length",
         "make_equal_angle",
+        "make_horizontal",
+        "make_vertical",
+        "make_coincident",
         "solve_constraints",
+        "move_point",
+        "detect_profiles",
         "make_profile",
+        "define_circle",
+        "update_circle",
+        "make_circle_profile",
         "add_profile_hole",
         "update_profile_hole",
+        "extrude_profile",
         "translate",
         "rotate",
         "mirror",
         "copy_linear",
         "intersect_lines",
         "project_point_to_line",
-        "batch",
-        "extrude_profile"
-      ]
+        "batch"
+      ],
+      "title": "Command Type",
+      "type": "string"
     },
-    "selection": {
-      "type": "array",
-      "items": {"type": "string"}
+    "mode": {
+      "default": "preview",
+      "enum": [
+        "preview",
+        "commit"
+      ],
+      "title": "Mode",
+      "type": "string"
     },
     "parameters": {
-      "type": "object",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "title": "Parameters",
+      "type": "object"
+    },
+    "selection": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Selection",
+      "type": "array"
+    },
+    "version": {
+      "default": "0.1",
+      "enum": [
+        "0.1",
+        "0.2"
+      ],
+      "title": "Version",
+      "type": "string"
     }
-  }
+  },
+  "required": [
+    "command_id",
+    "command_type"
+  ],
+  "title": "GeometryCommand",
+  "type": "object"
 }

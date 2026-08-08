@@ -80,11 +80,50 @@ export type SketchMathSelectionContext = {
   named_references: Record<string, string>;
 };
 
+export const SKETCHMATH_COMMAND_TYPES = [
+  "measure_distance",
+  "measure_angle",
+  "define_point",
+  "define_line",
+  "define_profile",
+  "delete_entity",
+  "set_distance",
+  "set_rectangle_dimension",
+  "set_line_polar",
+  "set_angle",
+  "make_parallel",
+  "make_perpendicular",
+  "make_equal_length",
+  "make_equal_angle",
+  "make_horizontal",
+  "make_vertical",
+  "make_coincident",
+  "solve_constraints",
+  "move_point",
+  "detect_profiles",
+  "make_profile",
+  "define_circle",
+  "update_circle",
+  "make_circle_profile",
+  "add_profile_hole",
+  "update_profile_hole",
+  "extrude_profile",
+  "translate",
+  "rotate",
+  "mirror",
+  "copy_linear",
+  "intersect_lines",
+  "project_point_to_line",
+  "batch",
+] as const;
+
+export type SketchMathCommandType = typeof SKETCHMATH_COMMAND_TYPES[number];
+
 export type SketchMathCommand = {
   version: "0.1" | "0.2";
   command_id: string;
   mode?: "preview" | "commit";
-  command_type: string;
+  command_type: SketchMathCommandType;
   selection: string[];
   parameters: Record<string, unknown>;
 };

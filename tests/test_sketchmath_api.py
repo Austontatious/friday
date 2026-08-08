@@ -358,6 +358,33 @@ def test_sketchmath_feature_flag_disables_routes(monkeypatch):
     client.close()
 
 
+def test_sketchmath_rejects_undeclared_command_contract(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = _client(monkeypatch)
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": _selection_context()})
+    session_id = created.json()["session_id"]
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/commands/commit",
+        json={
+            "command": {
+                "version": "9.9",
+                "command_id": "cmd_invalid_contract",
+                "mode": "commit",
+                "command_type": "not_a_sketchmath_command",
+                "selection": [],
+                "parameters": {},
+            }
+        },
+    )
+
+    assert response.status_code == 422
+    error = response.json()["detail"]["error"]
+    assert error["code"] == "invalid_command"
+    assert {tuple(item["location"]) for item in error["detail"]["errors"]} == {("version",), ("command_type",)}
+    client.close()
+
+
 def test_sketchmath_extrude_profile_preview_commit(monkeypatch):
     client = _client(monkeypatch)
     created = client.post("/api/sketchmath/sessions", json={"selection_context": _profile_selection_context()})
