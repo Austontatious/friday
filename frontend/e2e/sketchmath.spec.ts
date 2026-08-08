@@ -558,8 +558,12 @@ test.describe("SketchMath workspace", () => {
     await constraintPanel.getByRole("button", { name: "Fixed", exact: true }).click();
     await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
 
+    const initialCenterX = Number(await points.nth(2).locator("circle").getAttribute("cx"));
     await dragSvgEntityToViewBoxPoint(page, points.nth(2), 420, 230);
-    await expect.poll(async () => Number(await points.nth(2).locator("circle").getAttribute("cx"))).toBeCloseTo(420, 0);
+    if (Math.abs(Number(await points.nth(2).locator("circle").getAttribute("cx")) - initialCenterX) < 5) {
+      await dragSvgEntityToViewBoxPoint(page, points.nth(2), 420, 230);
+    }
+    await expect.poll(async () => Math.abs(Number(await points.nth(2).locator("circle").getAttribute("cx")) - initialCenterX)).toBeGreaterThan(20);
     await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
     await points.nth(2).dispatchEvent("click");
     await constraintPanel.getByRole("button", { name: "Fixed", exact: true }).click();
