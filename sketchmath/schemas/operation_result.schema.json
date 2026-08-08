@@ -917,6 +917,7 @@
             "make_symmetric",
             "make_concentric",
             "make_tangent",
+            "set_construction",
             "solve_constraints",
             "analyze_constraints",
             "move_point",
@@ -970,7 +971,8 @@
             "0.3",
             "0.4",
             "0.5",
-            "0.6"
+            "0.6",
+            "0.7"
           ],
           "title": "Version",
           "type": "string"
@@ -1384,6 +1386,11 @@
     "Point2DEntity": {
       "additionalProperties": false,
       "properties": {
+        "construction": {
+          "default": false,
+          "title": "Construction",
+          "type": "boolean"
+        },
         "coords": {
           "maxItems": 2,
           "minItems": 2,

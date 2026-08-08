@@ -17,6 +17,7 @@ class _EntityBase(BaseModel):
 class Point2DEntity(_EntityBase):
     type: Literal["point_2d"] = "point_2d"
     coords: tuple[float, float]
+    construction: bool = False
 
 
 class Line2DEntity(_EntityBase):

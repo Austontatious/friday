@@ -1282,6 +1282,11 @@
     "Point2DEntity": {
       "additionalProperties": false,
       "properties": {
+        "construction": {
+          "default": false,
+          "title": "Construction",
+          "type": "boolean"
+        },
         "coords": {
           "maxItems": 2,
           "minItems": 2,

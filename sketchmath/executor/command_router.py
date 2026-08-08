@@ -159,6 +159,7 @@ def apply_geometry_command(
         "make_symmetric": _handle_make_symmetric,
         "make_concentric": _handle_make_concentric,
         "make_tangent": _handle_make_tangent,
+        "set_construction": _handle_set_construction,
         "solve_constraints": _handle_solve_constraints,
         "analyze_constraints": _handle_analyze_constraints,
         "make_profile": _handle_make_profile,
@@ -240,7 +241,13 @@ def _handle_define_point(command: GeometryCommand, state: SelectionContext) -> t
     name = str(_parameter(command, "name"))
     coords = _point_tuple(_parameter(command, "coords"))
     label = command.parameters.get("label")
-    point = Point2DEntity(id=name, coords=coords, locked=bool(command.parameters.get("locked", False)), label=label)
+    point = Point2DEntity(
+        id=name,
+        coords=coords,
+        locked=bool(command.parameters.get("locked", False)),
+        label=label,
+        construction=bool(command.parameters.get("construction", False)),
+    )
     state.replace_entity(point)
     _sync_named_reference(state, point.id, label)
     return state, [point.id], None, None, {}
@@ -251,7 +258,8 @@ def _handle_define_line(command: GeometryCommand, state: SelectionContext) -> tu
     start = _point_tuple(_parameter(command, "start"))
     end = _point_tuple(_parameter(command, "end"))
     label = command.parameters.get("label")
-    line = Line2DEntity(
+    line_type = ConstructionLine2DEntity if bool(command.parameters.get("construction", False)) else Line2DEntity
+    line = line_type(
         id=name,
         start=start,
         end=end,
@@ -868,6 +876,46 @@ def _handle_make_tangent(command: GeometryCommand, state: SelectionContext) -> t
     outcome = _apply_tangent_constraint(constraint, state)
     state.replace_constraint(constraint)
     return state, outcome["changed_entity_ids"], None, None, {"constraint_id": constraint.id, "tangency": constraint.tangency}
+
+
+def _handle_set_construction(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    if not command.selection:
+        raise SelectionResolutionError("set_construction requires at least one point or line", detail={"selection": command.selection})
+    enabled = bool(command.parameters.get("enabled", True))
+    entities = [state.get_entity(entity_id) for entity_id in command.selection]
+    invalid = [entity for entity in entities if not isinstance(entity, (Point2DEntity, Line2DEntity, ConstructionLine2DEntity))]
+    if invalid:
+        raise WrongEntityTypeError(
+            "Construction conversion supports only points and lines",
+            detail={"entity_ids": [entity.id for entity in invalid], "actual": [entity.type for entity in invalid]},
+        )
+    if enabled:
+        profile_sources = {
+            line_id
+            for entity in state.items
+            if isinstance(entity, Profile2DEntity)
+            for line_id in entity.source_line_ids
+        }
+        blocked = sorted(profile_sources.intersection(command.selection))
+        if blocked:
+            raise SelectionResolutionError(
+                "Cannot convert lines used by a committed profile to construction geometry",
+                detail={"entity_ids": blocked, "dependencies": "profile_source_lines"},
+            )
+    changed: list[str] = []
+    for entity in entities:
+        if isinstance(entity, Point2DEntity):
+            if entity.construction != enabled:
+                state.replace_entity(Point2DEntity(**{**entity.model_dump(), "construction": enabled}))
+                changed.append(entity.id)
+            continue
+        target_type = ConstructionLine2DEntity if enabled else Line2DEntity
+        if not isinstance(entity, target_type):
+            payload = entity.model_dump()
+            payload.pop("type", None)
+            state.replace_entity(target_type(**payload))
+            changed.append(entity.id)
+    return state, changed, None, None, {"construction": enabled}
 
 
 def _handle_move_point(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
