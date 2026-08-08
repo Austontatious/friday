@@ -4,17 +4,18 @@ Updated: 2026-08-08
 
 Current phase: Phase 0 — stabilize and land
 
-Gate: Gate A implementation passed locally; remote landing in progress
+Gate: Gate A validated landing candidate; remote publication in progress
 
 ## Baseline
 
 - Audited checkout: `21b8153`
 - Latest SketchMath product commit: `8236828`
-- Branch: `phase0-stabilize`
+- Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
 - Local branch delta at program start: 68 commits ahead; 24 commits touch SketchMath code/docs/tests
-- Current local Gate A implementation commit: `799a7db`
+- Deliberate landing branch: `sketchmath-product-gate-a`
+- Validated landing code baseline: `54ff17e`
 
 ## Implemented Capabilities
 
@@ -30,11 +31,11 @@ Gate: Gate A implementation passed locally; remote landing in progress
 
 ## Current Gate A Validation
 
-On 2026-08-08 through `799a7db`:
+On 2026-08-08 at `54ff17e`:
 
 - 99 focused Python tests passed.
 - 42 semantic eval cases passed.
-- 42 frontend tests passed across the FRIDAY shell and SketchMath workspace.
+- 37 focused frontend tests passed across the deliberately selected FRIDAY shell and SketchMath workspace.
 - 9 live Playwright workflows passed with no test-reported console/page errors.
 - TypeScript compile passed.
 - Canonical generated schemas match the Pydantic models.
@@ -56,7 +57,7 @@ Completed locally:
 
 Remaining:
 
-6. Land only the deliberate validated SketchMath baseline and record its remote commit.
+6. Publish the deliberate branch and verify its remote ref. See `landing_manifest.md`.
 
 ## Known Limitations
 
