@@ -44,7 +44,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 
 | Requirement family | State | Next proof |
 | --- | --- | --- |
-| SM-SK / SM-SOL parametric sketcher | Partial | Solver architecture ADR, defensible DOF subset, arcs, Gate B browser scenario |
+| SM-SK / SM-SOL parametric sketcher | Partial | Remaining Gate B constraint families and mixed-geometry browser scenario |
 | SM-TOP general topology | Deferred | Adversarial planar-region fixtures and deterministic region selection |
 | SM-FEAT feature history | Deferred | Canonical document/feature model plus rebuild tests |
 | SM-REF reference stability | Deferred | Upstream-edit survival/repair tests |
@@ -61,7 +61,8 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | SM-ARCH-001 canonical document boundary | Design accepted | ADR 004 | Document envelope and migration are not implemented. |
 | SM-ARCH-003 solver boundary | Initial implementation | ADR 005; `SolverAnalysis`; unified `SolverRunResult`; generated schema; SciPy benchmark report/artifact | Production backend remains closed-form; SciPy is `promising_not_ready`. |
 | SM-SOL-001 state reporting | Partial | Exact linear consistency/redundancy tests and semantic eval; live Normal labels plus Advanced-only diagnostics in unit and Playwright coverage | Nonlinear redundancy and minimal conflict sets are unknown. |
-| SM-SOL-002 defensible DOF | Partial | Rank-based exact DOF for point/circle linear systems; explicit partial/unknown results; UI never promotes partial coverage to fully constrained | Arc, standalone-coordinate legacy geometry, and nonlinear DOF are not exact. |
+| SM-SOL-002 defensible DOF | Partial | Rank-based exact DOF for point/circle linear systems; explicit partial/unknown results; UI never promotes partial coverage to fully constrained | Arc, standalone-coordinate legacy geometry, and nonlinear DOF are not exact. Arc entities are explicitly listed as unmodeled. |
+| SM-SK-001 arc geometry | Initial implementation | Canonical `arc_2d`; v0.5 center/three-point command paths; point-link sync; SVG workspace tools | Geometry/schema/API/eval/frontend tests and reload-stable live browser workflow pass; arc topology and solver equations remain open. |
 | SM-SK-003 driving dimensions | Partial | v0.4 horizontal/vertical distance and radius/diameter commands update geometry and constraints through Normal UI | Remaining tangent/concentric/collinear/midpoint/symmetric families are open. |
 | SM-SOL-003 invalid commit prevention | Partial | Unified solve proposals apply only on `solved`; structured inconsistent/redundant/under/failed results retain patches without commit | Generalized nonlinear residual feasibility remains unimplemented. |
 | SM-UNIT-001 centralized tolerances | Initial implementation | Versioned `NumericalTolerancePolicy` | Unit expansion and display formatting remain open. |

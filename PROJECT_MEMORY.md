@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-08-08 - SketchMath Canonical Arc Geometry
+
+### What Changed
+- Added one canonical `arc_2d` entity with center/radius/start-angle/signed-sweep geometry, construction provenance, and optional stable source point IDs.
+- Added v0.5 `define_arc` and `update_arc` commands for center and three-point construction, including structured rejection of degenerate input.
+- Added center and 3-point arc tools, canonical SVG rendering, selection summaries, preview/commit/history persistence, entity upsert, and reload recovery.
+- Kept solver truth honest: arcs are explicitly unmodeled and make live coverage `partial` until arc equations exist.
+
+### Why
+- Gate B requires center and three-point arcs, but adding them before a canonical representation and unified solver result would have created a parallel UI-only geometry path.
+- Signed sweep plus derived endpoints prevents redundant-coordinate drift and preserves major/minor direction deterministically.
+
+### New Env Flags
+- None. Arc geometry is part of the existing default-off SketchMath product gate.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 127 passed.
+- `PYTHONPATH=. python3 -m sketchmath.evals.run_sketchmath_evals` — 47 passed.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand --runTestsByPath src/App.test.tsx src/components/sketchmath/SketchMathWorkspace.test.tsx src/components/sketchmath/commandBuilders.test.ts src/components/sketchmath/arcGeometry.test.ts` — 57 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npm run test:e2e -- sketchmath.spec.ts` — TypeScript/build and 10 browser workflows passed.
+
+### Remaining Phase 1 Work
+- Add the remaining Gate B constraint families and complete the mixed-geometry fully constrained acceptance sequence.
+
+---
+
 ## 2026-08-08 - SketchMath Unified Solver Run Path
 
 ### What Changed

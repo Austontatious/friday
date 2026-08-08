@@ -59,7 +59,8 @@ The build still reports the repository-wide stale Browserslist database notice. 
 - Driving axis and circle dimensions update canonical geometry, replace same-semantic edits, persist through history/API replay, and remain exact in live solver state.
 - SciPy `least_squares` benchmarked successfully for covered nondegenerate systems, but remains unadopted because optimizer termination can mask infeasible residuals and an analytic zero-length seed failed.
 - Analysis and solve now share a typed backend-neutral run result with before/after analysis, feasibility, residual availability, deterministic entity patches, termination reason, and diagnostics.
-- Current evidence: 118 focused Python tests, 45 semantic evals, 53 focused frontend tests, 9 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- Canonical center and three-point arcs now share one persisted `arc_2d` model, v0.5 typed commands, stable source points, SVG rendering, structured degeneracy errors, and reload-stable history.
+- Current evidence: 127 focused Python tests, 47 semantic evals, 57 focused frontend tests, 10 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
 
 ## Gate A Outcome
 
@@ -75,7 +76,7 @@ Completed and published:
 
 ## Known Limitations
 
-- Arc geometry is not implemented.
+- Arc solver equations, arc-aware dimensions/constraints, and arc participation in general planar topology are not implemented; solver coverage is explicitly partial.
 - Production solve remains a conservative closed-form subset. Exact analysis covers its linear point/circle families; Euclidean distance, angle, parallel/perpendicular, and equality relations remain partial/unknown.
 - Topology recognizes deterministic simple line cycles, not general planar regions.
 - The product lacks a canonical multi-body/feature document model and downstream rebuild graph.
@@ -97,7 +98,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Add canonical arcs on the unified solver boundary, then implement the remaining Gate B constraint families and acceptance scenario.
+Implement the remaining Gate B tangent/concentric/collinear/midpoint/symmetric/fixed families, then execute the mixed-geometry full-constraint acceptance scenario.
 
 ## Release Status
 

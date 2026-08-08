@@ -37,6 +37,8 @@ The first SciPy benchmark keeps the candidate outside production. Covered nondeg
 
 `SolverRunResult` now implements that neutral result boundary for both analysis and solve commands. The closed-form backend proposes deterministic entity patches against a copy; the command layer applies only accepted solved patches. Unsupported generalized residuals remain `null`, and partial coverage yields unknown feasibility instead of a fabricated success claim.
 
+Command version `0.5` adds canonical center and three-point arcs without pretending the linear analyzer covers them. Arc entities are listed explicitly as unmodeled, so whole-sketch coverage remains partial until arc equations, rank semantics, and residual validation are implemented behind the same `SolverRunResult` boundary.
+
 ## DOF semantics
 
 - `coverage=exact` means every mutable entity and active constraint is represented by the analyzer.

@@ -62,8 +62,8 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 ## Supported Tools
 
-- Primary canvas modes: Select, Draw rectangle, Circle, Add hole, Pan / view.
-- Secondary/advanced canvas tools: Point, Line, Dimension, Delete. Arc remains visibly deferred.
+- Primary canvas modes: Select, Draw rectangle, Circle, Arc, 3-point arc, Add hole, Pan / view.
+- Secondary/advanced canvas tools: Point, Line, Dimension, Delete.
 - Default guided actions: Start rectangle, Apply Rectangle Dimensions, Add center hole, Add Hole placement, selected-hole update, Fix corner, Delete, Extrude, Commit Preview, Revert Preview, Download STEP.
 - Dimension actions: Set Length, Set horizontal distance, Set vertical distance, Edit Width, Edit Height, Apply radius, and Apply diameter.
 - Advanced constraint actions: Set Angle, Horizontal, Vertical, Coincident, Parallel, Perpendicular, Equal Length, Equal Angle, Solve.
@@ -73,7 +73,8 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Existing holes can be selected on canvas. The workflow panel exposes diameter/center controls that commit a typed `update_profile_hole` command and immediately refresh the committed session state.
 - Selected rectangles show width/height dimension labels on canvas. Selected holes show a diameter label on canvas.
 - Profile and hole selection use friendly labels in the default UI. Raw entity IDs remain available only under Advanced / Debug.
-- Circle is a first-class selectable entity with direct drawing, driving radius/diameter editing, an extrusion profile adapter, exact center/radius DOF analysis, and optional reuse as a profile hole. Arc remains labeled `coming soon` and is not part of the current contract.
+- Circle is a first-class selectable entity with direct drawing, driving radius/diameter editing, an extrusion profile adapter, exact center/radius DOF analysis, and optional reuse as a profile hole.
+- Arc creates center/start/end points and one canonical center arc; 3-point arc creates start/through/end points and one canonical circumarc. Selection reports radius and sweep, while solver status remains explicitly partial until arc equations exist.
 
 ## View Controls
 

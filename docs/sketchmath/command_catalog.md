@@ -2,7 +2,7 @@
 
 SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 
-The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`. Undeclared versions and command types are rejected as `invalid_command` before execution.
+The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`; canonical arc commands use version `0.5`. Undeclared versions and command types are rejected as `invalid_command` before execution.
 
 ## Execution Loop
 
@@ -88,6 +88,12 @@ The canonical machine-readable contracts are generated from the Pydantic models 
   - Creates a selectable first-class circle with center, radius, and optional center-point identity.
 - `update_circle`
   - Edits the center/radius of an existing circle through the typed command path.
+- `define_arc`
+  - Version `0.5`; creates the canonical `arc_2d` representation from center/start/end plus direction or from start/through/end.
+  - Degenerate or collinear inputs return a structured `invalid_arc_geometry` error and never enter history.
+- `update_arc`
+  - Version `0.5`; edits canonical center/radius/start/sweep values or replaces the complete construction definition.
+  - Optional source point IDs keep point moves and persisted arc geometry synchronized.
 - `make_circle_profile`
   - Creates the deterministic polygonal adapter profile used by the current preview/FreeCAD boundary.
 - `add_profile_hole`
