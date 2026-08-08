@@ -539,7 +539,24 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       ...options.solverAnalysis,
     };
     const response = setSnapshot(snapshot.selection_context.items, [], command, false);
-    response.result.metadata = { solver_analysis: analysis };
+    response.result.metadata = {
+      solver_analysis: analysis,
+      solver_run: {
+        schema_version: "1.0",
+        backend: "closed_form_v1",
+        mode: "analyze",
+        outcome: "analyzed",
+        termination_reason: "analysis_complete",
+        requested_constraint_ids: snapshot.selection_context.constraints.map((constraint) => String(constraint.id)),
+        changed_entity_ids: [],
+        proposed_patch: [],
+        feasible: exact ? analysis.consistency_state !== "inconsistent" : null,
+        residual_norm: null,
+        analysis_before: analysis,
+        analysis_after: analysis,
+        diagnostics: analysis.diagnostics,
+      },
+    };
     return response;
   };
 
@@ -1088,6 +1105,7 @@ describe("SketchMath workspace", () => {
     expect(screen.queryByText(/Independent equations:/)).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: /Show Advanced \/ Debug/ }));
+    expect(await screen.findByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("Backend: closed_form_v1");
     expect(await screen.findByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("Independent equations:");
     expect(screen.getByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("constraint_distance");
     expect(screen.getByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("Nonlinear constraints prevent exact classification.");

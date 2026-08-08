@@ -189,6 +189,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("Equal length");
 
     await clickWorkbenchButton(page, "Show Advanced / Debug");
+    await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Backend: closed_form_v1");
     await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Coverage: partial");
     await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Independent equations:");
     await page.getByRole("button", { name: "Show Advanced / Debug DSL" }).click();

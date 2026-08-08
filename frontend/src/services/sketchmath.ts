@@ -101,6 +101,27 @@ export type SketchMathSolverAnalysis = {
   tolerance_policy: Record<string, number | string>;
 };
 
+export type SketchMathSolverRun = {
+  schema_version: "1.0";
+  backend: string;
+  mode: "analyze" | "solve";
+  outcome: "analyzed" | "solved" | "under_constrained" | "inconsistent" | "redundant" | "failed";
+  termination_reason: string;
+  requested_constraint_ids: string[];
+  changed_entity_ids: string[];
+  proposed_patch: Array<{
+    entity_id: string;
+    entity_type: string;
+    before: Record<string, unknown>;
+    after: Record<string, unknown>;
+  }>;
+  feasible: boolean | null;
+  residual_norm: number | null;
+  analysis_before: SketchMathSolverAnalysis;
+  analysis_after: SketchMathSolverAnalysis;
+  diagnostics: string[];
+};
+
 export const SKETCHMATH_COMMAND_TYPES = [
   "measure_distance",
   "measure_angle",

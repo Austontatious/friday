@@ -23,6 +23,7 @@ import type {
   SketchMathSelectionContext,
   SketchMathSessionSnapshot,
   SketchMathSolverAnalysis,
+  SketchMathSolverRun,
   SketchMathTranslationOutcome,
 } from "../../services/sketchmath";
 import {
@@ -149,6 +150,21 @@ const solverAnalysisFromMetadata = (value: unknown): SketchMathSolverAnalysis | 
     return null;
   }
   return candidate as SketchMathSolverAnalysis;
+};
+
+const solverRunFromMetadata = (value: unknown): SketchMathSolverRun | null => {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<SketchMathSolverRun>;
+  if (
+    candidate.schema_version !== "1.0" ||
+    typeof candidate.backend !== "string" ||
+    !["analyze", "solve"].includes(String(candidate.mode)) ||
+    !["analyzed", "solved", "under_constrained", "inconsistent", "redundant", "failed"].includes(String(candidate.outcome)) ||
+    !solverAnalysisFromMetadata(candidate.analysis_after)
+  ) {
+    return null;
+  }
+  return candidate as SketchMathSolverRun;
 };
 
 const isPointEntity = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "point_2d" }> => entity.type === "point_2d";
@@ -363,6 +379,7 @@ const SketchMathWorkspace = () => {
   const [profileCandidates, setProfileCandidates] = useState<SketchMathProfileCandidate[]>([]);
   const [solverOutcome, setSolverOutcome] = useState<"Conflict" | "Solve failed" | null>(null);
   const [solverAnalysis, setSolverAnalysis] = useState<SketchMathSolverAnalysis | null>(null);
+  const [solverRun, setSolverRun] = useState<SketchMathSolverRun | null>(null);
   const [solverAnalysisError, setSolverAnalysisError] = useState<string | null>(null);
   const [dragPreviewPoint, setDragPreviewPoint] = useState<{ id: string; point: Point } | null>(null);
   const [tool, setTool] = useState<SketchMathMode>("select");
@@ -426,18 +443,22 @@ const SketchMathWorkspace = () => {
       const response = await previewSketchMathCommand(activeSessionId, buildAnalyzeConstraintsCommand());
       if (requestId !== solverAnalysisRequestRef.current) return;
       const analysis = solverAnalysisFromMetadata(response.result.metadata.solver_analysis);
+      const run = solverRunFromMetadata(response.result.metadata.solver_run);
       if (!analysis) {
         setSolverAnalysis(null);
+        setSolverRun(null);
         setSolverAnalysisError("The backend returned an invalid solver analysis payload.");
         return;
       }
       setSolverAnalysis(analysis);
+      setSolverRun(run);
       setSolverAnalysisError(null);
       setSolverOutcome(null);
     } catch (analysisError) {
       if (requestId !== solverAnalysisRequestRef.current) return;
       const detail = analysisError instanceof Error ? analysisError.message : "Solver analysis request failed.";
       setSolverAnalysis(null);
+      setSolverRun(null);
       setSolverAnalysisError(detail);
     }
   }, []);
@@ -856,6 +877,11 @@ const SketchMathWorkspace = () => {
   const solverAnalysisDebugLines = useMemo(() => {
     if (!solverAnalysis) return solverAnalysisError ? [`Analysis error: ${solverAnalysisError}`] : ["No solver analysis received yet."];
     return [
+      `Backend: ${solverRun?.backend || "unknown"}`,
+      `Run outcome: ${solverRun?.outcome || "unknown"}`,
+      `Termination: ${solverRun?.termination_reason || "unknown"}`,
+      `Feasible: ${solverRun?.feasible ?? "unknown"}`,
+      `Residual norm: ${solverRun?.residual_norm ?? "unavailable"}`,
       `Coverage: ${solverAnalysis.coverage}`,
       `Freedom: ${solverAnalysis.freedom_state}`,
       `Consistency: ${solverAnalysis.consistency_state}`,
@@ -871,7 +897,7 @@ const SketchMathWorkspace = () => {
       `Unmodeled entities: ${solverAnalysis.unmodeled_entity_ids.join(", ") || "none"}`,
       ...(solverAnalysis.diagnostics.length ? solverAnalysis.diagnostics.map((diagnostic) => `Diagnostic: ${diagnostic}`) : []),
     ];
-  }, [solverAnalysis, solverAnalysisError]);
+  }, [solverAnalysis, solverAnalysisError, solverRun]);
 
   const dimensionSummary = useMemo(() => {
     const pointCount = committedEntities.filter((entity) => entity.type === "point_2d").length;
