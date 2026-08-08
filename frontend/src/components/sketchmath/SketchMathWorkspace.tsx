@@ -66,6 +66,7 @@ import {
   buildSymmetricCommand,
   buildConcentricCommand,
   buildTangentCommand,
+  buildSetConstructionCommand,
   buildDetectProfilesCommand,
   buildMovePointCommand,
   buildSetLengthCommand,
@@ -1056,6 +1057,14 @@ const SketchMathWorkspace = () => {
   );
 
   const selectedLineEntities = useMemo(() => selectedEntities.filter(isLineEntity), [selectedEntities]);
+  const constructionSelection = useMemo(
+    () => selectedEntities.filter((entity) => isPointEntity(entity) || isLineEntity(entity)),
+    [selectedEntities],
+  );
+  const canSetConstruction = constructionSelection.length > 0 && constructionSelection.length === selectedEntities.length;
+  const selectionIsConstruction = canSetConstruction && constructionSelection.every((entity) =>
+    isPointEntity(entity) ? Boolean(entity.construction) : entity.type === "construction_line_2d",
+  );
   const selectedCenterEntities = useMemo(
     () => selectedEntityIds
       .map((entityId) => committedEntities.find((entity) => entity.id === entityId))
@@ -1164,7 +1173,14 @@ const SketchMathWorkspace = () => {
           canEditHeight: dimension === "height",
         };
       }
-      return { ...base, kind: "one_line", summary: "Selected: 1 line", canSetLength: true, canMakeHorizontal: true, canMakeVertical: true };
+      return {
+        ...base,
+        kind: "one_line",
+        summary: line.type === "construction_line_2d" ? "Selected: Construction line" : "Selected: 1 line",
+        canSetLength: true,
+        canMakeHorizontal: true,
+        canMakeVertical: true,
+      };
     }
     if (selectedPointEntities.length === 2) {
       return { ...base, kind: "two_points", summary: "Selected: 2 points", canSetLength: true, canMakeCoincident: true };
@@ -1183,7 +1199,12 @@ const SketchMathWorkspace = () => {
           canFixCorner: true,
         };
       }
-      return { ...base, kind: "one_point", summary: "Selected: 1 point", canFixCorner: true };
+      return {
+        ...base,
+        kind: "one_point",
+        summary: point.construction ? "Selected: Construction point" : "Selected: 1 point",
+        canFixCorner: true,
+      };
     }
     if (rectangleDimensions) {
       return { ...base, kind: "rectangle", summary: "Selected: Rectangle", parentSummary: "Parent: Rectangle", canFixCorner: true };
@@ -2595,6 +2616,12 @@ const SketchMathWorkspace = () => {
     if (tangentSelectionIds.length === 2) await commitCommand(buildTangentCommand(tangentSelectionIds));
   };
 
+  const runSetConstruction = async () => {
+    if (canSetConstruction) {
+      await commitCommand(buildSetConstructionCommand(constructionSelection.map((entity) => entity.id), !selectionIsConstruction));
+    }
+  };
+
   const runUpdateCircle = async () => {
     if (!selectedCircle) return;
     const radius = Number(circleRadiusValue);
@@ -3337,6 +3364,9 @@ const SketchMathWorkspace = () => {
                       </Button>
                       <Button size="sm" onClick={() => void runQuickTangent()} isDisabled={tangentSelectionIds.length !== 2}>
                         Tangent
+                      </Button>
+                      <Button size="sm" onClick={() => void runSetConstruction()} isDisabled={!canSetConstruction}>
+                        {selectionIsConstruction ? "Make regular" : "Make construction"}
                       </Button>
                       <Button size="sm" onClick={() => void runQuickEqualAngle()} isDisabled={pointSelectionIds.length < 6}>
                         Equal Angle

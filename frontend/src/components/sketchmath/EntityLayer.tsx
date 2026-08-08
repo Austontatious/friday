@@ -179,6 +179,7 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
             y2={entity.end[1]}
             className={[
               "sketchmath-line",
+              entity.type === "construction_line_2d" ? "sketchmath-construction-line" : "",
               selected ? "sketchmath-line-selected" : "",
               focusedEntityId === entity.id ? "sketchmath-line-focus" : "",
             ].filter(Boolean).join(" ")}
@@ -256,6 +257,7 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
             r={selected ? 8 : 6}
             className={[
               "sketchmath-point",
+              entity.construction ? "sketchmath-construction-point" : "",
               selected ? "sketchmath-point-selected" : "",
               focusedEntityId === entity.id ? "sketchmath-point-focus" : "",
             ].filter(Boolean).join(" ")}

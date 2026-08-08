@@ -43,8 +43,9 @@ jest.mock("@chakra-ui/react", () => {
 });
 
 type Entity =
-  | { id: string; type: "point_2d"; coords: [number, number]; locked: boolean; label?: string | null }
+  | { id: string; type: "point_2d"; coords: [number, number]; locked: boolean; label?: string | null; construction?: boolean }
   | { id: string; type: "line_2d"; start: [number, number]; end: [number, number]; start_point_id?: string | null; end_point_id?: string | null; locked: boolean; label?: string | null }
+  | { id: string; type: "construction_line_2d"; start: [number, number]; end: [number, number]; start_point_id?: string | null; end_point_id?: string | null; locked: boolean; label?: string | null }
   | { id: string; type: "circle_2d"; center: [number, number]; radius: number; center_point_id?: string | null; locked: boolean; label?: string | null }
   | {
       id: string;
@@ -255,6 +256,7 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       coords: command.parameters.coords,
       locked: !!command.parameters.locked,
       label: command.parameters.label || null,
+      construction: !!command.parameters.construction,
     };
     const nextItems = [...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity];
     return setSnapshot(nextItems, [entity.id], command, mutate);
@@ -263,7 +265,7 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
   const defineLine = (command: any, mutate: boolean) => {
     const entity: Entity = {
       id: command.parameters.name,
-      type: "line_2d",
+      type: command.parameters.construction ? "construction_line_2d" : "line_2d",
       start: command.parameters.start,
       end: command.parameters.end,
       start_point_id: command.parameters.start_point_id || null,
@@ -273,6 +275,20 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
     };
     const nextItems = [...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity];
     return setSnapshot(nextItems, [entity.id], command, mutate);
+  };
+
+  const setConstruction = (command: any, mutate: boolean) => {
+    const selected = new Set(command.selection as string[]);
+    const enabled = command.parameters.enabled !== false;
+    const nextItems = snapshot.selection_context.items.map((item) => {
+      if (!selected.has(item.id)) return item;
+      if (item.type === "point_2d") return { ...item, construction: enabled };
+      if (item.type === "line_2d" || item.type === "construction_line_2d") {
+        return { ...item, type: enabled ? "construction_line_2d" as const : "line_2d" as const };
+      }
+      return item;
+    });
+    return setSnapshot(nextItems, command.selection, command, mutate);
   };
 
   const deleteEntity = (command: any, mutate: boolean) => {
@@ -815,6 +831,9 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
           };
         }
         return makeResponse(defineLine(command, mutate));
+      }
+      if (command.command_type === "set_construction") {
+        return makeResponse(setConstruction(command, mutate));
       }
       if (command.command_type === "define_circle") {
         const entity: Entity = { id: command.parameters.name, type: "circle_2d", center: command.parameters.center, radius: command.parameters.radius, center_point_id: command.parameters.center_point_id, locked: false, label: command.parameters.label };
@@ -1582,6 +1601,28 @@ describe("SketchMath workspace", () => {
     await userEvent.click(within(panel).getByRole("button", { name: "Fixed" }));
 
     await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Fixed"));
+  });
+
+  it("converts selected point-backed lines to canonical construction geometry and back", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 360, 120);
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: 1 line"));
+    await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
+
+    const panel = screen.getByTestId("sketchmath-advanced-constraints");
+    await userEvent.click(within(panel).getByRole("button", { name: "Make construction" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: Construction line"));
+    expect(screen.getByTestId(/^entity-line_/).querySelector(".sketchmath-construction-line")).not.toBeNull();
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Make regular" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: 1 line"));
   });
 
   it("anchors a rectangle corner without overstating partial solver coverage", async () => {

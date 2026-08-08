@@ -68,6 +68,11 @@ export const buildConcentricCommand = (selection: string[]): SketchMathCommand =
 export const buildTangentCommand = (selection: string[], tangency: "external" | "internal" = "external"): SketchMathCommand =>
   gateBConstraintCommand("make_tangent", selection.slice(0, 2), { tangency });
 
+export const buildSetConstructionCommand = (selection: string[], enabled: boolean): SketchMathCommand => ({
+  ...baseCommand("set_construction", selection, { enabled }),
+  version: "0.7",
+});
+
 export const buildDetectProfilesCommand = (): SketchMathCommand =>
   baseCommand("detect_profiles", [], {});
 

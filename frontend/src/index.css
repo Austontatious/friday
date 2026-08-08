@@ -961,6 +961,11 @@ input {
   filter: drop-shadow(0 0 5px rgba(51, 246, 255, 0.2));
 }
 
+.sketchmath-construction-line {
+  stroke-dasharray: 10 6;
+  opacity: 0.8;
+}
+
 .sketchmath-line-hit-target {
   stroke: transparent;
   stroke-width: 24;
@@ -983,6 +988,11 @@ input {
   stroke-width: 1.2;
   filter: drop-shadow(0 0 8px var(--friday-accent-glow));
   pointer-events: all;
+}
+
+.sketchmath-construction-point {
+  fill: var(--friday-grid-major);
+  stroke-dasharray: 2 2;
 }
 
 .sketchmath-point-selected,

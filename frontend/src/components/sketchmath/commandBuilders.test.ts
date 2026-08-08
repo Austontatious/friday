@@ -11,6 +11,7 @@ import {
   buildSymmetricCommand,
   buildConcentricCommand,
   buildTangentCommand,
+  buildSetConstructionCommand,
   buildSetDiameterCommand,
   buildSetHorizontalDistanceCommand,
   buildSetLengthCommand,
@@ -107,6 +108,15 @@ describe("SketchMath command builders", () => {
       command_type: "make_tangent",
       selection: ["line", "circle"],
       parameters: { tangency: "external" },
+    });
+  });
+
+  it("generates a v0.7 construction conversion command", () => {
+    expect(buildSetConstructionCommand(["point", "line"], true)).toMatchObject({
+      version: "0.7",
+      command_type: "set_construction",
+      selection: ["point", "line"],
+      parameters: { enabled: true },
     });
   });
 

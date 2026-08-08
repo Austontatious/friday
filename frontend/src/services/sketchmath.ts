@@ -28,6 +28,7 @@ export type SketchMathPointEntity = {
   coords: [number, number];
   locked?: boolean;
   label?: string | null;
+  construction?: boolean;
 };
 
 export type SketchMathLineEntity = {
@@ -168,6 +169,7 @@ export const SKETCHMATH_COMMAND_TYPES = [
   "make_symmetric",
   "make_concentric",
   "make_tangent",
+  "set_construction",
   "solve_constraints",
   "analyze_constraints",
   "move_point",
@@ -193,7 +195,7 @@ export const SKETCHMATH_COMMAND_TYPES = [
 export type SketchMathCommandType = typeof SKETCHMATH_COMMAND_TYPES[number];
 
 export type SketchMathCommand = {
-  version: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6";
+  version: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6" | "0.7";
   command_id: string;
   mode?: "preview" | "commit";
   command_type: SketchMathCommandType;

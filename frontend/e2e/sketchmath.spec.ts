@@ -573,6 +573,31 @@ test.describe("SketchMath workspace", () => {
     await page.screenshot({ path: screenshotPath("sketchmath-gate-b-mixed-fully-constrained.png"), fullPage: true });
   });
 
+  test("converts point-backed lines to construction geometry with reload-stable identity", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Line" }).first().click();
+    await clickSvgViewBoxPoint(page, 160, 150);
+    await clickSvgViewBoxPoint(page, 340, 150);
+    const line = page.locator('[data-testid^="entity-line_"]').last();
+    const lineId = await line.getAttribute("data-entity-id");
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 line");
+
+    await clickWorkbenchButton(page, "Show Advanced Constraints");
+    const panel = page.getByTestId("sketchmath-advanced-constraints");
+    await panel.getByRole("button", { name: "Make construction" }).click();
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Construction line");
+    await expect(line.locator("line.sketchmath-construction-line")).toHaveCount(1);
+
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    const restored = page.locator(`[data-entity-id="${lineId}"]`);
+    await expect(restored.locator("line.sketchmath-construction-line")).toHaveCount(1);
+    await restored.dispatchEvent("click");
+    await clickWorkbenchButton(page, "Show Advanced Constraints");
+    await page.getByTestId("sketchmath-advanced-constraints").getByRole("button", { name: "Make regular" }).click();
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 line");
+  });
+
   test("keeps multi-step undo and redo backend-authoritative across a branch edit", async ({ page }) => {
     await openSketchMath(page);
     await page.getByRole("button", { name: "Line" }).first().click();
