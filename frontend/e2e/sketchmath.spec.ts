@@ -496,6 +496,83 @@ test.describe("SketchMath workspace", () => {
     await page.screenshot({ path: screenshotPath("sketchmath-canonical-arcs.png"), fullPage: true });
   });
 
+  test("fully constrains mixed line and circle geometry through drag, dimension, history, and reload", async ({ page }) => {
+    await openSketchMath(page);
+
+    await page.getByRole("button", { name: "Line" }).first().click();
+    await clickSvgViewBoxPoint(page, 140, 140);
+    await clickSvgViewBoxPoint(page, 280, 140);
+    await page.getByRole("button", { name: "Circle" }).click();
+    await clickSvgViewBoxPoint(page, 380, 190);
+    await clickSvgViewBoxPoint(page, 410, 190);
+
+    const points = page.locator('[data-entity-type="point_2d"]');
+    const circle = page.locator('[data-entity-type="circle_2d"]').last();
+    await expect(points).toHaveCount(3);
+    await expect(circle).toBeVisible();
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
+    await expect(page.getByTestId("sketchmath-solver-status-detail")).toContainText("can still move");
+
+    await page.getByLabel("Circle radius").fill("24");
+    await clickWorkbenchButton(page, "Apply radius");
+    await expect(circle).toHaveAttribute("r", "24");
+
+    await page.getByRole("button", { name: "Select" }).click();
+    await points.nth(0).dispatchEvent("click");
+    await clickWorkbenchButton(page, "Show Advanced Constraints");
+    const constraintPanel = page.getByTestId("sketchmath-advanced-constraints");
+    await expect(constraintPanel.getByRole("button", { name: "Fixed", exact: true })).toBeEnabled();
+    await constraintPanel.getByRole("button", { name: "Fixed", exact: true }).click();
+
+    await points.nth(1).dispatchEvent("click");
+    await constraintPanel.getByRole("button", { name: "Fixed", exact: true }).click();
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
+
+    await dragSvgEntityToViewBoxPoint(page, points.nth(2), 420, 230);
+    await expect.poll(async () => Number(await points.nth(2).locator("circle").getAttribute("cx"))).toBeCloseTo(420, 0);
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
+    await points.nth(2).dispatchEvent("click");
+    await constraintPanel.getByRole("button", { name: "Fixed", exact: true }).click();
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Fully constrained", { timeout: 20000 });
+    await expect(page.getByTestId("sketchmath-solver-status-detail")).toContainText("All modeled movement is constrained");
+
+    await circle.dispatchEvent("click");
+    await page.getByLabel("Circle diameter").fill("60");
+    await clickWorkbenchButton(page, "Apply diameter");
+    await expect(circle).toHaveAttribute("r", "30");
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Fully constrained");
+
+    await clickWorkbenchButton(page, "Undo");
+    await expect(circle).toHaveAttribute("r", "24");
+    await clickWorkbenchButton(page, "Redo");
+    await expect(circle).toHaveAttribute("r", "30");
+
+    await constraintPanel.getByRole("button", { name: "Solve constraints" }).click();
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Fully constrained");
+    const geometryBeforeReload = await page.locator('[data-entity-type="point_2d"] circle, [data-entity-type="circle_2d"]').evaluateAll((entities) =>
+      entities.map((entity) => ({
+        testId: entity.closest("[data-testid]")?.getAttribute("data-testid"),
+        cx: entity.getAttribute("cx"),
+        cy: entity.getAttribute("cy"),
+        r: entity.getAttribute("r"),
+      })),
+    );
+
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Fully constrained", { timeout: 20000 });
+    const geometryAfterReload = await page.locator('[data-entity-type="point_2d"] circle, [data-entity-type="circle_2d"]').evaluateAll((entities) =>
+      entities.map((entity) => ({
+        testId: entity.closest("[data-testid]")?.getAttribute("data-testid"),
+        cx: entity.getAttribute("cx"),
+        cy: entity.getAttribute("cy"),
+        r: entity.getAttribute("r"),
+      })),
+    );
+    expect(geometryAfterReload).toEqual(geometryBeforeReload);
+    await page.screenshot({ path: screenshotPath("sketchmath-gate-b-mixed-fully-constrained.png"), fullPage: true });
+  });
+
   test("keeps multi-step undo and redo backend-authoritative across a branch edit", async ({ page }) => {
     await openSketchMath(page);
     await page.getByRole("button", { name: "Line" }).first().click();

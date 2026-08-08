@@ -1570,13 +1570,9 @@ describe("SketchMath workspace", () => {
 
     await screen.findByText("SketchMath");
     const canvas = screen.getByTestId("sketchmath-canvas");
-    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
-    clickCanvasAt(canvas, 160, 120);
-    clickCanvasAt(canvas, 400, 220);
-
-    const baseId = `rect_${firstStamp.toString(36)}`;
-    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
-    await userEvent.click(await screen.findByTestId(`entity-${baseId}_a`));
+    await userEvent.click(screen.getByRole("button", { name: "Point" }));
+    clickCanvasAt(canvas, 240, 160);
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: 1 point"));
     await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
 
     const panel = screen.getByTestId("sketchmath-advanced-constraints");
