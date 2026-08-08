@@ -1254,6 +1254,26 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId(`entity-${baseId}_c`).querySelector("circle")).toHaveAttribute("cy", "220");
   });
 
+  it("commits an open polyline as shared point identities and linked line segments", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Polyline" }));
+    clickCanvasAt(canvas, 120, 100);
+    clickCanvasAt(canvas, 240, 100);
+    clickCanvasAt(canvas, 240, 200);
+    expect(screen.getByTestId("sketchmath-polyline-draft")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Finish polyline" }));
+
+    await waitFor(() => expect(screen.queryByTestId("sketchmath-polyline-draft")).toBeNull());
+    expect(screen.getAllByTestId(/^entity-polyline_.*_p\d+$/)).toHaveLength(3);
+    expect(screen.getAllByTestId(/^entity-polyline_.*_s\d+$/)).toHaveLength(2);
+    expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("3 points • 2 lines");
+  });
+
   it("exposes rectangle dimensions that drive grouped rectangle geometry", async () => {
     const { fetchMock } = createSketchmathMock();
     global.fetch = fetchMock as unknown as typeof fetch;

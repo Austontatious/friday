@@ -341,6 +341,29 @@ test.describe("SketchMath workspace", () => {
     expect(restoredCoordinates).toEqual(coordinates);
   });
 
+  test("commits a reload-stable point-backed polyline", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Polyline", exact: true }).click();
+    await clickSvgViewBoxPoint(page, 140, 120);
+    await clickSvgViewBoxPoint(page, 260, 120);
+    await clickSvgViewBoxPoint(page, 300, 220);
+    await expect(page.getByTestId("sketchmath-polyline-draft")).toBeVisible();
+    await clickWorkbenchButton(page, "Finish polyline");
+
+    await expect(page.locator('[data-testid^="entity-polyline_"][data-entity-type="point_2d"]')).toHaveCount(3);
+    await expect(page.locator('[data-testid^="entity-polyline_"][data-entity-type="line_2d"]')).toHaveCount(2);
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    const response = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const snapshot = await response.json() as { selection_context: { items: Array<Record<string, unknown>> } };
+    const lines = snapshot.selection_context.items.filter((item) => item.type === "line_2d" && String(item.id).startsWith("polyline_"));
+    expect(lines).toHaveLength(2);
+    expect(lines[0].end_point_id).toBe(lines[1].start_point_id);
+
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    await expect(page.locator('[data-testid^="entity-polyline_"][data-entity-type="line_2d"]')).toHaveCount(2);
+  });
+
   test("handles referenced rectangle edge delete and clean sketch reset in the normal UI", async ({ page }) => {
     await openSketchMath(page);
 

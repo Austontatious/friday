@@ -19,6 +19,7 @@ type SketchCanvas2DProps = {
   rectangleDraft: { anchor: Point; current: Point } | null;
   circleDraft?: { center: Point; current: Point } | null;
   arcDraft?: { points: Point[]; current: Point } | null;
+  polylineDraft?: { points: Point[]; current: Point } | null;
   dragPreviewPoint: { id: string; point: Point } | null;
   holePlacementPreview?: { center: Point; diameter: number } | null;
   holePlacementActive?: boolean;
@@ -46,6 +47,7 @@ const SketchCanvas2D = ({
   rectangleDraft,
   circleDraft,
   arcDraft,
+  polylineDraft,
   dragPreviewPoint,
   holePlacementPreview,
   holePlacementActive = false,
@@ -131,6 +133,14 @@ const SketchCanvas2D = ({
           fill="none"
           className="sketchmath-draft-rectangle"
           data-testid="sketchmath-arc-draft"
+        />
+      ) : null}
+      {polylineDraft ? (
+        <polyline
+          points={[...polylineDraft.points, polylineDraft.current].map((point) => `${point.x},${point.y}`).join(" ")}
+          fill="none"
+          className="sketchmath-draft-rectangle"
+          data-testid="sketchmath-polyline-draft"
         />
       ) : null}
       {dragPreviewPoint ? <circle cx={dragPreviewPoint.point.x} cy={dragPreviewPoint.point.y} r={7} className="sketchmath-draft-point" data-testid={`sketchmath-drag-${dragPreviewPoint.id}`} /> : null}

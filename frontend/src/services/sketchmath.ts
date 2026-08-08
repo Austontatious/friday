@@ -8,6 +8,7 @@ export type SketchMathMode =
   | "line"
   | "rectangle"
   | "center_rectangle"
+  | "polyline"
   | "hole"
   | "pan"
   | "circle"

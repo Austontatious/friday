@@ -101,6 +101,7 @@ type HoleSelectionSummary = { holeId: string; profileId: string; diameter: numbe
 type WorkspaceViewMode = "sketch" | "solid";
 type CircleDraft = { center: Point; current: Point };
 type ArcDraft = { points: Point[]; current: Point };
+type PolylineDraft = { points: Point[]; current: Point };
 type CadExportArtifact = {
   stepPath: string;
   filename: string;
@@ -399,6 +400,7 @@ const SketchMathWorkspace = () => {
   const [rectangleDraft, setRectangleDraft] = useState<RectangleDraft | null>(null);
   const [circleDraft, setCircleDraft] = useState<CircleDraft | null>(null);
   const [arcDraft, setArcDraft] = useState<ArcDraft | null>(null);
+  const [polylineDraft, setPolylineDraft] = useState<PolylineDraft | null>(null);
   const [profileCandidates, setProfileCandidates] = useState<SketchMathProfileCandidate[]>([]);
   const [solverOutcome, setSolverOutcome] = useState<"Conflict" | "Solve failed" | null>(null);
   const [solverAnalysis, setSolverAnalysis] = useState<SketchMathSolverAnalysis | null>(null);
@@ -1506,6 +1508,7 @@ const SketchMathWorkspace = () => {
     setDraftPoint(null);
     setCircleDraft(null);
     setArcDraft(null);
+    setPolylineDraft(null);
     clearRectangleInteraction();
     setTranslationOutcome(null);
     setPendingCommandText("");
@@ -1561,6 +1564,30 @@ const SketchMathWorkspace = () => {
     const deltaY = corner.y - center.y;
     const anchor = { x: center.x - deltaX, y: center.y - deltaY };
     await commitRectangle(anchor, corner, false);
+  };
+
+  const commitPolyline = async () => {
+    if (!polylineDraft || polylineDraft.points.length < 2) return;
+    const stamp = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    const pointIds = polylineDraft.points.map((_, index) => `polyline_${stamp}_p${index + 1}`);
+    const lineIds = polylineDraft.points.slice(1).map((_, index) => `polyline_${stamp}_s${index + 1}`);
+    const commands = [
+      ...polylineDraft.points.map((point, index) => buildDefinePointCommand(point, pointIds[index], `Polyline point ${index + 1}`)),
+      ...lineIds.map((lineId, index) => buildDefineLineCommand(
+        polylineDraft.points[index],
+        polylineDraft.points[index + 1],
+        lineId,
+        `Polyline segment ${index + 1}`,
+        pointIds[index],
+        pointIds[index + 1],
+      )),
+    ];
+    const result = await commitCommand(buildBatchCommand(commands));
+    if (result) {
+      setSelectedEntityIds(lineIds);
+      setPolylineDraft(null);
+      setTool("select");
+    }
   };
 
   const handleCanvasClick = (point: Point) => {
@@ -1709,6 +1736,15 @@ const SketchMathWorkspace = () => {
       setTool("select");
       return;
     }
+    if (tool === "polyline") {
+      if (!polylineDraft) {
+        setPolylineDraft({ points: [point], current: point });
+      } else if (distanceBetween(polylineDraft.points[polylineDraft.points.length - 1], point) > 0.01) {
+        setPolylineDraft({ points: [...polylineDraft.points, point], current: point });
+      }
+      clearErrorState();
+      return;
+    }
     if (tool === "select") {
       setSelectedEntityIds([]);
       setRectangleSelectionDetail(null);
@@ -1767,6 +1803,10 @@ const SketchMathWorkspace = () => {
     }
     if ((tool === "arc" || tool === "three_point_arc") && arcDraft) {
       setArcDraft({ ...arcDraft, current: point });
+      return;
+    }
+    if (tool === "polyline" && polylineDraft) {
+      setPolylineDraft({ ...polylineDraft, current: point });
       return;
     }
     if (tool !== "rectangle" && tool !== "center_rectangle") {
@@ -1850,6 +1890,10 @@ const SketchMathWorkspace = () => {
   const handleCanvasContextMenu = () => {
     if (tool === "rectangle" || tool === "center_rectangle") {
       clearRectangleInteraction();
+      clearErrorState();
+    }
+    if (tool === "polyline") {
+      setPolylineDraft(null);
       clearErrorState();
     }
     if (tool === "pan") {
@@ -2537,11 +2581,17 @@ const SketchMathWorkspace = () => {
         setDraftPoint(null);
         setCircleDraft(null);
         setArcDraft(null);
+        setPolylineDraft(null);
         setTool("select");
         clearErrorState();
         return;
       }
       if (isTypingField) {
+        return;
+      }
+      if (event.key === "Enter" && tool === "polyline" && polylineDraft?.points.length && polylineDraft.points.length >= 2) {
+        event.preventDefault();
+        void commitPolyline();
         return;
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
@@ -2564,7 +2614,7 @@ const SketchMathWorkspace = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   // Rebind when selection identity or semantic rectangle detail changes so Delete uses the current routing state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rectangleSelectionDetail, selectedEntityIds, selectedRectangleBaseId]);
+  }, [polylineDraft, rectangleSelectionDetail, selectedEntityIds, selectedRectangleBaseId, tool]);
 
   const handleTranslate = async (utterance: string) => {
     if (!sessionId) {
@@ -2732,6 +2782,7 @@ const SketchMathWorkspace = () => {
       setDraftPoint(null);
       setCircleDraft(null);
       setArcDraft(null);
+      setPolylineDraft(null);
     }
     if (nextTool === "solve") {
       setTool(nextTool);
@@ -2796,6 +2847,8 @@ const SketchMathWorkspace = () => {
       ? "Drag on the canvas to draw a rectangle profile. Hold Shift while dragging for a square."
       : tool === "center_rectangle"
         ? "Click or drag from the rectangle center to a corner. Hold Shift for a centered square."
+      : tool === "polyline"
+        ? "Click each polyline vertex, then press Enter or use Finish polyline. Escape cancels the draft."
       : tool === "hole"
         ? "Select a profile, then click inside it to place a circular hole."
         : tool === "pan"
@@ -2932,6 +2985,7 @@ const SketchMathWorkspace = () => {
                     : rectangleDraft}
                   circleDraft={circleDraft}
                   arcDraft={arcDraft}
+                  polylineDraft={polylineDraft}
                   dragPreviewPoint={dragPreviewPoint}
                   holePlacementPreview={holePlacementPreview}
                   holePlacementActive={Boolean(holePlacement)}
@@ -2964,7 +3018,7 @@ const SketchMathWorkspace = () => {
               ) : null}
               <Box className="sketchmath-workflow-step" data-testid="sketchmath-tool-mode">
                 <Text className="sketchmath-step-label">Current mode</Text>
-                <Text fontWeight="600">{tool === "select" ? "Select" : tool === "rectangle" ? "Draw rectangle" : tool === "center_rectangle" ? "Center rectangle" : tool === "hole" ? "Add hole" : tool === "pan" ? "Pan / view" : tool}</Text>
+                <Text fontWeight="600">{tool === "select" ? "Select" : tool === "rectangle" ? "Draw rectangle" : tool === "center_rectangle" ? "Center rectangle" : tool === "polyline" ? "Polyline" : tool === "hole" ? "Add hole" : tool === "pan" ? "Pan / view" : tool}</Text>
                 <Text fontSize="sm" opacity={0.8}>
                   {canvasHelperText}
                 </Text>
@@ -3050,6 +3104,12 @@ const SketchMathWorkspace = () => {
                   </Button>
                   <Button size="sm" onClick={() => handleToolChange("center_rectangle")} variant={tool === "center_rectangle" ? "solid" : "outline"}>
                     Start center rectangle
+                  </Button>
+                  <Button size="sm" onClick={() => handleToolChange("polyline")} variant={tool === "polyline" ? "solid" : "outline"}>
+                    Start polyline
+                  </Button>
+                  <Button size="sm" onClick={() => void commitPolyline()} isDisabled={!polylineDraft || polylineDraft.points.length < 2}>
+                    Finish polyline
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => void handleClearSketch()}>
                     Clear sketch

@@ -21,6 +21,7 @@ const SketchMathToolbar = ({ mode, onModeChange, theme, onToggleTheme }: SketchM
           ["pan", "Pan / view"],
           ["point", "Point"],
           ["line", "Line"],
+          ["polyline", "Polyline"],
           ["circle", "Circle"],
           ["arc", "Arc"],
           ["three_point_arc", "3-point arc"],
