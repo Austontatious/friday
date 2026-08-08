@@ -62,7 +62,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 ## Supported Tools
 
-- Primary canvas modes: Select, Draw rectangle, Center rectangle, Circle, Arc, 3-point arc, Add hole, Pan / view.
+- Primary canvas modes: Select, Draw rectangle, Center rectangle, Polyline, Circle, Arc, 3-point arc, Add hole, Pan / view.
 - Secondary/advanced canvas tools: Point, Line, Dimension, Delete.
 - Default guided actions: Start rectangle, Apply Rectangle Dimensions, Add center hole, Add Hole placement, selected-hole update, Fix corner, Delete, Extrude, Commit Preview, Revert Preview, Download STEP.
 - Dimension actions: Set Length, Set horizontal distance, Set vertical distance, Edit Width, Edit Height, Apply radius, and Apply diameter.
@@ -72,6 +72,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Normal rectangle clicks select the profile by default. Edge and corner selection are available in Dimension mode, Advanced Constraints, or modifier-click so the MVP workflow does not accidentally land on raw child geometry.
 - Rectangle width/height controls commit typed `set_rectangle_dimension` commands directly and keep the rectangle/profile selected.
 - Center rectangle takes a center and corner (or a center-origin drag), then commits the same canonical four-point/four-edge/profile batch as the corner rectangle tool. Shift-drag produces a centered square. No second rectangle representation is persisted.
+- Polyline collects an open vertex chain and commits it as one typed batch of stable point identities and linked line segments. Enter or Finish polyline commits; Escape cancels. Adjacent segments share the same endpoint ID, so constraints, profile detection, history, and reload use the ordinary canonical point/line path.
 - Add center hole commits a centered typed `add_profile_hole` command. Add Hole enters placement mode; `Add Centered Hole` or a click inside the selected profile commits the same command shape with the chosen center.
 - Existing holes can be selected on canvas. The workflow panel exposes diameter/center controls that commit a typed `update_profile_hole` command and immediately refresh the committed session state.
 - Selected rectangles show width/height dimension labels on canvas. Selected holes show a diameter label on canvas.

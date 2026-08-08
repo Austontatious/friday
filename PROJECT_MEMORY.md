@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-08-08 - SketchMath Point-Backed Polyline Tool
+
+### What Changed
+- Added a Polyline canvas tool with live segment preview, explicit Finish polyline / Enter commit, and Escape cancellation.
+- Polyline commit is one typed batch containing stable `point_2d` vertices and ordinary linked `line_2d` segments; adjacent segments share the exact endpoint identity.
+- Added unit coverage for entity counts and a live browser/API workflow proving shared vertex IDs and identical reload recovery.
+- Tightened the browser toolbar query to the exact `Line` accessible name after `Polyline` made the prior substring selector ambiguous.
+
+### Why
+- Gate B needs polylines, but a separate polyline entity would duplicate the constraint, topology, profile, and editing paths already built around canonical points and lines.
+- A point-backed chain keeps future split/trim/constraint work on one identity model.
+
+### New Env Flags
+- None. The tool remains behind the existing default-off SketchMath feature gate.
+
+### How To Test
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand --runTestsByPath src/App.test.tsx src/components/sketchmath/SketchMathWorkspace.test.tsx src/components/sketchmath/commandBuilders.test.ts src/components/sketchmath/arcGeometry.test.ts` — 63 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npx playwright test e2e/sketchmath.spec.ts` — TypeScript/build and 14 browser workflows passed.
+- The unchanged backend gate remains at 145 Python tests, 50 semantic cases, generated schema/Compose checks, and 13 standards tests.
+
+### Remaining Phase 1 Work
+- Add slot and polygon primitives, then the safe trim/extend/split/offset/pattern editing envelope and broader nonlinear/arc solver equations.
+
+---
+
 ## 2026-08-08 - SketchMath Center Rectangle Tool
 
 ### What Changed

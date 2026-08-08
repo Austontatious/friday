@@ -65,7 +65,8 @@ The build still reports the repository-wide stale Browserslist database notice. 
 - A live mixed line/circle workflow now proves remaining-DOF drag, full constraint, dimensional edit, unified solve, undo/redo, and identical reload recovery without browser errors.
 - Canonical construction points and construction lines now use stable existing entity identities plus typed v0.7 conversion, profile-source safety checks, distinct rendering, and reload-stable workspace controls.
 - Center rectangle now provides center/corner and center-origin drag construction while committing the existing canonical rectangle bundle, so dimensions, profiles, history, reload, and extrusion remain shared.
-- Current evidence: 145 focused Python tests, 50 semantic evals, 62 focused frontend tests, 13 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- Open polylines now commit atomically as stable point identities plus linked line segments, with explicit finish/cancel controls and reload-stable shared vertices.
+- Current evidence: 145 focused Python tests, 50 semantic evals, 63 focused frontend tests, 14 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
 
 ## Gate A Outcome
 
@@ -104,7 +105,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Complete the remaining Gate B geometry/editing envelope (polyline, slot/polygon, and safe trim/extend/split/offset/pattern flows), then expand exact solver coverage for nonlinear and arc systems.
+Complete the remaining Gate B geometry/editing envelope (slot/polygon and safe trim/extend/split/offset/pattern flows), then expand exact solver coverage for nonlinear and arc systems.
 
 ## Release Status
 
