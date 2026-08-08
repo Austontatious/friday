@@ -5,6 +5,12 @@ import {
   buildDefineThreePointArcCommand,
   buildDeleteEntityCommand,
   buildExtrudeProfileCommand,
+  buildFixedCommand,
+  buildMidpointCommand,
+  buildCollinearCommand,
+  buildSymmetricCommand,
+  buildConcentricCommand,
+  buildTangentCommand,
   buildSetDiameterCommand,
   buildSetHorizontalDistanceCommand,
   buildSetLengthCommand,
@@ -83,6 +89,24 @@ describe("SketchMath command builders", () => {
       version: "0.5",
       command_type: "define_arc",
       parameters: { construction: "three_point", through_point_id: "b" },
+    });
+  });
+
+  it("generates v0.6 Gate B constraint commands with explicit selection order", () => {
+    expect(buildFixedCommand("anchor")).toMatchObject({ version: "0.6", command_type: "make_fixed", selection: ["anchor"] });
+    expect(buildMidpointCommand(["mid", "a", "b"])).toMatchObject({ version: "0.6", command_type: "make_midpoint", selection: ["mid", "a", "b"] });
+    expect(buildCollinearCommand(["a", "b", "moving"])).toMatchObject({ version: "0.6", command_type: "make_collinear", selection: ["a", "b", "moving"] });
+    expect(buildSymmetricCommand(["reference", "target", "axis_a", "axis_b"])).toMatchObject({
+      version: "0.6",
+      command_type: "make_symmetric",
+      selection: ["reference", "target", "axis_a", "axis_b"],
+    });
+    expect(buildConcentricCommand(["reference", "target"])).toMatchObject({ version: "0.6", command_type: "make_concentric" });
+    expect(buildTangentCommand(["line", "circle"])).toMatchObject({
+      version: "0.6",
+      command_type: "make_tangent",
+      selection: ["line", "circle"],
+      parameters: { tangency: "external" },
     });
   });
 

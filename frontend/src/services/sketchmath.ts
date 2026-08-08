@@ -162,6 +162,12 @@ export const SKETCHMATH_COMMAND_TYPES = [
   "make_horizontal",
   "make_vertical",
   "make_coincident",
+  "make_fixed",
+  "make_midpoint",
+  "make_collinear",
+  "make_symmetric",
+  "make_concentric",
+  "make_tangent",
   "solve_constraints",
   "analyze_constraints",
   "move_point",
@@ -187,7 +193,7 @@ export const SKETCHMATH_COMMAND_TYPES = [
 export type SketchMathCommandType = typeof SKETCHMATH_COMMAND_TYPES[number];
 
 export type SketchMathCommand = {
-  version: "0.1" | "0.2" | "0.3" | "0.4" | "0.5";
+  version: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6";
   command_id: string;
   mode?: "preview" | "commit";
   command_type: SketchMathCommandType;

@@ -356,6 +356,10 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
         id: `${type}_${snapshot.history.length + 1}`,
         type,
         points: command.selection,
+        point_id: type === "fixed_point_constraint" || type === "midpoint_constraint" ? command.selection[0] : undefined,
+        line_points: type === "midpoint_constraint" ? command.selection.slice(1, 3) : undefined,
+        entities: type === "concentric_constraint" || type === "tangent_constraint" ? command.selection.slice(0, 2) : undefined,
+        tangency: command.parameters.tangency,
         distance: command.parameters.distance,
         unit: command.parameters.unit || "mm",
         angle: command.parameters.angle,
@@ -510,6 +514,8 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       "vertical_distance_constraint",
       "radius_constraint",
       "diameter_constraint",
+      "midpoint_constraint",
+      "concentric_constraint",
     ]);
     const unsupportedConstraintIds = snapshot.selection_context.constraints
       .filter((constraint) => !supportedTypes.has(String(constraint.type)))
@@ -525,7 +531,7 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       .map((item) => item.id);
     const fixedCount = points.filter((point) => point.locked).length;
     const supportedEquationCount = snapshot.selection_context.constraints.reduce((count, constraint) => {
-      if (constraint.type === "fixed_point_constraint" || constraint.type === "coincident_constraint") return count + 2;
+      if (["fixed_point_constraint", "coincident_constraint", "midpoint_constraint", "concentric_constraint"].includes(String(constraint.type))) return count + 2;
       if (["horizontal_constraint", "vertical_constraint", "horizontal_distance_constraint", "vertical_distance_constraint", "radius_constraint", "diameter_constraint"].includes(String(constraint.type))) return count + 1;
       return count;
     }, fixedCount * 2);
@@ -927,6 +933,24 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       }
       if (command.command_type === "make_coincident") {
         return makeResponse(constraintHandler(command, mutate, "coincident_constraint", command.selection.slice(0, 2)));
+      }
+      if (command.command_type === "make_fixed") {
+        return makeResponse(constraintHandler(command, mutate, "fixed_point_constraint", command.selection.slice(0, 1)));
+      }
+      if (command.command_type === "make_midpoint") {
+        return makeResponse(constraintHandler(command, mutate, "midpoint_constraint", command.selection.slice(0, 3)));
+      }
+      if (command.command_type === "make_collinear") {
+        return makeResponse(constraintHandler(command, mutate, "collinear_constraint", command.selection.slice(0, 3)));
+      }
+      if (command.command_type === "make_symmetric") {
+        return makeResponse(constraintHandler(command, mutate, "symmetric_constraint", command.selection.slice(0, 4)));
+      }
+      if (command.command_type === "make_concentric") {
+        return makeResponse(constraintHandler(command, mutate, "concentric_constraint", command.selection.slice(0, 2)));
+      }
+      if (command.command_type === "make_tangent") {
+        return makeResponse(constraintHandler(command, mutate, "tangent_constraint", command.selection.slice(0, 2)));
       }
       if (command.command_type === "detect_profiles") {
         const response = setSnapshot(snapshot.selection_context.items, [], command, false);
@@ -1537,6 +1561,31 @@ describe("SketchMath workspace", () => {
     await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: Rectangle corner"));
     expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Angle: 90");
     expect(screen.getByRole("button", { name: "Fix corner" })).toBeEnabled();
+  });
+
+  it("exposes and commits the v0.6 fixed constraint from the advanced constraint panel", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 400, 220);
+
+    const baseId = `rect_${firstStamp.toString(36)}`;
+    await userEvent.click(screen.getAllByRole("button", { name: "Dimension" })[0]);
+    await userEvent.click(await screen.findByTestId(`entity-${baseId}_a`));
+    await userEvent.click(screen.getByRole("button", { name: "Show Advanced Constraints" }));
+
+    const panel = screen.getByTestId("sketchmath-advanced-constraints");
+    expect(within(panel).getByRole("button", { name: "Fixed" })).toBeEnabled();
+    expect(within(panel).getByRole("button", { name: "Midpoint" })).toBeDisabled();
+    expect(within(panel).getByRole("button", { name: "Concentric" })).toBeDisabled();
+    await userEvent.click(within(panel).getByRole("button", { name: "Fixed" }));
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Fixed"));
   });
 
   it("anchors a rectangle corner without overstating partial solver coverage", async () => {

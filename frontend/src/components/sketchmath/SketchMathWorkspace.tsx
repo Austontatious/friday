@@ -60,6 +60,12 @@ import {
   buildHorizontalCommand,
   buildVerticalCommand,
   buildCoincidentCommand,
+  buildFixedCommand,
+  buildMidpointCommand,
+  buildCollinearCommand,
+  buildSymmetricCommand,
+  buildConcentricCommand,
+  buildTangentCommand,
   buildDetectProfilesCommand,
   buildMovePointCommand,
   buildSetLengthCommand,
@@ -912,11 +918,13 @@ const SketchMathWorkspace = () => {
 
   const selectedIdsAreReferenced = (entityIds: string[]): boolean => {
     const selected = new Set(entityIds);
-    const referencedByConstraint = committedContext.constraints.some((constraint) =>
-      (Array.isArray((constraint as Record<string, unknown>).points) &&
-        ((constraint as Record<string, unknown>).points as unknown[]).some((pointId) => typeof pointId === "string" && selected.has(pointId))) ||
-      (typeof (constraint as Record<string, unknown>).circle_id === "string" && selected.has((constraint as Record<string, unknown>).circle_id as string)),
-    );
+    const referencedByConstraint = committedContext.constraints.some((constraint) => {
+      const record = constraint as Record<string, unknown>;
+      const references = [record.points, record.line_points, record.entities]
+        .flatMap((value) => Array.isArray(value) ? value : [])
+        .concat([record.point_id, record.circle_id]);
+      return references.some((reference) => typeof reference === "string" && selected.has(reference));
+    });
     const referencedByName = Object.values(committedContext.named_references).some((entityId) => selected.has(entityId));
     const referencedByProfile = committedEntities.some(
       (entity) => isClosedProfileEntity(entity) && selected.has(entity.id),
@@ -931,6 +939,10 @@ const SketchMathWorkspace = () => {
         const record = constraint as Record<string, unknown>;
         const references = Array.isArray(record.points)
           ? record.points
+          : Array.isArray(record.line_points)
+            ? [record.point_id, ...record.line_points]
+            : Array.isArray(record.entities)
+              ? record.entities
           : typeof record.point_id === "string"
             ? [record.point_id]
             : typeof record.circle_id === "string"
@@ -953,7 +965,12 @@ const SketchMathWorkspace = () => {
           perpendicular_constraint: "Perpendicular",
           equal_length_constraint: "Equal length",
           equal_angle_constraint: "Equal angle",
-          fixed_constraint: "Fixed",
+          fixed_point_constraint: "Fixed",
+          midpoint_constraint: "Midpoint",
+          collinear_constraint: "Collinear",
+          symmetric_constraint: "Symmetric",
+          concentric_constraint: "Concentric",
+          tangent_constraint: "Tangent",
         }[type] || "Constraint";
         const detailParts: string[] = [];
         if (typeof (constraint as Record<string, unknown>).distance === "number") {
@@ -983,7 +1000,15 @@ const SketchMathWorkspace = () => {
       committedContext.constraints.filter((constraint) => {
         if (selectedEntityIds.length === 0) return true;
         const record = constraint as Record<string, unknown>;
-        const references = Array.isArray(record.points) ? record.points : typeof record.point_id === "string" ? [record.point_id] : [];
+        const references = Array.isArray(record.points)
+          ? record.points
+          : Array.isArray(record.line_points)
+            ? [record.point_id, ...record.line_points]
+            : Array.isArray(record.entities)
+              ? record.entities
+              : typeof record.point_id === "string"
+                ? [record.point_id]
+                : [];
         return references.some((entityId) => typeof entityId === "string" && selectedEntityIds.includes(entityId));
       }).map((constraint, index) => {
         const type = typeof constraint.type === "string" ? constraint.type : "constraint";
@@ -1025,7 +1050,31 @@ const SketchMathWorkspace = () => {
     [selectedPointEntities],
   );
 
+  const orderedPointSelectionIds = useMemo(
+    () => selectedEntityIds.filter((entityId) => committedEntities.some((entity) => entity.id === entityId && isPointEntity(entity))),
+    [committedEntities, selectedEntityIds],
+  );
+
   const selectedLineEntities = useMemo(() => selectedEntities.filter(isLineEntity), [selectedEntities]);
+  const selectedCenterEntities = useMemo(
+    () => selectedEntityIds
+      .map((entityId) => committedEntities.find((entity) => entity.id === entityId))
+      .filter((entity): entity is Extract<SketchMathEntity, { type: "circle_2d" | "arc_2d" }> => Boolean(entity && (isCircleEntity(entity) || isArcEntity(entity)))),
+    [committedEntities, selectedEntityIds],
+  );
+  const selectedCircleEntities = useMemo(
+    () => selectedCenterEntities.filter(isCircleEntity),
+    [selectedCenterEntities],
+  );
+  const tangentSelectionIds = useMemo(() => {
+    if (selectedLineEntities.length === 1 && selectedCircleEntities.length === 1) {
+      return [selectedLineEntities[0].id, selectedCircleEntities[0].id];
+    }
+    if (selectedCircleEntities.length === 2) {
+      return selectedCircleEntities.map((entity) => entity.id);
+    }
+    return [];
+  }, [selectedCircleEntities, selectedLineEntities]);
   const selectedLinePointIds = useMemo(
     () => Array.from(new Set(selectedLineEntities.flatMap((entity) => lineEndpointPointIds(entity)))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2522,6 +2571,30 @@ const SketchMathWorkspace = () => {
     if (pointSelectionIds.length === 2) await commitCommand(buildCoincidentCommand(pointSelectionIds));
   };
 
+  const runQuickFixed = async () => {
+    if (orderedPointSelectionIds.length === 1) await commitCommand(buildFixedCommand(orderedPointSelectionIds[0]));
+  };
+
+  const runQuickMidpoint = async () => {
+    if (orderedPointSelectionIds.length === 3) await commitCommand(buildMidpointCommand(orderedPointSelectionIds));
+  };
+
+  const runQuickCollinear = async () => {
+    if (orderedPointSelectionIds.length === 3) await commitCommand(buildCollinearCommand(orderedPointSelectionIds));
+  };
+
+  const runQuickSymmetric = async () => {
+    if (orderedPointSelectionIds.length === 4) await commitCommand(buildSymmetricCommand(orderedPointSelectionIds));
+  };
+
+  const runQuickConcentric = async () => {
+    if (selectedCenterEntities.length === 2) await commitCommand(buildConcentricCommand(selectedCenterEntities.map((entity) => entity.id)));
+  };
+
+  const runQuickTangent = async () => {
+    if (tangentSelectionIds.length === 2) await commitCommand(buildTangentCommand(tangentSelectionIds));
+  };
+
   const runUpdateCircle = async () => {
     if (!selectedCircle) return;
     const radius = Number(circleRadiusValue);
@@ -3241,12 +3314,30 @@ const SketchMathWorkspace = () => {
                 {constraintsOpen ? (
                   <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-advanced-constraints">
                     <Text fontSize="sm" opacity={0.75} mb={2}>
-                      Committed constraints for the current selection.
+                      Committed constraints for the current selection. Point constraints use selection order: midpoint first; symmetry reference, target, then axis endpoints.
                     </Text>
                     <Text fontSize="sm" opacity={0.8} whiteSpace="pre-wrap" mb={2}>
                       {constraintDebugSummaries.length ? constraintDebugSummaries.join("\n") : "No constraints yet."}
                     </Text>
                     <HStack spacing={2} flexWrap="wrap" mt={2}>
+                      <Button size="sm" onClick={() => void runQuickFixed()} isDisabled={orderedPointSelectionIds.length !== 1}>
+                        Fixed
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickMidpoint()} isDisabled={orderedPointSelectionIds.length !== 3}>
+                        Midpoint
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickCollinear()} isDisabled={orderedPointSelectionIds.length !== 3}>
+                        Collinear
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickSymmetric()} isDisabled={orderedPointSelectionIds.length !== 4}>
+                        Symmetric
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickConcentric()} isDisabled={selectedCenterEntities.length !== 2}>
+                        Concentric
+                      </Button>
+                      <Button size="sm" onClick={() => void runQuickTangent()} isDisabled={tangentSelectionIds.length !== 2}>
+                        Tangent
+                      </Button>
                       <Button size="sm" onClick={() => void runQuickEqualAngle()} isDisabled={pointSelectionIds.length < 6}>
                         Equal Angle
                       </Button>

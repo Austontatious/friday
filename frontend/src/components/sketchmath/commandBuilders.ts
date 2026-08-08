@@ -41,6 +41,33 @@ export const buildVerticalCommand = (selection: string[]): SketchMathCommand =>
 export const buildCoincidentCommand = (selection: string[]): SketchMathCommand =>
   baseCommand("make_coincident", selection.slice(0, 2), {});
 
+const gateBConstraintCommand = (
+  commandType: SketchMathCommandType,
+  selection: string[],
+  parameters: Record<string, unknown> = {},
+): SketchMathCommand => ({
+  ...baseCommand(commandType, selection, parameters),
+  version: "0.6",
+});
+
+export const buildFixedCommand = (pointId: string): SketchMathCommand =>
+  gateBConstraintCommand("make_fixed", [pointId]);
+
+export const buildMidpointCommand = (selection: string[]): SketchMathCommand =>
+  gateBConstraintCommand("make_midpoint", selection.slice(0, 3));
+
+export const buildCollinearCommand = (selection: string[]): SketchMathCommand =>
+  gateBConstraintCommand("make_collinear", selection.slice(0, 3));
+
+export const buildSymmetricCommand = (selection: string[]): SketchMathCommand =>
+  gateBConstraintCommand("make_symmetric", selection.slice(0, 4));
+
+export const buildConcentricCommand = (selection: string[]): SketchMathCommand =>
+  gateBConstraintCommand("make_concentric", selection.slice(0, 2));
+
+export const buildTangentCommand = (selection: string[], tangency: "external" | "internal" = "external"): SketchMathCommand =>
+  gateBConstraintCommand("make_tangent", selection.slice(0, 2), { tangency });
+
 export const buildDetectProfilesCommand = (): SketchMathCommand =>
   baseCommand("detect_profiles", [], {});
 
