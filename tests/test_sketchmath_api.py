@@ -365,6 +365,37 @@ def test_v06_gate_b_constraints_round_trip_with_typed_solver_analysis(monkeypatc
     client.close()
 
 
+def test_v07_construction_conversion_round_trips_with_stable_ids(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = _client(monkeypatch)
+    created = client.post(
+        "/api/sketchmath/sessions",
+        json={
+            "selection_context": _selection_context(
+                [
+                    {"id": "guide", "type": "point_2d", "coords": [0, 0]},
+                    {"id": "centerline", "type": "line_2d", "start": [0, 0], "end": [10, 0], "start_point_id": "guide"},
+                ]
+            )
+        },
+    )
+    session_id = created.json()["session_id"]
+    command = _command("set_construction", "construction_api", mode="commit", selection=["guide", "centerline"])
+    command["version"] = "0.7"
+    command["parameters"] = {"enabled": True}
+    response = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": command})
+    assert response.status_code == 200
+    items = {item["id"]: item for item in response.json()["selection_context"]["items"]}
+    assert items["guide"]["construction"] is True
+    assert items["centerline"]["type"] == "construction_line_2d"
+
+    reloaded = client.get(f"/api/sketchmath/sessions/{session_id}").json()
+    reloaded_items = {item["id"]: item for item in reloaded["selection_context"]["items"]}
+    assert reloaded_items["guide"]["construction"] is True
+    assert reloaded_items["centerline"]["type"] == "construction_line_2d"
+    client.close()
+
+
 def test_sketchmath_rectangle_dimension_preview_and_commit(monkeypatch):
     client = _client(monkeypatch)
     created = client.post(

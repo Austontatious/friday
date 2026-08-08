@@ -1,0 +1,29 @@
+{
+  "name": "sketchmath_v07_set_construction",
+  "input": {
+    "command": {
+      "version": "0.7",
+      "command_id": "cmd_eval_construction",
+      "mode": "commit",
+      "command_type": "set_construction",
+      "selection": ["guide", "centerline"],
+      "parameters": {"enabled": true}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_construction",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "guide", "type": "point_2d", "coords": [0, 0]},
+        {"id": "centerline", "type": "line_2d", "start": [0, 0], "end": [10, 0], "start_point_id": "guide"}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "changed_entity_ids": ["guide", "centerline"],
+    "metadata": {"construction": true}
+  }
+}
