@@ -5,7 +5,7 @@ import { openSketchMath } from "./helpers/sketchmath";
 const screenshotPath = (name: string) => `../tmp/sketchmath_sol/${name}`;
 
 const clickWorkbenchButton = async (page: Page, label: string) => {
-  await page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: label }).click();
+  await page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: label, exact: true }).click();
 };
 
 const clickSvgPrimitiveCenter = async (page: Page, selector: string, options: { shift?: boolean; first?: boolean } = {}) => {
@@ -158,6 +158,10 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
     await expect(page.getByTestId("sketchmath-solver-status-detail")).toContainText("can still move");
     await expect(page.getByText(/Independent equations:/)).toHaveCount(0);
+
+    await clickWorkbenchButton(page, "Set horizontal distance");
+    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("Horizontal distance");
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
 
     await clickWorkbenchButton(page, "Apply length");
     await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("distance 17.5 mm");
@@ -444,6 +448,14 @@ test.describe("SketchMath workspace", () => {
     await clickWorkbenchButton(page, "Apply radius");
     await expect(page.getByLabel("Circle radius")).toHaveValue("30");
     await expect(circle).toHaveAttribute("r", "30");
+    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("Radius");
+
+    await page.getByLabel("Circle diameter").fill("40");
+    await clickWorkbenchButton(page, "Apply diameter");
+    await expect(page.getByLabel("Circle radius")).toHaveValue("20");
+    await expect(circle).toHaveAttribute("r", "20");
+    await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("Diameter");
+    await expect(page.getByTestId("sketchmath-selected-constraints")).not.toContainText("Radius •");
 
     await clickWorkbenchButton(page, "Extrude");
     await expect(page.getByTestId("sketchmath-cad-feature-summary")).toContainText("Extrude preview ready");

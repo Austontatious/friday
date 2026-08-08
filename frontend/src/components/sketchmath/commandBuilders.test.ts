@@ -3,8 +3,12 @@ import {
   buildAnalyzeConstraintsCommand,
   buildDeleteEntityCommand,
   buildExtrudeProfileCommand,
+  buildSetDiameterCommand,
+  buildSetHorizontalDistanceCommand,
   buildSetLengthCommand,
+  buildSetRadiusCommand,
   buildSetRectangleDimensionCommand,
+  buildSetVerticalDistanceCommand,
   buildTranslateCommand,
   buildUpdateProfileHoleCommand,
 } from "./commandBuilders";
@@ -18,6 +22,38 @@ describe("SketchMath command builders", () => {
     expect(command.selection).toEqual(["point_A", "point_B"]);
     expect(command.parameters.distance).toBe(17.5);
     expect(command.parameters.unit).toBe("mm");
+  });
+
+  it("generates v0.4 driving axis distance commands", () => {
+    const horizontal = buildSetHorizontalDistanceCommand(["point_A", "point_B"], 12, "mm");
+    const vertical = buildSetVerticalDistanceCommand(["point_A", "point_B"], 7, "mm");
+
+    expect(horizontal).toMatchObject({
+      version: "0.4",
+      command_type: "set_horizontal_distance",
+      selection: ["point_A", "point_B"],
+      parameters: { distance: 12, unit: "mm", anchor: "midpoint" },
+    });
+    expect(vertical).toMatchObject({
+      version: "0.4",
+      command_type: "set_vertical_distance",
+      parameters: { distance: 7, unit: "mm", anchor: "midpoint" },
+    });
+  });
+
+  it("generates v0.4 driving circle dimension commands", () => {
+    expect(buildSetRadiusCommand("circle_A", 9)).toMatchObject({
+      version: "0.4",
+      command_type: "set_radius",
+      selection: ["circle_A"],
+      parameters: { radius: 9, unit: "mm" },
+    });
+    expect(buildSetDiameterCommand("circle_A", 18)).toMatchObject({
+      version: "0.4",
+      command_type: "set_diameter",
+      selection: ["circle_A"],
+      parameters: { diameter: 18, unit: "mm" },
+    });
   });
 
   it("generates a typed delete command for the full selected set", () => {

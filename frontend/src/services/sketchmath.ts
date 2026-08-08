@@ -109,6 +109,10 @@ export const SKETCHMATH_COMMAND_TYPES = [
   "define_profile",
   "delete_entity",
   "set_distance",
+  "set_horizontal_distance",
+  "set_vertical_distance",
+  "set_radius",
+  "set_diameter",
   "set_rectangle_dimension",
   "set_line_polar",
   "set_angle",
@@ -142,7 +146,7 @@ export const SKETCHMATH_COMMAND_TYPES = [
 export type SketchMathCommandType = typeof SKETCHMATH_COMMAND_TYPES[number];
 
 export type SketchMathCommand = {
-  version: "0.1" | "0.2" | "0.3";
+  version: "0.1" | "0.2" | "0.3" | "0.4";
   command_id: string;
   mode?: "preview" | "commit";
   command_type: SketchMathCommandType;

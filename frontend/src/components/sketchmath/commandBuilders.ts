@@ -59,6 +59,27 @@ export const buildMakeCircleProfileCommand = (circleId: string, profileId?: stri
 export const buildSetLengthCommand = (selection: string[], length: number, unit: string, anchor: "point_a" | "point_b" | "midpoint" = "midpoint"): SketchMathCommand =>
   baseCommand("set_distance", selection.slice(0, 2), { distance: length, unit, anchor });
 
+const versionedConstraintCommand = (
+  commandType: SketchMathCommandType,
+  selection: string[],
+  parameters: Record<string, unknown>,
+): SketchMathCommand => ({
+  ...baseCommand(commandType, selection, parameters),
+  version: "0.4",
+});
+
+export const buildSetHorizontalDistanceCommand = (selection: string[], distance: number, unit: string = "mm"): SketchMathCommand =>
+  versionedConstraintCommand("set_horizontal_distance", selection.slice(0, 2), { distance, unit, anchor: "midpoint" });
+
+export const buildSetVerticalDistanceCommand = (selection: string[], distance: number, unit: string = "mm"): SketchMathCommand =>
+  versionedConstraintCommand("set_vertical_distance", selection.slice(0, 2), { distance, unit, anchor: "midpoint" });
+
+export const buildSetRadiusCommand = (circleId: string, radius: number, unit: string = "mm"): SketchMathCommand =>
+  versionedConstraintCommand("set_radius", [circleId], { radius, unit });
+
+export const buildSetDiameterCommand = (circleId: string, diameter: number, unit: string = "mm"): SketchMathCommand =>
+  versionedConstraintCommand("set_diameter", [circleId], { diameter, unit });
+
 export const buildSetRectangleDimensionCommand = (
   selection: string[],
   dimension: "width" | "height",

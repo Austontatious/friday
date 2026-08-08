@@ -46,7 +46,6 @@ import {
   buildDefinePointCommand,
   buildDefineCircleCommand,
   buildMakeCircleProfileCommand,
-  buildUpdateCircleCommand,
   buildExtrudeProfileCommand,
   buildBatchCommand,
   buildEqualAngleCommand,
@@ -61,6 +60,10 @@ import {
   buildDetectProfilesCommand,
   buildMovePointCommand,
   buildSetLengthCommand,
+  buildSetHorizontalDistanceCommand,
+  buildSetVerticalDistanceCommand,
+  buildSetRadiusCommand,
+  buildSetDiameterCommand,
   buildSetRectangleDimensionCommand,
   buildUpdateProfileHoleCommand,
 } from "./commandBuilders";
@@ -383,6 +386,7 @@ const SketchMathWorkspace = () => {
   const [extrudeDepthValue, setExtrudeDepthValue] = useState("10");
   const [holeDiameterValue, setHoleDiameterValue] = useState("8");
   const [circleRadiusValue, setCircleRadiusValue] = useState("10");
+  const [circleDiameterValue, setCircleDiameterValue] = useState("20");
   const [selectedHoleDiameterDraft, setSelectedHoleDiameterDraft] = useState("");
   const [selectedHoleCenterXDraft, setSelectedHoleCenterXDraft] = useState("");
   const [selectedHoleCenterYDraft, setSelectedHoleCenterYDraft] = useState("");
@@ -803,7 +807,10 @@ const SketchMathWorkspace = () => {
   }, [rectangleDimensions]);
 
   useEffect(() => {
-    if (selectedCircle) setCircleRadiusValue(String(selectedCircle.radius));
+    if (selectedCircle) {
+      setCircleRadiusValue(String(selectedCircle.radius));
+      setCircleDiameterValue(String(selectedCircle.radius * 2));
+    }
   }, [selectedCircle]);
 
   useEffect(() => {
@@ -875,8 +882,9 @@ const SketchMathWorkspace = () => {
   const selectedIdsAreReferenced = (entityIds: string[]): boolean => {
     const selected = new Set(entityIds);
     const referencedByConstraint = committedContext.constraints.some((constraint) =>
-      Array.isArray((constraint as Record<string, unknown>).points) &&
-      ((constraint as Record<string, unknown>).points as unknown[]).some((pointId) => typeof pointId === "string" && selected.has(pointId)),
+      (Array.isArray((constraint as Record<string, unknown>).points) &&
+        ((constraint as Record<string, unknown>).points as unknown[]).some((pointId) => typeof pointId === "string" && selected.has(pointId))) ||
+      (typeof (constraint as Record<string, unknown>).circle_id === "string" && selected.has((constraint as Record<string, unknown>).circle_id as string)),
     );
     const referencedByName = Object.values(committedContext.named_references).some((entityId) => selected.has(entityId));
     const referencedByProfile = committedEntities.some(
@@ -890,12 +898,22 @@ const SketchMathWorkspace = () => {
       committedContext.constraints.filter((constraint) => {
         if (selectedEntityIds.length === 0) return true;
         const record = constraint as Record<string, unknown>;
-        const references = Array.isArray(record.points) ? record.points : typeof record.point_id === "string" ? [record.point_id] : [];
+        const references = Array.isArray(record.points)
+          ? record.points
+          : typeof record.point_id === "string"
+            ? [record.point_id]
+            : typeof record.circle_id === "string"
+              ? [record.circle_id]
+              : [];
         return references.some((entityId) => typeof entityId === "string" && selectedEntityIds.includes(entityId));
       }).map((constraint, index) => {
         const type = typeof constraint.type === "string" ? constraint.type : "constraint";
         const friendlyType = {
           distance_constraint: "Distance",
+          horizontal_distance_constraint: "Horizontal distance",
+          vertical_distance_constraint: "Vertical distance",
+          radius_constraint: "Radius",
+          diameter_constraint: "Diameter",
           angle_constraint: "Angle",
           horizontal_constraint: "Horizontal",
           vertical_constraint: "Vertical",
@@ -916,6 +934,13 @@ const SketchMathWorkspace = () => {
           const angle = (constraint as Record<string, unknown>).angle as number;
           const unit = typeof (constraint as Record<string, unknown>).unit === "string" ? (constraint as Record<string, unknown>).unit : "deg";
           detailParts.push(`angle ${angle} ${unit}`);
+        }
+        for (const dimension of ["radius", "diameter"] as const) {
+          if (typeof (constraint as Record<string, unknown>)[dimension] === "number") {
+            const value = (constraint as Record<string, unknown>)[dimension] as number;
+            const unit = typeof (constraint as Record<string, unknown>).unit === "string" ? (constraint as Record<string, unknown>).unit : "mm";
+            detailParts.push(`${dimension} ${value} ${unit}`);
+          }
         }
         return `${index + 1}. ${friendlyType}${detailParts.length ? ` • ${detailParts.join(" • ")}` : ""}`;
       }),
@@ -2385,6 +2410,20 @@ const SketchMathWorkspace = () => {
     await commitCommand(buildSetLengthCommand(lengthSelectionPointIds, Number(lengthValue), "mm", "midpoint"));
   };
 
+  const runQuickAxisDistance = async (axis: "horizontal" | "vertical") => {
+    if (lengthSelectionPointIds.length < 2) return;
+    const value = Number(lengthValue);
+    if (!Number.isFinite(value) || value <= 0) {
+      setUserError("Axis distance must be a positive number.");
+      return;
+    }
+    await commitCommand(
+      axis === "horizontal"
+        ? buildSetHorizontalDistanceCommand(lengthSelectionPointIds, value)
+        : buildSetVerticalDistanceCommand(lengthSelectionPointIds, value),
+    );
+  };
+
   const runQuickHorizontal = async () => {
     if (selectedLineEntities.length === 1) await commitCommand(buildHorizontalCommand([selectedLineEntities[0].id]));
   };
@@ -2404,10 +2443,17 @@ const SketchMathWorkspace = () => {
       setUserError("Circle radius must be a positive number.");
       return;
     }
-    await commitCommand(buildBatchCommand([
-      buildUpdateCircleCommand(selectedCircle.id, { x: selectedCircle.center[0], y: selectedCircle.center[1] }, radius),
-      buildMakeCircleProfileCommand(selectedCircle.id, `profile_${selectedCircle.id}`),
-    ]));
+    await commitCommand(buildSetRadiusCommand(selectedCircle.id, radius));
+  };
+
+  const runUpdateCircleDiameter = async () => {
+    if (!selectedCircle) return;
+    const diameter = Number(circleDiameterValue);
+    if (!Number.isFinite(diameter) || diameter <= 0) {
+      setUserError("Circle diameter must be a positive number.");
+      return;
+    }
+    await commitCommand(buildSetDiameterCommand(selectedCircle.id, diameter));
   };
 
   const runCircleAsHole = async () => {
@@ -2844,15 +2890,22 @@ const SketchMathWorkspace = () => {
                     ) : (
                       <Button size="sm" mt={2} onClick={() => void runQuickCoincident()}>Coincident</Button>
                     )}
+                    <HStack spacing={2} mt={2} flexWrap="wrap">
+                      <Button size="sm" variant="outline" onClick={() => void runQuickAxisDistance("horizontal")}>Set horizontal distance</Button>
+                      <Button size="sm" variant="outline" onClick={() => void runQuickAxisDistance("vertical")}>Set vertical distance</Button>
+                    </HStack>
                   </Box>
                 ) : null}
                 {selectedCircle ? (
                   <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-circle-editor">
-                    <Text fontWeight="600" fontSize="sm" mb={2}>Circle radius</Text>
-                    <HStack spacing={2}>
+                    <Text fontWeight="600" fontSize="sm" mb={2}>Driving circle dimension</Text>
+                    <HStack spacing={2} flexWrap="wrap">
                       <Input type="number" aria-label="Circle radius" value={circleRadiusValue} onChange={(event) => setCircleRadiusValue(event.target.value)} width="100px" />
                       <Text fontSize="sm">mm</Text>
                       <Button size="sm" onClick={() => void runUpdateCircle()}>Apply radius</Button>
+                      <Input type="number" aria-label="Circle diameter" value={circleDiameterValue} onChange={(event) => setCircleDiameterValue(event.target.value)} width="100px" />
+                      <Text fontSize="sm">mm</Text>
+                      <Button size="sm" onClick={() => void runUpdateCircleDiameter()}>Apply diameter</Button>
                       {circleHoleTarget ? <Button size="sm" onClick={() => void runCircleAsHole()}>Use as hole</Button> : null}
                     </HStack>
                   </Box>

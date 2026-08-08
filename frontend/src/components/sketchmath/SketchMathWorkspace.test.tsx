@@ -324,8 +324,19 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
     };
   };
 
-  const constraintHandler = (command: any, mutate: boolean, type: string, changedEntityIds: string[]) =>
-    appendConstraint(
+  const constraintHandler = (command: any, mutate: boolean, type: string, changedEntityIds: string[]) => {
+    const priorSnapshot = snapshot;
+    if (["radius_constraint", "diameter_constraint"].includes(type)) {
+      snapshot = {
+        ...snapshot,
+        selection_context: {
+          ...snapshot.selection_context,
+          constraints: snapshot.selection_context.constraints.filter((constraint) =>
+            !["radius_constraint", "diameter_constraint"].includes(String(constraint.type)) || constraint.circle_id !== command.selection[0]),
+        },
+      };
+    }
+    const response = appendConstraint(
       {
         id: `${type}_${snapshot.history.length + 1}`,
         type,
@@ -334,11 +345,68 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
         unit: command.parameters.unit || "mm",
         angle: command.parameters.angle,
         anchor: command.parameters.anchor,
+        direction: command.parameters.direction || 1,
+        circle_id: command.selection[0],
+        radius: command.parameters.radius,
+        diameter: command.parameters.diameter,
       },
       command,
       changedEntityIds,
       mutate,
     );
+    if (!mutate) snapshot = priorSnapshot;
+    return response;
+  };
+
+  const circleDimensionHandler = (command: any, mutate: boolean) => {
+    const beforeContext = snapshot.selection_context;
+    const existing = beforeContext.items.find((item) => item.id === command.selection[0]) as Extract<Entity, { type: "circle_2d" }>;
+    const radius = command.command_type === "set_radius" ? command.parameters.radius : command.parameters.diameter / 2;
+    const constraintType = command.command_type === "set_radius" ? "radius_constraint" : "diameter_constraint";
+    const constraint = {
+      id: `${constraintType}_${snapshot.history.length + 1}`,
+      type: constraintType,
+      circle_id: existing.id,
+      radius: command.parameters.radius,
+      diameter: command.parameters.diameter,
+      unit: command.parameters.unit || "mm",
+    };
+    const nextContext = {
+      ...beforeContext,
+      items: beforeContext.items.map((item) => item.id === existing.id ? { ...existing, radius } : item) as Entity[],
+      constraints: [
+        ...beforeContext.constraints.filter((item) =>
+          !["radius_constraint", "diameter_constraint"].includes(String(item.type)) || item.circle_id !== existing.id),
+        constraint,
+      ],
+    };
+    if (mutate) {
+      snapshot = {
+        ...snapshot,
+        selection_context: nextContext,
+        history: [
+          ...snapshot.history,
+          { command: { ...command, mode: "commit" }, committed: true, before: beforeContext, after: nextContext },
+        ],
+        history_length: snapshot.history.length + 1,
+      };
+    }
+    return {
+      session_id: snapshot.session_id,
+      selection_context: mutate ? snapshot.selection_context : nextContext,
+      result: {
+        command: { ...command, mode: command.mode || "preview" },
+        status: mutate ? "committed" : "preview",
+        before: beforeContext,
+        after: nextContext,
+        changed_entity_ids: [existing.id],
+        replay_index: snapshot.history.length,
+        metadata: { constraint_id: constraint.id, radius, diameter: radius * 2 },
+      },
+      history_length: snapshot.history.length,
+      session_metadata: snapshot.session_metadata,
+    };
+  };
 
   const profile = (command: any, mutate: boolean) => {
     const selected = command.selection
@@ -417,7 +485,17 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
 
   const analyzeConstraints = (command: any) => {
     const points = snapshot.selection_context.items.filter((item): item is Extract<Entity, { type: "point_2d" }> => item.type === "point_2d");
-    const supportedTypes = new Set(["fixed_point_constraint", "horizontal_constraint", "vertical_constraint", "coincident_constraint"]);
+    const circles = snapshot.selection_context.items.filter((item): item is Extract<Entity, { type: "circle_2d" }> => item.type === "circle_2d");
+    const supportedTypes = new Set([
+      "fixed_point_constraint",
+      "horizontal_constraint",
+      "vertical_constraint",
+      "coincident_constraint",
+      "horizontal_distance_constraint",
+      "vertical_distance_constraint",
+      "radius_constraint",
+      "diameter_constraint",
+    ]);
     const unsupportedConstraintIds = snapshot.selection_context.constraints
       .filter((constraint) => !supportedTypes.has(String(constraint.type)))
       .map((constraint) => String(constraint.id));
@@ -426,27 +504,29 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
         if (item.type === "point_2d") return false;
         if (item.type === "line_2d") return !item.start_point_id || !item.end_point_id;
         if (item.type === "profile_2d") return !(item.source_line_ids?.length || item.source_circle_id);
+        if (item.type === "circle_2d") return false;
         return true;
       })
       .map((item) => item.id);
     const fixedCount = points.filter((point) => point.locked).length;
     const supportedEquationCount = snapshot.selection_context.constraints.reduce((count, constraint) => {
       if (constraint.type === "fixed_point_constraint" || constraint.type === "coincident_constraint") return count + 2;
-      if (constraint.type === "horizontal_constraint" || constraint.type === "vertical_constraint") return count + 1;
+      if (["horizontal_constraint", "vertical_constraint", "horizontal_distance_constraint", "vertical_distance_constraint", "radius_constraint", "diameter_constraint"].includes(String(constraint.type))) return count + 1;
       return count;
     }, fixedCount * 2);
+    const trackedVariableCount = points.length * 2 + circles.reduce((count, circle) => count + (circle.center_point_id ? 1 : 3), 0);
     const exact = unsupportedConstraintIds.length === 0 && unmodeledEntityIds.length === 0;
-    const remainingDof = exact ? Math.max(0, points.length * 2 - supportedEquationCount) : null;
+    const remainingDof = exact ? Math.max(0, trackedVariableCount - supportedEquationCount) : null;
     const analysis = {
       schema_version: "1.0",
       coverage: exact ? "exact" : points.length ? "partial" : "unknown",
       freedom_state: exact ? (remainingDof === 0 ? "fully_constrained" : "under_constrained") : "unknown",
       consistency_state: exact ? "consistent" : "unknown",
       redundancy_state: exact ? "none" : "unknown",
-      tracked_variable_count: points.length * 2,
+      tracked_variable_count: trackedVariableCount,
       independent_equation_count: supportedEquationCount,
       remaining_dof: remainingDof,
-      remaining_tracked_dof_upper_bound: Math.max(0, points.length * 2 - supportedEquationCount),
+      remaining_tracked_dof_upper_bound: Math.max(0, trackedVariableCount - supportedEquationCount),
       fixed_entity_ids: points.filter((point) => point.locked).map((point) => point.id),
       supported_constraint_ids: snapshot.selection_context.constraints.filter((constraint) => supportedTypes.has(String(constraint.type))).map((constraint) => String(constraint.id)),
       unsupported_constraint_ids: unsupportedConstraintIds,
@@ -726,6 +806,15 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       if (command.command_type === "set_distance") {
         return makeResponse(constraintHandler(command, mutate, "distance_constraint", command.selection.slice(0, 2)));
       }
+      if (command.command_type === "set_horizontal_distance") {
+        return makeResponse(constraintHandler(command, mutate, "horizontal_distance_constraint", command.selection.slice(0, 2)));
+      }
+      if (command.command_type === "set_vertical_distance") {
+        return makeResponse(constraintHandler(command, mutate, "vertical_distance_constraint", command.selection.slice(0, 2)));
+      }
+      if (command.command_type === "set_radius" || command.command_type === "set_diameter") {
+        return makeResponse(circleDimensionHandler(command, mutate));
+      }
       if (command.command_type === "set_rectangle_dimension") {
         return makeResponse(setRectangleDimension(command, mutate));
       }
@@ -1002,6 +1091,27 @@ describe("SketchMath workspace", () => {
     expect(await screen.findByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("Independent equations:");
     expect(screen.getByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("constraint_distance");
     expect(screen.getByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("Nonlinear constraints prevent exact classification.");
+  });
+
+  it("creates driving horizontal and vertical distance constraints from Normal mode", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 380, 200);
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Selected: 1 line"));
+    fireEvent.change(screen.getByLabelText("SketchMath length"), { target: { value: "30" } });
+    await userEvent.click(screen.getByRole("button", { name: "Set horizontal distance" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selected-constraints")).toHaveTextContent("Horizontal distance • distance 30 mm"));
+    expect(screen.getByTestId("sketchmath-status")).toHaveTextContent("Under-constrained");
+
+    await userEvent.click(screen.getByRole("button", { name: "Set vertical distance" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selected-constraints")).toHaveTextContent("Vertical distance • distance 30 mm"));
   });
 
   it("creates a parametric rectangle from two clicks and keeps the workbench CAD-ready", async () => {
@@ -1793,6 +1903,15 @@ describe("SketchMath workspace", () => {
     fireEvent.change(screen.getByLabelText("Circle radius"), { target: { value: "25" } });
     await userEvent.click(screen.getByRole("button", { name: "Apply radius" }));
     await waitFor(() => expect(screen.getByLabelText("Circle radius")).toHaveValue(25));
+    expect(screen.getByTestId("sketchmath-selected-constraints")).toHaveTextContent("Radius • radius 25 mm");
+
+    await userEvent.clear(screen.getByLabelText("Circle diameter"));
+    await userEvent.type(screen.getByLabelText("Circle diameter"), "30");
+    expect(screen.getByLabelText("Circle diameter")).toHaveValue(30);
+    await userEvent.click(screen.getByRole("button", { name: "Apply diameter" }));
+    await waitFor(() => expect(screen.getByTestId("sketchmath-selected-constraints")).toHaveTextContent("Diameter • diameter 30 mm"));
+    await waitFor(() => expect(screen.getByLabelText("Circle radius")).toHaveValue(15));
+    expect(screen.getByLabelText("Circle diameter")).toHaveValue(30);
   });
 
   it("shows a productized STEP export card with browser download href after extrusion commit", async () => {
