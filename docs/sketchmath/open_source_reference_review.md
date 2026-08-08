@@ -3,6 +3,10 @@
 This is a reference pass for FRIDAY SketchMath, not an implementation change.
 The goal is to stop guessing at sketcher UX and solver architecture by comparing mature open-source parametric sketchers and extracting the smallest viable design for FRIDAY.
 
+## 2026 Gate B Architecture Update
+
+ADR 005 supersedes the earlier frontend-first solver recommendation for the backend-authoritative product architecture. The current production solver remains in place while a solver-neutral typed analysis/solve contract is established. SolveSpace remains reference-only because its official repository is GPL-3.0-or-later. FreeCAD remains an LGPL kernel/oracle behind a subprocess boundary. BSD-licensed SciPy `least_squares` is the leading future nonlinear backend candidate, subject to analytic Jacobian, degeneracy, packaging, and timeout benchmarks. No external solver was adopted in the initial Gate B slice.
+
 ## Bottom Line
 
 If we separate the references by what they are best at:
