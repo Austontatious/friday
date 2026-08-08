@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-08-08 - SketchMath Unified Solver Run Path
+
+### What Changed
+- Added the typed `SolverRunResult` and deterministic `SolverCoordinatePatch` contract plus a generated JSON schema.
+- Routed both `analyze_constraints` and `solve_constraints` through one closed-form evaluation path.
+- Solve now evaluates against a deep copy and applies only an accepted solved patch; under-constrained, inconsistent, redundant, and failed outcomes include the full run result in structured errors without committing partial geometry.
+- Exposed backend, outcome, termination, feasibility, and residual availability under Advanced / Debug.
+
+### Why
+- A future nonlinear backend needs one safe proposal/result seam shared with live analysis.
+- The SciPy benchmark proved that optimizer termination alone is insufficient; feasibility and residuals must be explicit and independent.
+
+### New Env Flags
+- None. The production backend remains `closed_form_v1`; SciPy remains benchmark-only.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 118 passed with SciPy installed.
+- `PYTHONPATH=. python3 -m sketchmath.schemas.generate --check`.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand App.test.tsx SketchMathWorkspace.test.tsx commandBuilders.test.ts` — 53 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npm run test:e2e -- sketchmath.spec.ts` — TypeScript/build and 9 browser workflows passed.
+
+### Remaining Phase 1 Work
+- Add canonical arcs using the unified solver contract, then implement the remaining Gate B constraints and mixed-geometry acceptance sequence.
+
+---
+
 ## 2026-08-08 - SketchMath SciPy Nonlinear Solver Benchmark
 
 ### What Changed

@@ -70,12 +70,14 @@ The canonical machine-readable contracts are generated from the Pydantic models 
 - `make_coincident`
   - Makes two point identities coincident without merging their stable IDs.
 - `solve_constraints`
-  - Runs the conservative 2D solver over stored constraints.
+  - Runs the conservative 2D solver over stored constraints through the unified `SolverRunResult` path.
+  - Applies only an accepted `solved` coordinate patch. Under-constrained, inconsistent, redundant, and failed proposals return structured errors with the run result and do not commit partial geometry.
 - `analyze_constraints`
   - Version `0.3`, preview-only, and non-mutating.
   - Reports exact DOF for the covered linear subset: point and circle scalar variables; locked/fixed points/circles; horizontal, vertical, coincident, horizontal/vertical distance, radius, and diameter constraints.
   - Returns explicit `partial` or `unknown` coverage instead of inventing DOF for nonlinear distance/angle/relation constraints, coordinate-only legacy geometry, or other unmodeled entities.
   - Reports consistency and proven redundancy separately; a deterministic conflict ID is not claimed to be a minimal conflict set.
+  - Returns the same unified `solver_run` envelope as solve mode while retaining `solver_analysis` compatibility metadata for live status.
 - `move_point`
   - Drags one addressable point while preserving the currently supported linked constraints.
 - `detect_profiles`

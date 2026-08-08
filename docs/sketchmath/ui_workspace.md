@@ -57,6 +57,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - `Partially analyzed` is intentional when geometry or constraints fall outside the analyzer's exact subset. It must not be presented as fully constrained merely because a closed-form edit succeeded.
 - Request failures report `Analysis unavailable`; an in-flight analysis reports `Analyzing constraints…`.
 - Raw coverage, rank/equation counts, remaining DOF, affected constraint/entity IDs, and diagnostics are visible only under Advanced / Debug.
+- Advanced / Debug also shows the unified solver backend, run outcome, termination reason, feasibility, and residual availability.
 - A successful `solve_constraints` command does not display a generic `Solved` badge. The live analysis result remains the authority for the status label.
 
 ## Supported Tools

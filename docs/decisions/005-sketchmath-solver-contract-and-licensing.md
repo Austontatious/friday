@@ -35,6 +35,8 @@ Command version `0.4` adds driving horizontal/vertical distance and radius/diame
 
 The first SciPy benchmark keeps the candidate outside production. Covered nondegenerate cases and analytic Jacobian checks passed, but SciPy reported successful termination for both a deliberately inconsistent system and an analytic zero-length seed with unacceptable residual. Any future adapter must classify feasibility from scaled residuals, define a degeneracy policy, and return diagnostics through the neutral result contract.
 
+`SolverRunResult` now implements that neutral result boundary for both analysis and solve commands. The closed-form backend proposes deterministic entity patches against a copy; the command layer applies only accepted solved patches. Unsupported generalized residuals remain `null`, and partial coverage yields unknown feasibility instead of a fabricated success claim.
+
 ## DOF semantics
 
 - `coverage=exact` means every mutable entity and active constraint is represented by the analyzer.
