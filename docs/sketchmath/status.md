@@ -63,7 +63,8 @@ The build still reports the repository-wide stale Browserslist database notice. 
 - Gate B fixed, midpoint, collinear, symmetric, concentric, and tangent constraints now use typed v0.6 commands, deterministic closed-form mutation, persistence/dependency handling, constrained drag where linked geometry is addressable, and selection-aware workspace controls.
 - Fixed, midpoint, and circle concentricity extend exact linear analysis. Collinearity, symmetry, and tangency remain explicitly partial until their nonlinear equations are modeled.
 - A live mixed line/circle workflow now proves remaining-DOF drag, full constraint, dimensional edit, unified solve, undo/redo, and identical reload recovery without browser errors.
-- Current evidence: 140 focused Python tests, 49 semantic evals, 59 focused frontend tests, 11 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- Canonical construction points and construction lines now use stable existing entity identities plus typed v0.7 conversion, profile-source safety checks, distinct rendering, and reload-stable workspace controls.
+- Current evidence: 145 focused Python tests, 50 semantic evals, 61 focused frontend tests, 12 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
 
 ## Gate A Outcome
 
@@ -102,7 +103,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Complete the remaining Gate B geometry/editing envelope (construction geometry, polyline/center rectangle, slot/polygon, and safe trim/extend/split/offset/pattern flows), then expand exact solver coverage for nonlinear and arc systems.
+Complete the remaining Gate B geometry/editing envelope (polyline/center rectangle, slot/polygon, and safe trim/extend/split/offset/pattern flows), then expand exact solver coverage for nonlinear and arc systems.
 
 ## Release Status
 

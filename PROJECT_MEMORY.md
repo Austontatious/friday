@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-08 - SketchMath Canonical Construction Geometry
+
+### What Changed
+- Added canonical construction/reference points through a `construction` flag on stable `point_2d` entities and activated the existing `construction_line_2d` entity through typed creation and conversion.
+- Added v0.7 `set_construction` to convert selected points/lines in preview or commit mode while retaining IDs, endpoint links, constraints, history, and reload persistence.
+- Protected committed profile boundaries from silent invalidation by rejecting conversion of their source lines.
+- Added dashed construction-line and hollow/dashed construction-point styling plus Make construction / Make regular workspace controls.
+
+### Why
+- Remaining Gate B tools need centerlines and reference geometry that constraints can address without a parallel UI-only representation.
+- Stable-ID type conversion preserves the existing command/history/session architecture and keeps construction lines excluded from profile detection.
+
+### New Env Flags
+- None. Construction geometry remains behind the existing default-off SketchMath feature gate.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 145 passed.
+- `PYTHONPATH=. python3 -m sketchmath.evals.run_sketchmath_evals` — 50 passed.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand --runTestsByPath src/App.test.tsx src/components/sketchmath/SketchMathWorkspace.test.tsx src/components/sketchmath/commandBuilders.test.ts src/components/sketchmath/arcGeometry.test.ts` — 61 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npx playwright test e2e/sketchmath.spec.ts` — TypeScript/build and 12 browser workflows passed.
+- Generated schemas, Compose config, and 13 repository standards tests passed.
+
+### Remaining Phase 1 Work
+- Add polyline/center rectangle and slot/polygon primitives, then the safe trim/extend/split/offset/pattern editing envelope and broader nonlinear/arc solver equations.
+
+---
+
 ## 2026-08-08 - SketchMath Gate B Constraint Families and Mixed-Geometry Acceptance
 
 ### What Changed

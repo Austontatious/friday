@@ -68,6 +68,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Dimension actions: Set Length, Set horizontal distance, Set vertical distance, Edit Width, Edit Height, Apply radius, and Apply diameter.
 - Advanced constraint actions: Set Angle, Horizontal, Vertical, Coincident, Parallel, Perpendicular, Equal Length, Equal Angle, Fixed, Midpoint, Collinear, Symmetric, Concentric, Tangent, and Solve.
 - Fixed accepts one point. Midpoint and Collinear accept three points in selection order. Symmetric accepts reference, target, then two axis endpoints. Concentric accepts two circles/arcs. Tangent accepts a line plus circle or two circles; finite-arc tangency is intentionally unavailable.
+- Make construction / Make regular converts selected point and line geometry through the typed v0.7 command. Construction lines render dashed, construction points render as hollow/dashed reference points, and the stable entity IDs survive reload.
 - Normal rectangle clicks select the profile by default. Edge and corner selection are available in Dimension mode, Advanced Constraints, or modifier-click so the MVP workflow does not accidentally land on raw child geometry.
 - Rectangle width/height controls commit typed `set_rectangle_dimension` commands directly and keep the rectangle/profile selected.
 - Add center hole commits a centered typed `add_profile_hole` command. Add Hole enters placement mode; `Add Centered Hole` or a click inside the selected profile commits the same command shape with the chosen center.

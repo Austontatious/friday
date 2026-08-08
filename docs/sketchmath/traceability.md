@@ -23,6 +23,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | Horizontal/vertical/coincident constrained drag | Passed | foundation tests and Playwright constrained-drag workflow |
 | Fixed/midpoint/collinear/symmetric/concentric/tangent constraints | Passed for the deterministic v0.6 envelope | executor/schema/API/semantic/frontend tests; finite-arc tangency is structured unsupported behavior |
 | Mixed-geometry full-constraint lifecycle | Passed for exact point-backed line/circle subset | Playwright remaining-DOF drag, full constraint, dimension re-solve, undo/redo, reload identity, and browser-error assertion |
+| Construction/reference points and lines | Passed for canonical conversion envelope | v0.7 executor/schema/API/semantic/frontend tests plus live conversion/reload browser workflow; committed profile source lines are protected |
 | Simple closed-loop profile detection | Passed for current deterministic simple-cycle envelope | topology foundation tests and Playwright detected-profile workflow |
 | Preview/commit/revert and persistent undo/redo | Passed | API/history tests and Playwright reload/history workflow |
 | Rectangle/circle/line-profile extrusion | Passed | CAD adapter/API tests and Playwright workflows |
@@ -46,7 +47,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 
 | Requirement family | State | Next proof |
 | --- | --- | --- |
-| SM-SK / SM-SOL parametric sketcher | Partial | Remaining Gate B geometry/editing families plus nonlinear and arc solver coverage |
+| SM-SK / SM-SOL parametric sketcher | Partial | Polyline/center rectangle, slot/polygon, remaining safe editing families, and nonlinear/arc solver coverage |
 | SM-TOP general topology | Deferred | Adversarial planar-region fixtures and deterministic region selection |
 | SM-FEAT feature history | Deferred | Canonical document/feature model plus rebuild tests |
 | SM-REF reference stability | Deferred | Upstream-edit survival/repair tests |
@@ -65,6 +66,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | SM-SOL-001 state reporting | Partial | Exact linear consistency/redundancy tests and semantic eval; live Normal labels plus Advanced-only diagnostics in unit and Playwright coverage | Nonlinear redundancy and minimal conflict sets are unknown. |
 | SM-SOL-002 defensible DOF | Partial | Rank-based exact DOF for point/circle linear systems; explicit partial/unknown results; UI never promotes partial coverage to fully constrained | Arc, standalone-coordinate legacy geometry, and nonlinear DOF are not exact. Arc entities are explicitly listed as unmodeled. |
 | SM-SK-001 arc geometry | Initial implementation | Canonical `arc_2d`; v0.5 center/three-point command paths; point-link sync; SVG workspace tools | Geometry/schema/API/eval/frontend tests and reload-stable live browser workflow pass; arc topology and solver equations remain open. |
+| SM-SK-001 construction geometry | Initial implementation | Point construction flag, canonical `construction_line_2d`, v0.7 stable-ID conversion, profile dependency guard, distinct workspace styling | Creation/conversion/schema/API/eval/frontend tests and live reload-stable browser workflow pass; dedicated axis/reference-plane semantics remain open. |
 | SM-SK-003 constraints and driving dimensions | Partial | v0.4 driving dimensions plus v0.6 fixed/midpoint/collinear/symmetric/concentric/tangent commands; exact mixed line/circle browser lifecycle passes | Collinear/symmetric/tangent and existing nonlinear relations remain partial in DOF analysis; finite-arc tangency is unsupported. |
 | SM-SOL-003 invalid commit prevention | Partial | Unified solve proposals apply only on `solved`; structured inconsistent/redundant/under/failed results retain patches without commit | Generalized nonlinear residual feasibility remains unimplemented. |
 | SM-UNIT-001 centralized tolerances | Initial implementation | Versioned `NumericalTolerancePolicy` | Unit expansion and display formatting remain open. |

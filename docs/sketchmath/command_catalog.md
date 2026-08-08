@@ -2,7 +2,7 @@
 
 SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 
-The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`; canonical arc commands use version `0.5`; the additional Gate B constraint families use version `0.6`. Undeclared versions and command types are rejected as `invalid_command` before execution.
+The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`; canonical arc commands use version `0.5`; the additional Gate B constraint families use version `0.6`; construction conversion uses version `0.7`. Undeclared versions and command types are rejected as `invalid_command` before execution.
 
 ## Execution Loop
 
@@ -82,6 +82,9 @@ The canonical machine-readable contracts are generated from the Pydantic models 
 - `make_tangent`
   - Version `0.6`; supports line-to-circle and circle-to-circle closed-form tangency with external or internal circle tangency.
   - Finite-arc tangency is explicitly rejected with `error_code=unsupported_arc_tangency`; it is not approximated as full-circle tangency.
+- `set_construction`
+  - Version `0.7`; converts selected points and lines between regular and construction/reference geometry while preserving stable IDs, endpoint links, constraints, history, and reload behavior.
+  - Lines used by a committed profile cannot be converted to construction geometry because that would silently invalidate the profile boundary.
 - `solve_constraints`
   - Runs the conservative 2D solver over stored constraints through the unified `SolverRunResult` path.
   - Applies only an accepted `solved` coordinate patch. Under-constrained, inconsistent, redundant, and failed proposals return structured errors with the run result and do not commit partial geometry.
