@@ -2,6 +2,8 @@
 
 SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 
+The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; current browser topology/circle commands use version `0.2`. Undeclared versions and command types are rejected as `invalid_command` before execution.
+
 ## Execution Loop
 
 1. A translator emits a typed `GeometryCommand`.
@@ -31,6 +33,8 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
   - Creates or replaces a point entity.
 - `define_line`
   - Creates or replaces a line entity.
+- `define_profile`
+  - Creates or replaces an explicitly supplied profile entity after model validation.
 - `delete_entity`
   - Removes the full selected set when every selected entity is unlocked and unreferenced.
   - `parameters.cascade=true` is reserved for semantic parent-object deletion, such as deleting a whole rectangle bundle after the UI has warned the user.
@@ -52,10 +56,26 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
   - Adjusts one unlocked endpoint so a segment matches the reference length.
 - `make_equal_angle`
   - Adjusts one unlocked point so a target angle matches a source angle.
+- `make_horizontal`
+  - Aligns two addressable points horizontally and persists a horizontal constraint.
+- `make_vertical`
+  - Aligns two addressable points vertically and persists a vertical constraint.
+- `make_coincident`
+  - Makes two point identities coincident without merging their stable IDs.
 - `solve_constraints`
   - Runs the conservative 2D solver over stored constraints.
+- `move_point`
+  - Drags one addressable point while preserving the currently supported linked constraints.
+- `detect_profiles`
+  - Non-mutating detection of deterministic simple closed line cycles; candidates require explicit promotion.
 - `make_profile`
   - Detects a closed 2D profile and stores its area and winding.
+- `define_circle`
+  - Creates a selectable first-class circle with center, radius, and optional center-point identity.
+- `update_circle`
+  - Edits the center/radius of an existing circle through the typed command path.
+- `make_circle_profile`
+  - Creates the deterministic polygonal adapter profile used by the current preview/FreeCAD boundary.
 - `add_profile_hole`
   - Adds a circular inner `profile_2d` hole to a selected closed profile.
   - Preview mode returns the updated outer profile plus hole entity without mutating session state.
@@ -78,6 +98,8 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
   - Creates a deterministic point at the intersection of two line-like entities.
 - `project_point_to_line`
   - Creates a deterministic point projected onto a line-like entity.
+- `batch`
+  - Applies a validated list of typed subcommands atomically to a working copy before commit.
 - `extrude_profile`
   - Consumes one closed outer `profile_2d` plus optional closed hole profiles and exports a STEP solid through the headless FreeCAD adapter.
   - If `parameters.holes` is omitted, stored `profile.holes` are used.
@@ -93,6 +115,9 @@ SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 - `perpendicular_constraint`
 - `equal_length_constraint`
 - `equal_angle_constraint`
+- `horizontal_constraint`
+- `vertical_constraint`
+- `coincident_constraint`
 - `fixed_point_constraint`
 
 Locked entities act as fixed anchors. The solver only moves unlocked points, and it prefers closed-form cases over iterative search.
@@ -224,12 +249,14 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 - `unsupported_command_type`
 - `locked_entity_mutation`
 - `invalid_units`
+- `invalid_command`
 
 ## Constraint Solver Limits
 
 - No general nonlinear CAD solving yet.
 - No full CAD feature tree, trimming workflow, or sketch solver beyond the supported closed-form cases.
-- No first-class free-standing circle or arc entities yet. The UI labels those tools as coming soon; circular holes are represented as inner `profile_2d` geometry through `add_profile_hole`.
+- First-class circles are supported. Arc entities remain deferred and the UI labels Arc as coming soon.
+- Profile detection is limited to deterministic simple line cycles; nested/general planar-region extraction remains deferred.
 - No arbitrary Python execution.
 - No hidden geometry mutation outside typed commands.
 - Ambiguous or under-constrained input returns `clarification_required`.
@@ -241,7 +268,7 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 - Run semantic SketchMath evals with:
   - `python3 -m sketchmath.evals.run_sketchmath_evals`
 - The runner loads geometry and translator contract cases from `evals/cases/sketchmath_*.json`, executes geometry cases against the deterministic executor, executes translator cases against the deterministic translator helper, and writes `evals/sketchmath_semantic_results.json`.
-- Geometry evals now include the `extrude_profile` adapter spike with hole validation and validate the exported STEP artifact metadata when present.
+- Geometry evals include v0.2 circle, horizontal-constraint, and profile-detection coverage plus the `extrude_profile` adapter with hole validation and STEP metadata checks when present.
 
 All geometry changes must continue to flow through typed `GeometryCommand` objects. The gateway owns translation and policy boundaries; SketchMath owns geometry execution only.
 
