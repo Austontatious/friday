@@ -3,7 +3,7 @@
 ## Route
 
 - Open the workspace at `/tools/sketchmath`.
-- FRIDAY's main shell shows a `SketchMath` button for the same route when `REACT_APP_SKETCHMATH_ENABLED=1`.
+- FRIDAY's main shell shows a `SketchMath` button when its build sets `REACT_APP_SKETCHMATH_ENABLED=1`; the backend must also set `FRIDAY_SKETCHMATH_ENABLED=1`. Both default off.
 - The main shell now shows only `Direct Friday` and optional `SketchMath`; `Althing` is hidden from the visible shell UI.
 
 ## Runtime Boundary

@@ -6,12 +6,12 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 
 | Requirement | Current state | Implementation / source | Tests and acceptance evidence | Commit |
 | --- | --- | --- | --- | --- |
-| SM-GA-001 contract agreement | In progress | `sketchmath/models/`, `sketchmath/schemas/`, `sketchmath/executor/command_router.py`, `frontend/src/services/sketchmath.ts` | Contract/schema tests and semantic eval check required | TBD |
-| SM-GA-002 documentation truth | In progress | `docs/sketchmath/command_catalog.md`, `docs/sketchmath/ui_workspace.md` | Documentation contradiction scan | TBD |
-| SM-GA-003 feature-gate agreement | In progress | `core/config.py`, `frontend/src/services/sketchmath.ts`, deployment examples | Backend and frontend unset/off/on tests | TBD |
-| SM-GA-004 clean build | In progress | `frontend/src/components/sketchmath/SketchMathWorkspace.tsx` | `npx tsc --noEmit`; `npm run build` | TBD |
+| SM-GA-001 contract agreement | Passed locally | `sketchmath/models/`, generated `sketchmath/schemas/`, executor handler discovery, closed frontend command union | 66 focused contract/executor/API tests; schema drift check; 42 semantic evals | `e357112` |
+| SM-GA-002 documentation truth | Passed locally | `docs/sketchmath/command_catalog.md`, `docs/sketchmath/ui_workspace.md`, translator contract prompt | Circle/topology/constraint contradiction scan; focused translation tests | `e47ff78` |
+| SM-GA-003 feature-gate agreement | Passed locally | `core/config.py`, `frontend/src/services/sketchmath.ts`, `.env.example`, Dockerfile, Compose, ADR 003 | Backend unset/off tests; frontend unset/off/on tests; Compose config | `799a7db` |
+| SM-GA-004 clean build | Passed locally | Removed unused `sessionMetadata`; explicit frontend build flag | `npx tsc --noEmit`; production build compiled without SketchMath source warnings | `799a7db` |
 | SM-GA-005 deliberate landing | Blocked pending commit-set analysis | Git history and landing record in living status | Remote ref plus reproducible validation record | TBD |
-| SM-GA-006 regression baseline | Passed at audited `21b8153` on 2026-08-08 | Existing implementation | 93 Python, 39 semantic eval, 30 frontend, 9 Playwright, TypeScript, build, Compose, 13 standards | `21b8153` checkout; latest SketchMath `8236828` |
+| SM-GA-006 regression baseline | Passed locally on 2026-08-08 | Current implementation | 99 Python, 42 semantic eval, 42 frontend, 9 Playwright, schema check, TypeScript, build, Compose, 13 standards | Through `799a7db`; remote candidate TBD |
 
 ## Verified Existing Capability Ledger
 
@@ -28,16 +28,16 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 
 ## Known Contradictions at Program Start
 
-| ID | Contradiction | Resolution target |
-| --- | --- | --- |
-| C-001 | Runtime supports v0.2 circle/topology/constraint commands absent from `geometry_command.schema.json`. | SM-GA-001 |
-| C-002 | `selection_context.schema.json` omits circle entities, linked line endpoint IDs, profile source metadata/holes, and horizontal/vertical/coincident constraints. | SM-GA-001 |
-| C-003 | Command catalog/UI docs say standalone circles are unsupported while runtime and acceptance tests support them. | SM-GA-002 |
-| C-004 | Frontend treats an unset SketchMath flag as enabled; backend treats unset as disabled. | SM-GA-003 |
-| C-005 | Production build reports unused `sessionMetadata`. | SM-GA-004 |
-| C-006 | Local validated history is substantially ahead of the remote branch and includes unrelated FRIDAY commits. | SM-GA-005 |
-| C-007 | Automated camera movement passes, but prior manual CAD-like pan/tilt concern was never explicitly closed. | SM-VIEW-001 |
-| C-008 | Filesystem persistence plus process-local cache requires one backend worker. | SM-DOC-002 |
+| ID | Contradiction | State | Resolution target |
+| --- | --- | --- | --- |
+| C-001 | Runtime supports v0.2 circle/topology/constraint commands absent from `geometry_command.schema.json`. | Resolved | SM-GA-001 |
+| C-002 | `selection_context.schema.json` omits circle entities, linked line endpoint IDs, profile source metadata/holes, and horizontal/vertical/coincident constraints. | Resolved | SM-GA-001 |
+| C-003 | Command catalog/UI docs say standalone circles are unsupported while runtime and acceptance tests support them. | Resolved | SM-GA-002 |
+| C-004 | Frontend treats an unset SketchMath flag as enabled; backend treats unset as disabled. | Resolved | SM-GA-003 |
+| C-005 | Production build reports unused `sessionMetadata`. | Resolved | SM-GA-004 |
+| C-006 | Local validated history is substantially ahead of the remote branch and includes unrelated FRIDAY commits. | Active | SM-GA-005 |
+| C-007 | Automated camera movement passes, but prior manual CAD-like pan/tilt concern was never explicitly closed. | Deferred | SM-VIEW-001 |
+| C-008 | Filesystem persistence plus process-local cache requires one backend worker. | Deferred | SM-DOC-002 |
 
 ## Future Gate Summary
 

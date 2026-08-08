@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-08-08 - SketchMath Gate A Local Stabilization Candidate
+
+### What Changed
+- Established canonical full-product specification, traceability, living status, and phased execution-plan artifacts under `docs/sketchmath/` and `docs/tasks/`.
+- Closed the runtime command contract over versions `0.1` and `0.2`, added a matching TypeScript command union, generated the three checked-in JSON schemas from Pydantic models, and return structured `invalid_command` errors for undeclared versions/types.
+- Added semantic eval coverage for first-class circles, deterministic profile detection, and horizontal constraints; the suite now has 42 cases.
+- Reconciled command/UI documentation with implemented circle, topology, endpoint, and constraint behavior.
+- Aligned frontend and backend SketchMath feature gates to explicit default-off behavior and declared the build/runtime values in `.env.example`, Compose, and the frontend Dockerfile.
+- Removed unused `sessionMetadata` state so the SketchMath production build has no source warning.
+
+### Why
+- Gate A requires one reproducible, documented contract before solver/topology/feature expansion.
+- The prior frontend implicit-on/backend implicit-off behavior could advertise a workspace whose API was unavailable.
+- Generated schemas and closed command unions prevent runtime behavior from drifting ahead of public contracts again.
+
+### New Env Flags
+- No new flag names.
+- Canonical enablement now requires both `FRIDAY_SKETCHMATH_ENABLED=1` and `REACT_APP_SKETCHMATH_ENABLED=1`; both default to `0`.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 99 passed.
+- `PYTHONPATH=. python3 sketchmath/evals/run_sketchmath_evals.py --check` — 42 passed.
+- `PYTHONPATH=. python3 -m sketchmath.schemas.generate --check`.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand App.test.tsx SketchMathWorkspace.test.tsx` — 42 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npm run test:e2e -- sketchmath.spec.ts` — TypeScript/build passed; 9 browser workflows passed.
+- `docker compose config -q`.
+- `python3 -m pytest -q tests/test_codex_standards.py --noconftest` — 13 passed.
+
+### Remaining Gate A Work
+- Publish the deliberately reconstructed and revalidated SketchMath branch; record the resulting remote ref and commit before starting major geometry expansion.
+
+---
+
 ## Current Target
 Upgrade FRIDAY to Lexi-grade architecture patterns + modern multimodal capabilities:
 - tiered memory

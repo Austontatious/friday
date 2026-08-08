@@ -4,7 +4,7 @@ Updated: 2026-08-08
 
 Current phase: Phase 0 — stabilize and land
 
-Gate: Gate A in progress
+Gate: Gate A implementation passed locally; remote landing in progress
 
 ## Baseline
 
@@ -14,6 +14,7 @@ Gate: Gate A in progress
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
 - Local branch delta at program start: 68 commits ahead; 24 commits touch SketchMath code/docs/tests
+- Current local Gate A implementation commit: `799a7db`
 
 ## Implemented Capabilities
 
@@ -27,26 +28,34 @@ Gate: Gate A in progress
 - Persistent sessions and backend-authoritative undo/redo across reload.
 - Structured errors and Normal/Advanced UI separation.
 
-## Last Verified Regression Baseline
+## Current Gate A Validation
 
-On 2026-08-08 at `21b8153`:
+On 2026-08-08 through `799a7db`:
 
-- 93 focused Python tests passed.
-- 39 semantic eval cases passed.
-- 30 SketchMath frontend tests passed.
+- 99 focused Python tests passed.
+- 42 semantic eval cases passed.
+- 42 frontend tests passed across the FRIDAY shell and SketchMath workspace.
 - 9 live Playwright workflows passed with no test-reported console/page errors.
 - TypeScript compile passed.
-- Production frontend build passed with one actionable SketchMath warning: unused `sessionMetadata`.
+- Canonical generated schemas match the Pydantic models.
+- Production frontend build compiled successfully with no SketchMath source warning.
 - Docker Compose config passed.
 - 13 repository standards tests passed.
 
+The build still reports the repository-wide stale Browserslist database notice. Updating frontend dependency metadata is intentionally deferred from the SketchMath-only Gate A slice.
+
 ## Active Phase 0 Work
 
-1. Reconcile v0.1/v0.2 runtime, JSON schemas, frontend command types, docs, and eval contracts.
-2. Correct stale supported-envelope documentation.
-3. Make frontend/backend feature-gate defaults identical and explicit.
-4. Remove SketchMath-specific build warnings.
-5. Validate the complete Gate A regression suite.
+Completed locally:
+
+1. Reconciled v0.1/v0.2 runtime, generated JSON schemas, frontend command types, docs, and eval contracts.
+2. Corrected stale supported-envelope documentation.
+3. Made frontend/backend feature-gate defaults explicitly off and aligned deployment configuration.
+4. Removed the unused SketchMath frontend state/build warning.
+5. Passed the complete Gate A regression suite.
+
+Remaining:
+
 6. Land only the deliberate validated SketchMath baseline and record its remote commit.
 
 ## Known Limitations
