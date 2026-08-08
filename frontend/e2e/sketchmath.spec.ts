@@ -155,10 +155,13 @@ test.describe("SketchMath workspace", () => {
 
     await expect(page.locator('[data-testid^="entity-line_"]').first()).toBeAttached();
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 line");
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
+    await expect(page.getByTestId("sketchmath-solver-status-detail")).toContainText("can still move");
+    await expect(page.getByText(/Independent equations:/)).toHaveCount(0);
 
     await clickWorkbenchButton(page, "Apply length");
     await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("distance 17.5 mm");
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Constraints present");
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Partially analyzed");
 
     await page.getByRole("button", { name: "Line" }).first().click();
     await page.getByTestId("sketchmath-canvas").click({ position: { x: 180, y: 260 } });
@@ -182,6 +185,8 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("Equal length");
 
     await clickWorkbenchButton(page, "Show Advanced / Debug");
+    await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Coverage: partial");
+    await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Independent equations:");
     await page.getByRole("button", { name: "Show Advanced / Debug DSL" }).click();
     await expect(page.getByTestId("sketchmath-command-panel")).toBeVisible();
     await expect(page.getByTestId("sketchmath-command-box")).toBeVisible();
@@ -201,7 +206,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
     await expect(page.getByTestId("sketchmath-workbench-panel")).toContainText("Closed profile: valid");
     await expect(page.getByTestId("sketchmath-workbench-panel")).toContainText("Rectangle dimensions");
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Constraints present");
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Partially analyzed");
     await expect(page.getByTestId("sketchmath-workbench-panel")).toContainText("Ready for CAD feature");
     await page.screenshot({ path: screenshotPath("sketchmath-rectangle-after-create-selected.png"), fullPage: true });
     await page.getByRole("button", { name: "Dimension" }).first().click();
@@ -220,7 +225,7 @@ test.describe("SketchMath workspace", () => {
     await page.screenshot({ path: screenshotPath("sketchmath-dimension-edit-width.png"), fullPage: true });
     await page.getByRole("button", { name: "Apply dimension" }).click();
     await expect(widthLabel).toContainText("40 mm", { timeout: 20000 });
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Constraints present");
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Partially analyzed");
 
     await heightLabel.click();
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Rectangle height edge");

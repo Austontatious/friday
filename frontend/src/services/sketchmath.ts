@@ -80,6 +80,27 @@ export type SketchMathSelectionContext = {
   named_references: Record<string, string>;
 };
 
+export type SketchMathSolverAnalysis = {
+  schema_version: "1.0";
+  coverage: "exact" | "partial" | "unknown";
+  freedom_state: "under_constrained" | "fully_constrained" | "unknown";
+  consistency_state: "consistent" | "inconsistent" | "unknown";
+  redundancy_state: "none" | "redundant" | "unknown";
+  tracked_variable_count: number;
+  independent_equation_count: number;
+  remaining_dof: number | null;
+  remaining_tracked_dof_upper_bound: number;
+  fixed_entity_ids: string[];
+  supported_constraint_ids: string[];
+  unsupported_constraint_ids: string[];
+  invalid_constraint_ids: string[];
+  redundant_constraint_ids: string[];
+  conflicting_constraint_ids: string[];
+  unmodeled_entity_ids: string[];
+  diagnostics: string[];
+  tolerance_policy: Record<string, number | string>;
+};
+
 export const SKETCHMATH_COMMAND_TYPES = [
   "measure_distance",
   "measure_angle",

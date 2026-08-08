@@ -30,6 +30,7 @@ Gate: Gate A passed
 - Persistent sessions and backend-authoritative undo/redo across reload.
 - Structured errors and Normal/Advanced UI separation.
 - Versioned, non-mutating solver analysis with exact linear point-backed DOF and explicit partial/unknown coverage.
+- Live Normal-mode solver labels backed by that analysis, with rank/DOF internals kept under Advanced / Debug.
 
 ## Current Gate A Validation
 
@@ -53,7 +54,8 @@ The build still reports the repository-wide stale Browserslist database notice. 
 - Command `analyze_constraints` uses contract version `0.3`, is preview-only, and never enters history.
 - Exact rank-based analysis currently covers point-backed locked/fixed, horizontal, vertical, and coincident equations.
 - Nonlinear constraints and unmodeled geometry return honest partial/unknown results.
-- Current evidence: 106 focused Python tests, 43 semantic evals, 46 focused frontend tests, 9 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- The live workspace now refreshes non-mutating analysis after committed changes and reports Under/Fully/Over/Conflicting/Partially analyzed without exposing rank internals in Normal mode.
+- Current evidence: 106 focused Python tests, 43 semantic evals, 50 focused frontend tests, 9 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
 
 ## Gate A Outcome
 
@@ -90,7 +92,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Wire solver analysis into the live workspace, then extend the exact subset to radius/diameter and horizontal/vertical distance constraints before adding arcs.
+Extend the exact subset to radius/diameter and horizontal/vertical distance constraints, benchmark a permissive nonlinear backend, and converge analysis/mutation on one solve path before adding arcs.
 
 ## Release Status
 

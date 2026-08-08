@@ -22,6 +22,7 @@ import type {
   SketchMathProfileCandidate,
   SketchMathSelectionContext,
   SketchMathSessionSnapshot,
+  SketchMathSolverAnalysis,
   SketchMathTranslationOutcome,
 } from "../../services/sketchmath";
 import {
@@ -39,6 +40,7 @@ import {
 } from "../../services/sketchmath";
 import {
   buildAddProfileHoleCommand,
+  buildAnalyzeConstraintsCommand,
   buildDeleteEntityCommand,
   buildDefineLineCommand,
   buildDefinePointCommand,
@@ -130,6 +132,21 @@ const sketchmathInitialContext = (): SketchMathSelectionContext => ({
 });
 
 const asCommandText = (command: SketchMathCommand | null): string => (command ? JSON.stringify(command, null, 2) : "");
+
+const solverAnalysisFromMetadata = (value: unknown): SketchMathSolverAnalysis | null => {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<SketchMathSolverAnalysis>;
+  if (
+    candidate.schema_version !== "1.0" ||
+    !["exact", "partial", "unknown"].includes(String(candidate.coverage)) ||
+    !["under_constrained", "fully_constrained", "unknown"].includes(String(candidate.freedom_state)) ||
+    !["consistent", "inconsistent", "unknown"].includes(String(candidate.consistency_state)) ||
+    !["none", "redundant", "unknown"].includes(String(candidate.redundancy_state))
+  ) {
+    return null;
+  }
+  return candidate as SketchMathSolverAnalysis;
+};
 
 const isPointEntity = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "point_2d" }> => entity.type === "point_2d";
 
@@ -341,7 +358,9 @@ const SketchMathWorkspace = () => {
   const [rectangleDraft, setRectangleDraft] = useState<RectangleDraft | null>(null);
   const [circleDraft, setCircleDraft] = useState<CircleDraft | null>(null);
   const [profileCandidates, setProfileCandidates] = useState<SketchMathProfileCandidate[]>([]);
-  const [solverOutcome, setSolverOutcome] = useState<"Solved" | "Conflict" | "Solve failed" | null>(null);
+  const [solverOutcome, setSolverOutcome] = useState<"Conflict" | "Solve failed" | null>(null);
+  const [solverAnalysis, setSolverAnalysis] = useState<SketchMathSolverAnalysis | null>(null);
+  const [solverAnalysisError, setSolverAnalysisError] = useState<string | null>(null);
   const [dragPreviewPoint, setDragPreviewPoint] = useState<{ id: string; point: Point } | null>(null);
   const [tool, setTool] = useState<SketchMathMode>("select");
   const [workspaceViewMode, setWorkspaceViewMode] = useState<WorkspaceViewMode>("sketch");
@@ -384,6 +403,7 @@ const SketchMathWorkspace = () => {
   const dragPreviewTimerRef = useRef<number | null>(null);
   const ignoreNextCanvasClickRef = useRef(false);
   const profileCandidateRequestRef = useRef(0);
+  const solverAnalysisRequestRef = useRef(0);
   const notifiedArtifactPathsRef = useRef<Set<string>>(new Set());
   const lastSelectedHoleIdRef = useRef<string | null>(null);
 
@@ -393,6 +413,29 @@ const SketchMathWorkspace = () => {
 
   const appendEvents = useCallback((events: TelemetryEvent[]) => {
     setSystemEvents((previous) => [...[...events].reverse(), ...previous].slice(0, 16));
+  }, []);
+
+  const refreshSolverAnalysis = useCallback(async (activeSessionId: string) => {
+    const requestId = solverAnalysisRequestRef.current + 1;
+    solverAnalysisRequestRef.current = requestId;
+    try {
+      const response = await previewSketchMathCommand(activeSessionId, buildAnalyzeConstraintsCommand());
+      if (requestId !== solverAnalysisRequestRef.current) return;
+      const analysis = solverAnalysisFromMetadata(response.result.metadata.solver_analysis);
+      if (!analysis) {
+        setSolverAnalysis(null);
+        setSolverAnalysisError("The backend returned an invalid solver analysis payload.");
+        return;
+      }
+      setSolverAnalysis(analysis);
+      setSolverAnalysisError(null);
+      setSolverOutcome(null);
+    } catch (analysisError) {
+      if (requestId !== solverAnalysisRequestRef.current) return;
+      const detail = analysisError instanceof Error ? analysisError.message : "Solver analysis request failed.";
+      setSolverAnalysis(null);
+      setSolverAnalysisError(detail);
+    }
   }, []);
 
   const clearErrorState = () => {
@@ -495,6 +538,11 @@ const SketchMathWorkspace = () => {
       cancelled = true;
     };
   }, [appendEvents, enabled]);
+
+  useEffect(() => {
+    if (!sessionId || loading) return;
+    void refreshSolverAnalysis(sessionId);
+  }, [committedContext, loading, refreshSolverAnalysis, sessionId]);
 
   useEffect(() => {
     if (!cadExportPath || notifiedArtifactPathsRef.current.has(cadExportPath)) {
@@ -779,8 +827,44 @@ const SketchMathWorkspace = () => {
 
   const sketchStatus = useMemo(() => {
     if (solverOutcome) return solverOutcome;
-    return committedContext.constraints.length > 0 ? "Constraints present" : "No constraints";
-  }, [committedContext.constraints.length, solverOutcome]);
+    if (committedEntities.length === 0) return "No constraints";
+    if (!solverAnalysis) return solverAnalysisError ? "Analysis unavailable" : "Analyzing constraints…";
+    if (solverAnalysis.consistency_state === "inconsistent") return "Conflicting";
+    if (solverAnalysis.redundancy_state === "redundant") return "Over-constrained";
+    if (solverAnalysis.coverage !== "exact" || solverAnalysis.freedom_state === "unknown") return "Partially analyzed";
+    if (solverAnalysis.freedom_state === "fully_constrained") return "Fully constrained";
+    return "Under-constrained";
+  }, [committedEntities.length, solverAnalysis, solverAnalysisError, solverOutcome]);
+
+  const solverStatusDetail = useMemo(() => {
+    if (sketchStatus === "Fully constrained") return "All modeled movement is constrained.";
+    if (sketchStatus === "Under-constrained") return "Some modeled geometry can still move.";
+    if (sketchStatus === "Over-constrained") return "One or more constraints are redundant.";
+    if (sketchStatus === "Conflicting" || sketchStatus === "Conflict") return "Constraints disagree; resolve the conflict before committing dependent edits.";
+    if (sketchStatus === "Partially analyzed") return "Some geometry or constraints are outside exact solver coverage.";
+    if (sketchStatus === "Analysis unavailable") return "Live constraint analysis is temporarily unavailable.";
+    return null;
+  }, [sketchStatus]);
+
+  const solverAnalysisDebugLines = useMemo(() => {
+    if (!solverAnalysis) return solverAnalysisError ? [`Analysis error: ${solverAnalysisError}`] : ["No solver analysis received yet."];
+    return [
+      `Coverage: ${solverAnalysis.coverage}`,
+      `Freedom: ${solverAnalysis.freedom_state}`,
+      `Consistency: ${solverAnalysis.consistency_state}`,
+      `Redundancy: ${solverAnalysis.redundancy_state}`,
+      `Tracked variables: ${solverAnalysis.tracked_variable_count}`,
+      `Independent equations: ${solverAnalysis.independent_equation_count}`,
+      `Remaining DOF: ${solverAnalysis.remaining_dof ?? "unknown"}`,
+      `Tracked DOF upper bound: ${solverAnalysis.remaining_tracked_dof_upper_bound}`,
+      `Unsupported constraints: ${solverAnalysis.unsupported_constraint_ids.join(", ") || "none"}`,
+      `Invalid constraints: ${solverAnalysis.invalid_constraint_ids.join(", ") || "none"}`,
+      `Redundant constraints: ${solverAnalysis.redundant_constraint_ids.join(", ") || "none"}`,
+      `Conflicting constraints: ${solverAnalysis.conflicting_constraint_ids.join(", ") || "none"}`,
+      `Unmodeled entities: ${solverAnalysis.unmodeled_entity_ids.join(", ") || "none"}`,
+      ...(solverAnalysis.diagnostics.length ? solverAnalysis.diagnostics.map((diagnostic) => `Diagnostic: ${diagnostic}`) : []),
+    ];
+  }, [solverAnalysis, solverAnalysisError]);
 
   const dimensionSummary = useMemo(() => {
     const pointCount = committedEntities.filter((entity) => entity.type === "point_2d").length;
@@ -1076,7 +1160,7 @@ const SketchMathWorkspace = () => {
       } else if (["make_profile", "make_circle_profile"].includes(nextCommand.command_type)) {
         setProfileCandidates([]);
       }
-      if (nextCommand.command_type === "solve_constraints") setSolverOutcome("Solved");
+      if (nextCommand.command_type === "solve_constraints") setSolverOutcome(null);
       return response.result;
     } catch (err) {
       const { message, debugText } = normalizeCaughtError(err, "Command failed");
@@ -2620,6 +2704,11 @@ const SketchMathWorkspace = () => {
                 <Text data-testid="sketchmath-status" fontSize="sm" opacity={0.8}>
                   {sketchStatus}
                 </Text>
+                {solverStatusDetail ? (
+                  <Text data-testid="sketchmath-solver-status-detail" fontSize="xs" opacity={0.72}>
+                    {solverStatusDetail}
+                  </Text>
+                ) : null}
                 {constraintSummaries.length ? (
                   <Text fontSize="sm" opacity={0.75} whiteSpace="pre-wrap" data-testid="sketchmath-selected-constraints">
                     {constraintSummaries.join("\n")}
@@ -3047,6 +3136,12 @@ const SketchMathWorkspace = () => {
                 </HStack>
                 <Text fontSize="sm" opacity={0.75} mt={2}>
                   Shows raw point and line ids on the canvas for troubleshooting.
+                </Text>
+              </Box>
+              <Box className="sketchmath-panel" data-testid="sketchmath-solver-analysis-debug">
+                <Text fontWeight="600">Solver analysis</Text>
+                <Text fontSize="sm" opacity={0.78} mt={2} whiteSpace="pre-wrap">
+                  {solverAnalysisDebugLines.join("\n")}
                 </Text>
               </Box>
               <SelectionInspector

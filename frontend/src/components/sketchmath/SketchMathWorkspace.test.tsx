@@ -44,7 +44,7 @@ jest.mock("@chakra-ui/react", () => {
 
 type Entity =
   | { id: string; type: "point_2d"; coords: [number, number]; locked: boolean; label?: string | null }
-  | { id: string; type: "line_2d"; start: [number, number]; end: [number, number]; locked: boolean; label?: string | null }
+  | { id: string; type: "line_2d"; start: [number, number]; end: [number, number]; start_point_id?: string | null; end_point_id?: string | null; locked: boolean; label?: string | null }
   | { id: string; type: "circle_2d"; center: [number, number]; radius: number; center_point_id?: string | null; locked: boolean; label?: string | null }
   | {
       id: string;
@@ -56,6 +56,8 @@ type Entity =
       closed: boolean;
       locked: boolean;
       holes?: string[];
+      source_line_ids?: string[];
+      source_circle_id?: string | null;
       label?: string | null;
     };
 
@@ -143,7 +145,7 @@ const makeResponse = (payload: any) => ({
   headers: { get: () => "application/json" },
 });
 
-const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfileHoleDependency?: boolean } = {}) => {
+const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfileHoleDependency?: boolean; solverAnalysis?: Record<string, unknown> } = {}) => {
   let snapshot = baseSnapshot();
 
   const replaceNamedReference = (entityId: string, label: string | null | undefined) => {
@@ -249,6 +251,8 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       type: "line_2d",
       start: command.parameters.start,
       end: command.parameters.end,
+      start_point_id: command.parameters.start_point_id || null,
+      end_point_id: command.parameters.end_point_id || null,
       locked: !!command.parameters.locked,
       label: command.parameters.label || null,
     };
@@ -370,6 +374,7 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       closed: vertices.length >= 3,
       locked: false,
       label: command.parameters.name || null,
+      source_line_ids: selected.filter((item): item is Extract<Entity, { type: "line_2d" }> => item.type === "line_2d").map((item) => item.id),
     };
     const nextItems = [...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity];
     return setSnapshot(nextItems, [entity.id], command, mutate);
@@ -408,6 +413,54 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
       return { ...item, coords: coordsBySuffix[suffix] || item.coords };
     });
     return setSnapshot(nextItems as Entity[], [], command, mutate);
+  };
+
+  const analyzeConstraints = (command: any) => {
+    const points = snapshot.selection_context.items.filter((item): item is Extract<Entity, { type: "point_2d" }> => item.type === "point_2d");
+    const supportedTypes = new Set(["fixed_point_constraint", "horizontal_constraint", "vertical_constraint", "coincident_constraint"]);
+    const unsupportedConstraintIds = snapshot.selection_context.constraints
+      .filter((constraint) => !supportedTypes.has(String(constraint.type)))
+      .map((constraint) => String(constraint.id));
+    const unmodeledEntityIds = snapshot.selection_context.items
+      .filter((item) => {
+        if (item.type === "point_2d") return false;
+        if (item.type === "line_2d") return !item.start_point_id || !item.end_point_id;
+        if (item.type === "profile_2d") return !(item.source_line_ids?.length || item.source_circle_id);
+        return true;
+      })
+      .map((item) => item.id);
+    const fixedCount = points.filter((point) => point.locked).length;
+    const supportedEquationCount = snapshot.selection_context.constraints.reduce((count, constraint) => {
+      if (constraint.type === "fixed_point_constraint" || constraint.type === "coincident_constraint") return count + 2;
+      if (constraint.type === "horizontal_constraint" || constraint.type === "vertical_constraint") return count + 1;
+      return count;
+    }, fixedCount * 2);
+    const exact = unsupportedConstraintIds.length === 0 && unmodeledEntityIds.length === 0;
+    const remainingDof = exact ? Math.max(0, points.length * 2 - supportedEquationCount) : null;
+    const analysis = {
+      schema_version: "1.0",
+      coverage: exact ? "exact" : points.length ? "partial" : "unknown",
+      freedom_state: exact ? (remainingDof === 0 ? "fully_constrained" : "under_constrained") : "unknown",
+      consistency_state: exact ? "consistent" : "unknown",
+      redundancy_state: exact ? "none" : "unknown",
+      tracked_variable_count: points.length * 2,
+      independent_equation_count: supportedEquationCount,
+      remaining_dof: remainingDof,
+      remaining_tracked_dof_upper_bound: Math.max(0, points.length * 2 - supportedEquationCount),
+      fixed_entity_ids: points.filter((point) => point.locked).map((point) => point.id),
+      supported_constraint_ids: snapshot.selection_context.constraints.filter((constraint) => supportedTypes.has(String(constraint.type))).map((constraint) => String(constraint.id)),
+      unsupported_constraint_ids: unsupportedConstraintIds,
+      invalid_constraint_ids: [],
+      redundant_constraint_ids: [],
+      conflicting_constraint_ids: [],
+      unmodeled_entity_ids: unmodeledEntityIds,
+      diagnostics: exact ? [] : ["Fixture contains geometry or constraints outside exact analysis coverage."],
+      tolerance_policy: { version: "1.0", coordinate_abs_mm: 1e-9, scalar_rel: 1e-9, linear_rank_abs: 1e-10 },
+      ...options.solverAnalysis,
+    };
+    const response = setSnapshot(snapshot.selection_context.items, [], command, false);
+    response.result.metadata = { solver_analysis: analysis };
+    return response;
   };
 
   const setRectangleDimension = (command: any, mutate: boolean) => {
@@ -660,7 +713,7 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
           const angle = (index % 16) * Math.PI * 2 / 16;
           return [circle.center[0] + circle.radius * Math.cos(angle), circle.center[1] + circle.radius * Math.sin(angle)] as [number, number];
         });
-        const entity: Entity = { id: command.parameters.name || `profile_${circle.id}`, type: "profile_2d", vertices, area: Math.PI * circle.radius ** 2, winding: "counterclockwise", warnings: [], closed: true, locked: false, holes: [] };
+        const entity: Entity = { id: command.parameters.name || `profile_${circle.id}`, type: "profile_2d", vertices, area: Math.PI * circle.radius ** 2, winding: "counterclockwise", warnings: [], closed: true, locked: false, holes: [], source_circle_id: circle.id };
         return makeResponse(setSnapshot([...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity], [entity.id], command, mutate));
       }
       if (command.command_type === "delete_entity") {
@@ -733,6 +786,9 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
         const response = setSnapshot(snapshot.selection_context.items, [], command, false);
         response.result.metadata = { profile_candidates: [] };
         return makeResponse(response);
+      }
+      if (command.command_type === "analyze_constraints") {
+        return makeResponse(analyzeConstraints(command));
       }
       if (command.command_type === "solve_constraints") {
         return makeResponse(solveConstraints(command, mutate));
@@ -875,7 +931,7 @@ describe("SketchMath workspace", () => {
     await waitFor(() =>
       expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("distance 17.5 mm"),
     );
-    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Constraints present");
+    await waitFor(() => expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Partially analyzed"));
 
     stamp.value = 1710000001000;
     await userEvent.click(screen.getByRole("button", { name: "Line" }));
@@ -896,6 +952,56 @@ describe("SketchMath workspace", () => {
     await userEvent.click(screen.getByRole("button", { name: "Select" }));
     clickCanvasAt(canvas, 620, 520);
     await waitFor(() => expect(screen.getByTestId("sketchmath-selection-summary")).toHaveTextContent("Nothing selected."));
+  });
+
+  it.each([
+    ["Fully constrained", { coverage: "exact", freedom_state: "fully_constrained", consistency_state: "consistent", redundancy_state: "none", remaining_dof: 0 }],
+    ["Over-constrained", { coverage: "exact", freedom_state: "fully_constrained", consistency_state: "consistent", redundancy_state: "redundant", remaining_dof: 0, redundant_constraint_ids: ["constraint_redundant"] }],
+    ["Conflicting", { coverage: "exact", freedom_state: "unknown", consistency_state: "inconsistent", redundancy_state: "none", remaining_dof: null, conflicting_constraint_ids: ["constraint_conflict"] }],
+  ])("shows the live %s solver state in Normal mode", async (expectedStatus, solverAnalysis) => {
+    const { fetchMock } = createSketchmathMock({ solverAnalysis });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 380, 120);
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-status")).toHaveTextContent(expectedStatus));
+    expect(screen.queryByText(/Independent equations:/)).toBeNull();
+  });
+
+  it("keeps solver internals Advanced-only while explaining partial coverage normally", async () => {
+    const { fetchMock } = createSketchmathMock({
+      solverAnalysis: {
+        coverage: "partial",
+        freedom_state: "unknown",
+        consistency_state: "unknown",
+        redundancy_state: "unknown",
+        remaining_dof: null,
+        unsupported_constraint_ids: ["constraint_distance"],
+        diagnostics: ["Nonlinear constraints prevent exact classification."],
+      },
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    clickCanvasAt(canvas, 160, 120);
+    clickCanvasAt(canvas, 380, 120);
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-status")).toHaveTextContent("Partially analyzed"));
+    expect(screen.getByTestId("sketchmath-solver-status-detail")).toHaveTextContent("outside exact solver coverage");
+    expect(screen.queryByText(/Independent equations:/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /Show Advanced \/ Debug/ }));
+    expect(await screen.findByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("Independent equations:");
+    expect(screen.getByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("constraint_distance");
+    expect(screen.getByTestId("sketchmath-solver-analysis-debug")).toHaveTextContent("Nonlinear constraints prevent exact classification.");
   });
 
   it("creates a parametric rectangle from two clicks and keeps the workbench CAD-ready", async () => {
@@ -939,7 +1045,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId(`dimension-${baseId}-height`)).toHaveTextContent("100 mm");
     expect(screen.getByTestId(`dimension-guide-${baseId}-width`)).toBeVisible();
     expect(screen.getByTestId(`dimension-guide-${baseId}-height`)).toBeVisible();
-    expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Constraints present");
+    await waitFor(() => expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Partially analyzed"));
     expect(screen.getByTestId(`rectangle-selection-outline-${baseId}`)).toBeVisible();
 
     fireEvent.change(screen.getByLabelText("Rectangle width"), { target: { value: "40" } });
@@ -1043,7 +1149,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Selected: Rectangle width edge");
     expect(screen.queryByTestId("sketchmath-preview-controls")).toBeNull();
     await waitFor(() =>
-      expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Constraints present"),
+      expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Partially analyzed"),
     );
 
     await userEvent.click(screen.getByTestId(`dimension-${baseId}-height`));
@@ -1265,7 +1371,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByRole("button", { name: "Fix corner" })).toBeEnabled();
   });
 
-  it("anchors a rectangle corner and reports fully defined status honestly", async () => {
+  it("anchors a rectangle corner without overstating partial solver coverage", async () => {
     const { fetchMock } = createSketchmathMock();
     global.fetch = fetchMock as unknown as typeof fetch;
     renderWorkspace();
@@ -1282,7 +1388,7 @@ describe("SketchMath workspace", () => {
     await userEvent.click(screen.getByRole("button", { name: "Fix corner" }));
 
     await waitFor(() =>
-      expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Constraints present"),
+      expect(within(workbench).getByTestId("sketchmath-status")).toHaveTextContent("Partially analyzed"),
     );
     expect(screen.getByTestId("sketchmath-workbench-panel")).toHaveTextContent("Anchored at corner A");
   });

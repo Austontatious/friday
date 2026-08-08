@@ -50,6 +50,15 @@ The backend remains the source of truth for committed geometry and history repla
 
 The default workspace is canvas-first and hides raw command JSON, proposed command JSON, backend error payloads, internal point/line IDs, system events, and other DSL internals unless the advanced view is opened explicitly. Normal errors are shown as short user-facing messages; raw backend details stay in `Error details` under Advanced / Debug.
 
+## Live Solver Status
+
+- The workspace requests the preview-only `analyze_constraints` command after the committed session changes. Analysis does not mutate geometry or enter undo/redo history.
+- Normal mode reports `Under-constrained`, `Fully constrained`, `Over-constrained`, `Conflicting`, or `Partially analyzed` with a short user-facing explanation.
+- `Partially analyzed` is intentional when geometry or constraints fall outside the analyzer's exact subset. It must not be presented as fully constrained merely because a closed-form edit succeeded.
+- Request failures report `Analysis unavailable`; an in-flight analysis reports `Analyzing constraints…`.
+- Raw coverage, rank/equation counts, remaining DOF, affected constraint/entity IDs, and diagnostics are visible only under Advanced / Debug.
+- A successful `solve_constraints` command does not display a generic `Solved` badge. The live analysis result remains the authority for the status label.
+
 ## Supported Tools
 
 - Primary canvas modes: Select, Draw rectangle, Circle, Add hole, Pan / view.

@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-08 - SketchMath Live Solver State
+
+### What Changed
+- Wired the preview-only `analyze_constraints` result into the actual SketchMath workspace after committed session changes.
+- Replaced the generic constraint badge with honest Normal-mode states: Under-constrained, Fully constrained, Over-constrained, Conflicting, and Partially analyzed.
+- Kept equation counts, remaining DOF, raw IDs, and diagnostics under Advanced / Debug.
+- Removed the misleading generic `Solved` outcome; the analysis response is authoritative after solve commands.
+- Added frontend fixtures for exact, redundant, inconsistent, and partial states plus a live backend/browser assertion for under-constrained and partial systems.
+
+### Why
+- A successful geometry mutation is not proof that a sketch is fully constrained.
+- Gate B requires solver state to be visible in the real product while unsupported nonlinear systems remain explicitly partial.
+
+### New Env Flags
+- None. Live analysis remains behind the existing default-off SketchMath product gate.
+
+### How To Test
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand SketchMathWorkspace.test.tsx` — 34 passed.
+- `cd frontend && npx tsc --noEmit`.
+- `cd frontend && npx playwright test e2e/sketchmath.spec.ts --grep "draws geometry"` — 1 passed against the live backend.
+- Full regression commands and counts are recorded in `docs/sketchmath/status.md` after validation.
+
+### Remaining Phase 1 Work
+- Add driving horizontal/vertical distance and radius/diameter constraints, benchmark the nonlinear backend, unify solve paths, then add canonical arcs and the remaining Gate B constraints.
+
+---
+
 ## 2026-08-08 - SketchMath Phase 1 Solver Analysis Foundation
 
 ### What Changed
