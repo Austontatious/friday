@@ -47,6 +47,7 @@ from sketchmath.geometry.topology import detect_line_profiles
 from sketchmath.models.geometry_command import GeometryCommand, SUPPORTED_GEOMETRY_COMMAND_TYPES
 from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
+from sketchmath.solver.analysis import analyze_constraint_system
 
 from .errors import (
     CadExportError,
@@ -136,6 +137,7 @@ def apply_geometry_command(
         "make_equal_length": _handle_make_equal_length,
         "make_equal_angle": _handle_make_equal_angle,
         "solve_constraints": _handle_solve_constraints,
+        "analyze_constraints": _handle_analyze_constraints,
         "make_profile": _handle_make_profile,
         "add_profile_hole": _handle_add_profile_hole,
         "update_profile_hole": _handle_update_profile_hole,
@@ -756,6 +758,16 @@ def _handle_solve_constraints(command: GeometryCommand, state: SelectionContext)
             detail={"constraint_ids": unresolved},
         )
     return current, _dedupe(changed), None, None, {"solved_constraints": [constraint.id for constraint in constraints]}
+
+
+def _handle_analyze_constraints(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    if command.mode != "preview":
+        raise CommandValidationError(
+            "analyze_constraints is a non-mutating preview command",
+            detail={"command_type": command.command_type, "mode": command.mode},
+        )
+    analysis = analyze_constraint_system(state)
+    return state, [], None, None, {"solver_analysis": analysis.model_dump(mode="json")}
 
 
 def _handle_make_profile(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:

@@ -99,6 +99,7 @@ export const SKETCHMATH_COMMAND_TYPES = [
   "make_vertical",
   "make_coincident",
   "solve_constraints",
+  "analyze_constraints",
   "move_point",
   "detect_profiles",
   "make_profile",
@@ -120,7 +121,7 @@ export const SKETCHMATH_COMMAND_TYPES = [
 export type SketchMathCommandType = typeof SKETCHMATH_COMMAND_TYPES[number];
 
 export type SketchMathCommand = {
-  version: "0.1" | "0.2";
+  version: "0.1" | "0.2" | "0.3";
   command_id: string;
   mode?: "preview" | "commit";
   command_type: SketchMathCommandType;

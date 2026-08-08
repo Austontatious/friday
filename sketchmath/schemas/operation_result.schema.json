@@ -623,6 +623,7 @@
             "make_vertical",
             "make_coincident",
             "solve_constraints",
+            "analyze_constraints",
             "move_point",
             "detect_profiles",
             "make_profile",
@@ -668,7 +669,8 @@
           "default": "0.1",
           "enum": [
             "0.1",
-            "0.2"
+            "0.2",
+            "0.3"
           ],
           "title": "Version",
           "type": "string"

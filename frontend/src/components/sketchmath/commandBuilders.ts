@@ -126,6 +126,11 @@ export const buildDeleteEntityCommand = (selection: string[], cascade = false): 
 export const buildSolveConstraintsCommand = (constraintIds?: string[]): SketchMathCommand =>
   baseCommand("solve_constraints", [], constraintIds ? { constraint_ids: constraintIds } : {});
 
+export const buildAnalyzeConstraintsCommand = (): SketchMathCommand => ({
+  ...baseCommand("analyze_constraints", [], {}),
+  version: "0.3",
+});
+
 export const buildBatchCommand = (commands: SketchMathCommand[]): SketchMathCommand =>
   baseCommand("batch", [], {
     commands: commands.map((command) => command),

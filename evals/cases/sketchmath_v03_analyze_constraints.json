@@ -1,0 +1,41 @@
+{
+  "name": "sketchmath_v03_analyze_constraints",
+  "input": {
+    "command": {
+      "version": "0.3",
+      "command_id": "cmd_eval_analyze",
+      "mode": "preview",
+      "command_type": "analyze_constraints",
+      "selection": [],
+      "parameters": {}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_analyze",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "point_a", "type": "point_2d", "coords": [0.0, 0.0], "locked": true},
+        {"id": "point_b", "type": "point_2d", "coords": [4.0, 0.0]}
+      ],
+      "constraints": [
+        {"id": "constraint_horizontal", "type": "horizontal_constraint", "points": ["point_a", "point_b"]}
+      ],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "preview",
+    "changed_entity_ids": [],
+    "metadata": {
+      "solver_analysis": {
+        "coverage": "exact",
+        "freedom_state": "under_constrained",
+        "consistency_state": "consistent",
+        "tracked_variable_count": 4,
+        "independent_equation_count": 3,
+        "remaining_dof": 1,
+        "supported_constraint_ids": ["constraint_horizontal"]
+      }
+    }
+  }
+}

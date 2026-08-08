@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sketchmath.models.geometry_command import GeometryCommand
 from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
+from sketchmath.models.solver_analysis import SolverAnalysis
 
 
 SchemaModel: TypeAlias = type[BaseModel]
@@ -17,6 +18,7 @@ SCHEMA_MODELS: dict[str, SchemaModel] = {
     "geometry_command.schema.json": GeometryCommand,
     "selection_context.schema.json": SelectionContext,
     "operation_result.schema.json": OperationResult,
+    "solver_analysis.schema.json": SolverAnalysis,
 }
 SCHEMA_ROOT = Path(__file__).resolve().parent
 

@@ -1,7 +1,7 @@
 {
-  "case_count": 41,
+  "case_count": 42,
   "failed": 0,
-  "passed": 41,
+  "passed": 42,
   "results": [
     {
       "diagnostic": "ok",
@@ -2758,6 +2758,60 @@
           "history_length": 1
         },
         "status": "committed",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v03_analyze_constraints",
+      "path": "evals/cases/sketchmath_v03_analyze_constraints.json",
+      "result": {
+        "after": {
+          "point_a": [
+            0.0,
+            0.0
+          ],
+          "point_b": [
+            4.0,
+            0.0
+          ]
+        },
+        "changed_entity_ids": [],
+        "metadata": {
+          "history_length": 0,
+          "solver_analysis": {
+            "conflicting_constraint_ids": [],
+            "consistency_state": "consistent",
+            "coverage": "exact",
+            "diagnostics": [],
+            "fixed_entity_ids": [
+              "point_a"
+            ],
+            "freedom_state": "under_constrained",
+            "independent_equation_count": 3,
+            "invalid_constraint_ids": [],
+            "redundancy_state": "none",
+            "redundant_constraint_ids": [],
+            "remaining_dof": 1,
+            "remaining_tracked_dof_upper_bound": 1,
+            "schema_version": "1.0",
+            "supported_constraint_ids": [
+              "constraint_horizontal"
+            ],
+            "tolerance_policy": {
+              "coordinate_abs_mm": 1e-09,
+              "linear_rank_abs": 1e-10,
+              "scalar_rel": 1e-09,
+              "version": "1.0"
+            },
+            "tracked_variable_count": 4,
+            "unmodeled_entity_ids": [],
+            "unsupported_constraint_ids": []
+          }
+        },
+        "status": "preview",
         "unit": null,
         "value": null
       },

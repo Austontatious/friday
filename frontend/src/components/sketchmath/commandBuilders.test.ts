@@ -1,5 +1,6 @@
 import {
   buildAddProfileHoleCommand,
+  buildAnalyzeConstraintsCommand,
   buildDeleteEntityCommand,
   buildExtrudeProfileCommand,
   buildSetLengthCommand,
@@ -12,7 +13,7 @@ describe("SketchMath command builders", () => {
   it("generates a valid set length GeometryCommand", () => {
     const command = buildSetLengthCommand(["point_A", "point_B"], 17.5, "mm");
 
-    expect(command.version).toBe("0.1");
+    expect(command.version).toBe("0.2");
     expect(command.command_type).toBe("set_distance");
     expect(command.selection).toEqual(["point_A", "point_B"]);
     expect(command.parameters.distance).toBe(17.5);
@@ -87,5 +88,15 @@ describe("SketchMath command builders", () => {
 
     expect(command.command_type).toBe("translate");
     expect(command.parameters.vector).toEqual([3, -1]);
+  });
+
+  it("generates a preview-only v0.3 solver analysis command", () => {
+    const command = buildAnalyzeConstraintsCommand();
+
+    expect(command.version).toBe("0.3");
+    expect(command.mode).toBe("preview");
+    expect(command.command_type).toBe("analyze_constraints");
+    expect(command.selection).toEqual([]);
+    expect(command.parameters).toEqual({});
   });
 });
