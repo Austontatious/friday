@@ -89,6 +89,13 @@ def test_checked_in_sketchmath_schemas_match_canonical_models() -> None:
     assert schema_drift() == []
 
 
+def test_solver_run_result_schema_declares_neutral_patch_and_feasibility_contract() -> None:
+    schema_text = Path("sketchmath/schemas/solver_run_result.schema.json").read_text(encoding="utf-8")
+
+    for field in ("backend", "outcome", "proposed_patch", "feasible", "residual_norm", "analysis_before", "analysis_after"):
+        assert f'"{field}"' in schema_text
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [("version", "9.9"), ("command_type", "unsupported")],

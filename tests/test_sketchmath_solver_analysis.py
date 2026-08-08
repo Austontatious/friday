@@ -215,6 +215,9 @@ def test_analyze_command_is_preview_only_and_does_not_enter_history() -> None:
 
     assert result.changed_entity_ids == []
     assert result.metadata["solver_analysis"]["remaining_dof"] == 2
+    assert result.metadata["solver_run"]["mode"] == "analyze"
+    assert result.metadata["solver_run"]["outcome"] == "analyzed"
+    assert result.metadata["solver_run"]["proposed_patch"] == []
     assert session.history.records == []
 
     with pytest.raises(CommandValidationError):

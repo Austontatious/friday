@@ -229,6 +229,21 @@ def test_v04_driving_axis_and_circle_dimensions_round_trip_through_api(monkeypat
     assert circle["radius"] == 15.0
     assert diameter.json()["result"]["after"]["constraints"][1]["type"] == "diameter_constraint"
 
+    analyze_command = _command("analyze_constraints", "unified_analysis")
+    analyze_command["version"] = "0.3"
+    analysis = client.post(f"/api/sketchmath/sessions/{session_id}/commands/preview", json={"command": analyze_command})
+    assert analysis.status_code == 200
+    assert analysis.json()["result"]["metadata"]["solver_run"]["outcome"] == "analyzed"
+    assert analysis.json()["result"]["metadata"]["solver_run"]["backend"] == "closed_form_v1"
+
+    solve = client.post(
+        f"/api/sketchmath/sessions/{session_id}/commands/preview",
+        json={"command": _command("solve_constraints", "unified_solve_preview")},
+    )
+    assert solve.status_code == 200
+    assert solve.json()["result"]["metadata"]["solver_run"]["outcome"] == "solved"
+    assert solve.json()["result"]["metadata"]["solver_run"]["analysis_after"]["coverage"] == "exact"
+
     snapshot = client.get(f"/api/sketchmath/sessions/{session_id}")
     assert snapshot.status_code == 200
     assert snapshot.json()["history_length"] == 2

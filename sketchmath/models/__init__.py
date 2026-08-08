@@ -24,6 +24,7 @@ from .geometry_command import GeometryCommand
 from .cad_export import CadExportArtifacts, CadExportMeasurements, CadExportResult
 from .operation_result import OperationResult
 from .selection_context import SelectionContext
+from .solver_run_result import SolverCoordinatePatch, SolverRunResult
 
 __all__ = [
     "Axis2DEntity",
@@ -49,5 +50,7 @@ __all__ = [
     "Point2DEntity",
     "SelectionContext",
     "SelectionEntity",
+    "SolverCoordinatePatch",
+    "SolverRunResult",
     "VerticalDistanceConstraint",
 ]

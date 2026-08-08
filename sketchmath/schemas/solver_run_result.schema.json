@@ -1,0 +1,299 @@
+{
+  "$defs": {
+    "SolverAnalysis": {
+      "additionalProperties": false,
+      "properties": {
+        "conflicting_constraint_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conflicting Constraint Ids",
+          "type": "array"
+        },
+        "consistency_state": {
+          "enum": [
+            "consistent",
+            "inconsistent",
+            "unknown"
+          ],
+          "title": "Consistency State",
+          "type": "string"
+        },
+        "coverage": {
+          "enum": [
+            "exact",
+            "partial",
+            "unknown"
+          ],
+          "title": "Coverage",
+          "type": "string"
+        },
+        "diagnostics": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Diagnostics",
+          "type": "array"
+        },
+        "fixed_entity_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fixed Entity Ids",
+          "type": "array"
+        },
+        "freedom_state": {
+          "enum": [
+            "under_constrained",
+            "fully_constrained",
+            "unknown"
+          ],
+          "title": "Freedom State",
+          "type": "string"
+        },
+        "independent_equation_count": {
+          "minimum": 0,
+          "title": "Independent Equation Count",
+          "type": "integer"
+        },
+        "invalid_constraint_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Invalid Constraint Ids",
+          "type": "array"
+        },
+        "redundancy_state": {
+          "enum": [
+            "none",
+            "redundant",
+            "unknown"
+          ],
+          "title": "Redundancy State",
+          "type": "string"
+        },
+        "redundant_constraint_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Redundant Constraint Ids",
+          "type": "array"
+        },
+        "remaining_dof": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remaining Dof"
+        },
+        "remaining_tracked_dof_upper_bound": {
+          "minimum": 0,
+          "title": "Remaining Tracked Dof Upper Bound",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "supported_constraint_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Supported Constraint Ids",
+          "type": "array"
+        },
+        "tolerance_policy": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Tolerance Policy",
+          "type": "object"
+        },
+        "tracked_variable_count": {
+          "minimum": 0,
+          "title": "Tracked Variable Count",
+          "type": "integer"
+        },
+        "unmodeled_entity_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unmodeled Entity Ids",
+          "type": "array"
+        },
+        "unsupported_constraint_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unsupported Constraint Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coverage",
+        "freedom_state",
+        "consistency_state",
+        "redundancy_state",
+        "tracked_variable_count",
+        "independent_equation_count",
+        "remaining_tracked_dof_upper_bound",
+        "tolerance_policy"
+      ],
+      "title": "SolverAnalysis",
+      "type": "object"
+    },
+    "SolverCoordinatePatch": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "additionalProperties": true,
+          "title": "After",
+          "type": "object"
+        },
+        "before": {
+          "additionalProperties": true,
+          "title": "Before",
+          "type": "object"
+        },
+        "entity_id": {
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "entity_type": {
+          "title": "Entity Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entity_id",
+        "entity_type",
+        "before",
+        "after"
+      ],
+      "title": "SolverCoordinatePatch",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "analysis_after": {
+      "$ref": "#/$defs/SolverAnalysis"
+    },
+    "analysis_before": {
+      "$ref": "#/$defs/SolverAnalysis"
+    },
+    "backend": {
+      "title": "Backend",
+      "type": "string"
+    },
+    "changed_entity_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Changed Entity Ids",
+      "type": "array"
+    },
+    "diagnostics": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Diagnostics",
+      "type": "array"
+    },
+    "feasible": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Feasible"
+    },
+    "mode": {
+      "enum": [
+        "analyze",
+        "solve"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "analyzed",
+        "solved",
+        "under_constrained",
+        "inconsistent",
+        "redundant",
+        "failed"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "proposed_patch": {
+      "items": {
+        "$ref": "#/$defs/SolverCoordinatePatch"
+      },
+      "title": "Proposed Patch",
+      "type": "array"
+    },
+    "requested_constraint_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Requested Constraint Ids",
+      "type": "array"
+    },
+    "residual_norm": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Residual Norm"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "termination_reason": {
+      "title": "Termination Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "backend",
+    "mode",
+    "outcome",
+    "termination_reason",
+    "analysis_before",
+    "analysis_after"
+  ],
+  "title": "SolverRunResult",
+  "type": "object"
+}

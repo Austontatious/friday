@@ -188,6 +188,8 @@ def test_under_constrained_solve_returns_structured_error() -> None:
         session.execute(_command("solve_constraints", "cmd_under", mode="commit"))
 
     assert exc_info.value.to_dict()["code"] == "clarification_required"
+    assert exc_info.value.detail["solver_run"]["outcome"] == "under_constrained"
+    assert exc_info.value.detail["solver_run"]["feasible"] is None
 
 
 def test_over_constrained_solve_returns_structured_error() -> None:
@@ -239,6 +241,61 @@ def test_driving_axis_distances_update_geometry_and_resolve_exactly() -> None:
         "horizontal_distance_constraint",
         "vertical_distance_constraint",
     ]
+
+
+def test_unified_solve_run_returns_analysis_and_deterministic_patch() -> None:
+    session = _session(
+        [
+            {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": True},
+            {"id": "point_B", "type": "point_2d", "coords": [2, 3], "locked": False},
+        ],
+        constraints=[
+            {
+                "id": "horizontal_distance",
+                "type": "horizontal_distance_constraint",
+                "points": ["point_A", "point_B"],
+                "distance": 8,
+                "unit": "mm",
+                "direction": 1,
+                "anchor": "point_a",
+            }
+        ],
+    )
+
+    result = session.execute(_command("solve_constraints", "unified_solve", mode="commit"))
+    run = result.metadata["solver_run"]
+
+    assert result.after.get_entity("point_B").coords == pytest.approx((8, 3))
+    assert run["backend"] == "closed_form_v1"
+    assert run["mode"] == "solve"
+    assert run["outcome"] == "solved"
+    assert run["feasible"] is True
+    assert run["residual_norm"] is None
+    assert run["analysis_before"]["coverage"] == "exact"
+    assert run["analysis_after"]["coverage"] == "exact"
+    assert [patch["entity_id"] for patch in run["proposed_patch"]] == ["point_B"]
+    assert run["proposed_patch"][0]["before"]["coords"] == [2.0, 3.0]
+    assert run["proposed_patch"][0]["after"]["coords"] == [8.0, 3.0]
+
+
+def test_unified_solve_rejects_exact_inconsistent_system_before_mutation() -> None:
+    session = _session(
+        [
+            {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": True},
+            {"id": "point_B", "type": "point_2d", "coords": [2, 3], "locked": True},
+        ],
+        constraints=[
+            {"id": "horizontal", "type": "horizontal_constraint", "points": ["point_A", "point_B"]},
+        ],
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        session.execute(_command("solve_constraints", "inconsistent", mode="commit"))
+
+    assert exc_info.value.to_dict()["code"] == "solver_error"
+    assert exc_info.value.detail["solver_run"]["outcome"] == "inconsistent"
+    assert exc_info.value.detail["solver_run"]["proposed_patch"] == []
+    assert session.state.get_entity("point_B").coords == pytest.approx((2, 3))
 
 
 def test_radius_and_diameter_commands_drive_circle_and_replace_prior_dimension() -> None:

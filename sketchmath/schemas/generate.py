@@ -11,6 +11,7 @@ from sketchmath.models.geometry_command import GeometryCommand
 from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
 from sketchmath.models.solver_analysis import SolverAnalysis
+from sketchmath.models.solver_run_result import SolverRunResult
 
 
 SchemaModel: TypeAlias = type[BaseModel]
@@ -19,6 +20,7 @@ SCHEMA_MODELS: dict[str, SchemaModel] = {
     "selection_context.schema.json": SelectionContext,
     "operation_result.schema.json": OperationResult,
     "solver_analysis.schema.json": SolverAnalysis,
+    "solver_run_result.schema.json": SolverRunResult,
 }
 SCHEMA_ROOT = Path(__file__).resolve().parent
 

@@ -51,6 +51,7 @@ from sketchmath.geometry.topology import detect_line_profiles
 from sketchmath.models.geometry_command import GeometryCommand, SUPPORTED_GEOMETRY_COMMAND_TYPES
 from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
+from sketchmath.models.solver_run_result import SolverCoordinatePatch, SolverRunResult
 from sketchmath.solver.analysis import analyze_constraint_system
 
 from .errors import (
@@ -891,33 +892,180 @@ def _handle_solve_constraints(command: GeometryCommand, state: SelectionContext)
     else:
         constraints = [state.get_constraint(str(constraint_id)) for constraint_id in constraint_ids]
     if not constraints:
-        return state, [], None, None, {"warnings": ["no_constraints"]}
-    current = state.model_copy(deep=True)
-    changed: list[str] = []
-    changed.extend(_solve_quadrilateral_intersections(constraints, current))
-    unresolved: list[str] = []
-    for _ in range(8):
-        pass_changed = False
-        current_unresolved: list[str] = []
-        for constraint in constraints:
-            outcome = _apply_constraint(constraint, current)
-            if outcome["status"] == "changed":
-                pass_changed = True
-                changed.extend(outcome["changed_entity_ids"])
-            elif outcome["status"] == "ambiguous":
-                current_unresolved.append(constraint.id)
-            elif outcome["status"] == "conflict":
-                raise SolverError("Constraint conflict", detail={"constraint_id": constraint.id, "reason": outcome["reason"]})
-        if not pass_changed:
-            unresolved = current_unresolved
-            break
-        unresolved = current_unresolved
-    if unresolved:
+        run = _run_constraint_path(state, [], solve=True)
+        return state, [], None, None, {
+            "warnings": ["no_constraints"],
+            "solver_analysis": run.analysis_after.model_dump(mode="json"),
+            "solver_run": run.model_dump(mode="json"),
+        }
+    run = _run_constraint_path(state, constraints, solve=True)
+    if run.outcome == "under_constrained":
         raise ClarificationRequiredError(
             "Constraint system is under-constrained",
-            detail={"constraint_ids": unresolved},
+            detail={"constraint_ids": run.requested_constraint_ids, "solver_run": run.model_dump(mode="json")},
         )
-    return current, _dedupe(changed), None, None, {"solved_constraints": [constraint.id for constraint in constraints]}
+    if run.outcome in {"inconsistent", "redundant", "failed"}:
+        raise SolverError(
+            "Constraint system cannot be committed",
+            detail={"constraint_ids": run.requested_constraint_ids, "solver_run": run.model_dump(mode="json")},
+        )
+    proposed = state.model_copy(deep=True)
+    for patch in run.proposed_patch:
+        proposed.replace_entity(type(state.get_entity(patch.entity_id)).model_validate(patch.after))
+    _sync_linked_geometry(proposed)
+    return proposed, run.changed_entity_ids, None, None, {
+        "solved_constraints": run.requested_constraint_ids,
+        "solver_analysis": run.analysis_after.model_dump(mode="json"),
+        "solver_run": run.model_dump(mode="json"),
+    }
+
+
+def _solver_coordinate_patch(before: SelectionContext, after: SelectionContext, changed_entity_ids: list[str]) -> list[SolverCoordinatePatch]:
+    before_entities = before.entity_map()
+    after_entities = after.entity_map()
+    patches: list[SolverCoordinatePatch] = []
+    for entity_id in sorted(set(changed_entity_ids)):
+        before_entity = before_entities.get(entity_id)
+        after_entity = after_entities.get(entity_id)
+        if before_entity is None or after_entity is None:
+            continue
+        before_payload = before_entity.model_dump(mode="json")
+        after_payload = after_entity.model_dump(mode="json")
+        if before_payload == after_payload:
+            continue
+        patches.append(
+            SolverCoordinatePatch(
+                entity_id=entity_id,
+                entity_type=after_entity.type,
+                before=before_payload,
+                after=after_payload,
+            )
+        )
+    return patches
+
+
+def _run_constraint_path(
+    state: SelectionContext,
+    constraints: list[ConstraintEntity],
+    *,
+    solve: bool,
+) -> SolverRunResult:
+    analysis_before = analyze_constraint_system(state)
+    requested_ids = [constraint.id for constraint in constraints]
+    if not solve:
+        return SolverRunResult(
+            backend="closed_form_v1",
+            mode="analyze",
+            outcome="analyzed",
+            termination_reason="analysis_complete",
+            requested_constraint_ids=[constraint.id for constraint in state.constraints],
+            analysis_before=analysis_before,
+            analysis_after=analysis_before,
+            feasible=False if analysis_before.consistency_state == "inconsistent" else True if analysis_before.coverage == "exact" else None,
+            diagnostics=list(analysis_before.diagnostics),
+        )
+    if analysis_before.consistency_state == "inconsistent":
+        return SolverRunResult(
+            backend="closed_form_v1",
+            mode="solve",
+            outcome="inconsistent",
+            termination_reason="analysis_rejected_inconsistent_system",
+            requested_constraint_ids=requested_ids,
+            analysis_before=analysis_before,
+            analysis_after=analysis_before,
+            feasible=False,
+            diagnostics=list(analysis_before.diagnostics),
+        )
+    if analysis_before.redundancy_state == "redundant":
+        return SolverRunResult(
+            backend="closed_form_v1",
+            mode="solve",
+            outcome="redundant",
+            termination_reason="analysis_rejected_redundant_system",
+            requested_constraint_ids=requested_ids,
+            analysis_before=analysis_before,
+            analysis_after=analysis_before,
+            feasible=True,
+            diagnostics=list(analysis_before.diagnostics),
+        )
+    current = state.model_copy(deep=True)
+    changed: list[str] = []
+    try:
+        changed.extend(_solve_quadrilateral_intersections(constraints, current))
+    except SolverError as exc:
+        return SolverRunResult(
+            backend="closed_form_v1",
+            mode="solve",
+            outcome="failed",
+            termination_reason="closed_form_prepass_failed",
+            requested_constraint_ids=requested_ids,
+            analysis_before=analysis_before,
+            analysis_after=analyze_constraint_system(current),
+            feasible=False,
+            diagnostics=[*analysis_before.diagnostics, str(exc)],
+        )
+    unresolved: list[str] = []
+    try:
+        for _ in range(8):
+            pass_changed = False
+            current_unresolved: list[str] = []
+            for constraint in constraints:
+                outcome = _apply_constraint(constraint, current)
+                if outcome["status"] == "changed":
+                    pass_changed = True
+                    changed.extend(outcome["changed_entity_ids"])
+                elif outcome["status"] == "ambiguous":
+                    current_unresolved.append(constraint.id)
+                elif outcome["status"] == "conflict":
+                    raise SolverError("Constraint conflict", detail={"constraint_id": constraint.id, "reason": outcome["reason"]})
+            if not pass_changed:
+                unresolved = current_unresolved
+                break
+            unresolved = current_unresolved
+    except SolverError as exc:
+        analysis_after = analyze_constraint_system(current)
+        return SolverRunResult(
+            backend="closed_form_v1",
+            mode="solve",
+            outcome="failed",
+            termination_reason="closed_form_constraint_failed",
+            requested_constraint_ids=requested_ids,
+            changed_entity_ids=_dedupe(changed),
+            proposed_patch=_solver_coordinate_patch(state, current, changed),
+            analysis_before=analysis_before,
+            analysis_after=analysis_after,
+            feasible=False,
+            diagnostics=[*analysis_after.diagnostics, str(exc)],
+        )
+    analysis_after = analyze_constraint_system(current)
+    if unresolved:
+        return SolverRunResult(
+            backend="closed_form_v1",
+            mode="solve",
+            outcome="under_constrained",
+            termination_reason="closed_form_constraints_ambiguous",
+            requested_constraint_ids=unresolved,
+            changed_entity_ids=_dedupe(changed),
+            proposed_patch=_solver_coordinate_patch(state, current, changed),
+            analysis_before=analysis_before,
+            analysis_after=analysis_after,
+            feasible=None,
+            diagnostics=[*analysis_after.diagnostics, "Closed-form backend cannot resolve all selected constraints."],
+        )
+    feasible = False if analysis_after.consistency_state == "inconsistent" else True if analysis_after.coverage == "exact" else None
+    return SolverRunResult(
+        backend="closed_form_v1",
+        mode="solve",
+        outcome="solved",
+        termination_reason="closed_form_constraints_applied",
+        requested_constraint_ids=requested_ids,
+        changed_entity_ids=_dedupe(changed),
+        proposed_patch=_solver_coordinate_patch(state, current, changed),
+        analysis_before=analysis_before,
+        analysis_after=analysis_after,
+        feasible=feasible,
+        diagnostics=[*analysis_after.diagnostics, "Generalized residual norm is unavailable for the closed-form backend."],
+    )
 
 
 def _handle_analyze_constraints(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
@@ -926,8 +1074,11 @@ def _handle_analyze_constraints(command: GeometryCommand, state: SelectionContex
             "analyze_constraints is a non-mutating preview command",
             detail={"command_type": command.command_type, "mode": command.mode},
         )
-    analysis = analyze_constraint_system(state)
-    return state, [], None, None, {"solver_analysis": analysis.model_dump(mode="json")}
+    run = _run_constraint_path(state, list(state.constraints), solve=False)
+    return state, [], None, None, {
+        "solver_analysis": run.analysis_after.model_dump(mode="json"),
+        "solver_run": run.model_dump(mode="json"),
+    }
 
 
 def _handle_make_profile(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:

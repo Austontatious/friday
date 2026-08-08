@@ -2249,9 +2249,93 @@
       "diagnostic": {
         "code": "solver_error",
         "detail": {
-          "constraint_id": "c_distance"
+          "constraint_ids": [
+            "c_distance"
+          ],
+          "solver_run": {
+            "analysis_after": {
+              "conflicting_constraint_ids": [],
+              "consistency_state": "unknown",
+              "coverage": "partial",
+              "diagnostics": [
+                "Nonlinear or unsupported constraints prevent exact DOF classification."
+              ],
+              "fixed_entity_ids": [
+                "point_A",
+                "point_B"
+              ],
+              "freedom_state": "unknown",
+              "independent_equation_count": 4,
+              "invalid_constraint_ids": [],
+              "redundancy_state": "unknown",
+              "redundant_constraint_ids": [],
+              "remaining_dof": null,
+              "remaining_tracked_dof_upper_bound": 0,
+              "schema_version": "1.0",
+              "supported_constraint_ids": [],
+              "tolerance_policy": {
+                "coordinate_abs_mm": 1e-09,
+                "linear_rank_abs": 1e-10,
+                "scalar_rel": 1e-09,
+                "version": "1.0"
+              },
+              "tracked_variable_count": 4,
+              "unmodeled_entity_ids": [],
+              "unsupported_constraint_ids": [
+                "c_distance"
+              ]
+            },
+            "analysis_before": {
+              "conflicting_constraint_ids": [],
+              "consistency_state": "unknown",
+              "coverage": "partial",
+              "diagnostics": [
+                "Nonlinear or unsupported constraints prevent exact DOF classification."
+              ],
+              "fixed_entity_ids": [
+                "point_A",
+                "point_B"
+              ],
+              "freedom_state": "unknown",
+              "independent_equation_count": 4,
+              "invalid_constraint_ids": [],
+              "redundancy_state": "unknown",
+              "redundant_constraint_ids": [],
+              "remaining_dof": null,
+              "remaining_tracked_dof_upper_bound": 0,
+              "schema_version": "1.0",
+              "supported_constraint_ids": [],
+              "tolerance_policy": {
+                "coordinate_abs_mm": 1e-09,
+                "linear_rank_abs": 1e-10,
+                "scalar_rel": 1e-09,
+                "version": "1.0"
+              },
+              "tracked_variable_count": 4,
+              "unmodeled_entity_ids": [],
+              "unsupported_constraint_ids": [
+                "c_distance"
+              ]
+            },
+            "backend": "closed_form_v1",
+            "changed_entity_ids": [],
+            "diagnostics": [
+              "Nonlinear or unsupported constraints prevent exact DOF classification.",
+              "Distance constraint conflicts with locked points"
+            ],
+            "feasible": false,
+            "mode": "solve",
+            "outcome": "failed",
+            "proposed_patch": [],
+            "requested_constraint_ids": [
+              "c_distance"
+            ],
+            "residual_norm": null,
+            "schema_version": "1.0",
+            "termination_reason": "closed_form_constraint_failed"
+          }
         },
-        "message": "Distance constraint conflicts with locked points",
+        "message": "Constraint system cannot be committed",
         "retryable": false
       },
       "name": "sketchmath_slice3_over_constrained",
@@ -2321,7 +2405,155 @@
           "solved_constraints": [
             "c_parallel",
             "c_perp"
-          ]
+          ],
+          "solver_analysis": {
+            "conflicting_constraint_ids": [],
+            "consistency_state": "unknown",
+            "coverage": "partial",
+            "diagnostics": [
+              "Nonlinear or unsupported constraints prevent exact DOF classification."
+            ],
+            "fixed_entity_ids": [
+              "point_A",
+              "point_B",
+              "point_C"
+            ],
+            "freedom_state": "unknown",
+            "independent_equation_count": 6,
+            "invalid_constraint_ids": [],
+            "redundancy_state": "unknown",
+            "redundant_constraint_ids": [],
+            "remaining_dof": null,
+            "remaining_tracked_dof_upper_bound": 2,
+            "schema_version": "1.0",
+            "supported_constraint_ids": [],
+            "tolerance_policy": {
+              "coordinate_abs_mm": 1e-09,
+              "linear_rank_abs": 1e-10,
+              "scalar_rel": 1e-09,
+              "version": "1.0"
+            },
+            "tracked_variable_count": 8,
+            "unmodeled_entity_ids": [],
+            "unsupported_constraint_ids": [
+              "c_parallel",
+              "c_perp"
+            ]
+          },
+          "solver_run": {
+            "analysis_after": {
+              "conflicting_constraint_ids": [],
+              "consistency_state": "unknown",
+              "coverage": "partial",
+              "diagnostics": [
+                "Nonlinear or unsupported constraints prevent exact DOF classification."
+              ],
+              "fixed_entity_ids": [
+                "point_A",
+                "point_B",
+                "point_C"
+              ],
+              "freedom_state": "unknown",
+              "independent_equation_count": 6,
+              "invalid_constraint_ids": [],
+              "redundancy_state": "unknown",
+              "redundant_constraint_ids": [],
+              "remaining_dof": null,
+              "remaining_tracked_dof_upper_bound": 2,
+              "schema_version": "1.0",
+              "supported_constraint_ids": [],
+              "tolerance_policy": {
+                "coordinate_abs_mm": 1e-09,
+                "linear_rank_abs": 1e-10,
+                "scalar_rel": 1e-09,
+                "version": "1.0"
+              },
+              "tracked_variable_count": 8,
+              "unmodeled_entity_ids": [],
+              "unsupported_constraint_ids": [
+                "c_parallel",
+                "c_perp"
+              ]
+            },
+            "analysis_before": {
+              "conflicting_constraint_ids": [],
+              "consistency_state": "unknown",
+              "coverage": "partial",
+              "diagnostics": [
+                "Nonlinear or unsupported constraints prevent exact DOF classification."
+              ],
+              "fixed_entity_ids": [
+                "point_A",
+                "point_B",
+                "point_C"
+              ],
+              "freedom_state": "unknown",
+              "independent_equation_count": 6,
+              "invalid_constraint_ids": [],
+              "redundancy_state": "unknown",
+              "redundant_constraint_ids": [],
+              "remaining_dof": null,
+              "remaining_tracked_dof_upper_bound": 2,
+              "schema_version": "1.0",
+              "supported_constraint_ids": [],
+              "tolerance_policy": {
+                "coordinate_abs_mm": 1e-09,
+                "linear_rank_abs": 1e-10,
+                "scalar_rel": 1e-09,
+                "version": "1.0"
+              },
+              "tracked_variable_count": 8,
+              "unmodeled_entity_ids": [],
+              "unsupported_constraint_ids": [
+                "c_parallel",
+                "c_perp"
+              ]
+            },
+            "backend": "closed_form_v1",
+            "changed_entity_ids": [
+              "point_D"
+            ],
+            "diagnostics": [
+              "Nonlinear or unsupported constraints prevent exact DOF classification.",
+              "Generalized residual norm is unavailable for the closed-form backend."
+            ],
+            "feasible": null,
+            "mode": "solve",
+            "outcome": "solved",
+            "proposed_patch": [
+              {
+                "after": {
+                  "coords": [
+                    0.0,
+                    3.0
+                  ],
+                  "id": "point_D",
+                  "label": null,
+                  "locked": false,
+                  "type": "point_2d"
+                },
+                "before": {
+                  "coords": [
+                    1.0,
+                    1.0
+                  ],
+                  "id": "point_D",
+                  "label": null,
+                  "locked": false,
+                  "type": "point_2d"
+                },
+                "entity_id": "point_D",
+                "entity_type": "point_2d"
+              }
+            ],
+            "requested_constraint_ids": [
+              "c_parallel",
+              "c_perp"
+            ],
+            "residual_norm": null,
+            "schema_version": "1.0",
+            "termination_reason": "closed_form_constraints_applied"
+          }
         },
         "status": "committed",
         "unit": null,
@@ -2335,7 +2567,83 @@
         "detail": {
           "constraint_ids": [
             "c_distance"
-          ]
+          ],
+          "solver_run": {
+            "analysis_after": {
+              "conflicting_constraint_ids": [],
+              "consistency_state": "unknown",
+              "coverage": "partial",
+              "diagnostics": [
+                "Nonlinear or unsupported constraints prevent exact DOF classification."
+              ],
+              "fixed_entity_ids": [],
+              "freedom_state": "unknown",
+              "independent_equation_count": 0,
+              "invalid_constraint_ids": [],
+              "redundancy_state": "unknown",
+              "redundant_constraint_ids": [],
+              "remaining_dof": null,
+              "remaining_tracked_dof_upper_bound": 4,
+              "schema_version": "1.0",
+              "supported_constraint_ids": [],
+              "tolerance_policy": {
+                "coordinate_abs_mm": 1e-09,
+                "linear_rank_abs": 1e-10,
+                "scalar_rel": 1e-09,
+                "version": "1.0"
+              },
+              "tracked_variable_count": 4,
+              "unmodeled_entity_ids": [],
+              "unsupported_constraint_ids": [
+                "c_distance"
+              ]
+            },
+            "analysis_before": {
+              "conflicting_constraint_ids": [],
+              "consistency_state": "unknown",
+              "coverage": "partial",
+              "diagnostics": [
+                "Nonlinear or unsupported constraints prevent exact DOF classification."
+              ],
+              "fixed_entity_ids": [],
+              "freedom_state": "unknown",
+              "independent_equation_count": 0,
+              "invalid_constraint_ids": [],
+              "redundancy_state": "unknown",
+              "redundant_constraint_ids": [],
+              "remaining_dof": null,
+              "remaining_tracked_dof_upper_bound": 4,
+              "schema_version": "1.0",
+              "supported_constraint_ids": [],
+              "tolerance_policy": {
+                "coordinate_abs_mm": 1e-09,
+                "linear_rank_abs": 1e-10,
+                "scalar_rel": 1e-09,
+                "version": "1.0"
+              },
+              "tracked_variable_count": 4,
+              "unmodeled_entity_ids": [],
+              "unsupported_constraint_ids": [
+                "c_distance"
+              ]
+            },
+            "backend": "closed_form_v1",
+            "changed_entity_ids": [],
+            "diagnostics": [
+              "Nonlinear or unsupported constraints prevent exact DOF classification.",
+              "Closed-form backend cannot resolve all selected constraints."
+            ],
+            "feasible": null,
+            "mode": "solve",
+            "outcome": "under_constrained",
+            "proposed_patch": [],
+            "requested_constraint_ids": [
+              "c_distance"
+            ],
+            "residual_norm": null,
+            "schema_version": "1.0",
+            "termination_reason": "closed_form_constraints_ambiguous"
+          }
         },
         "message": "Constraint system is under-constrained",
         "retryable": false
@@ -2809,6 +3117,79 @@
             "tracked_variable_count": 4,
             "unmodeled_entity_ids": [],
             "unsupported_constraint_ids": []
+          },
+          "solver_run": {
+            "analysis_after": {
+              "conflicting_constraint_ids": [],
+              "consistency_state": "consistent",
+              "coverage": "exact",
+              "diagnostics": [],
+              "fixed_entity_ids": [
+                "point_a"
+              ],
+              "freedom_state": "under_constrained",
+              "independent_equation_count": 3,
+              "invalid_constraint_ids": [],
+              "redundancy_state": "none",
+              "redundant_constraint_ids": [],
+              "remaining_dof": 1,
+              "remaining_tracked_dof_upper_bound": 1,
+              "schema_version": "1.0",
+              "supported_constraint_ids": [
+                "constraint_horizontal"
+              ],
+              "tolerance_policy": {
+                "coordinate_abs_mm": 1e-09,
+                "linear_rank_abs": 1e-10,
+                "scalar_rel": 1e-09,
+                "version": "1.0"
+              },
+              "tracked_variable_count": 4,
+              "unmodeled_entity_ids": [],
+              "unsupported_constraint_ids": []
+            },
+            "analysis_before": {
+              "conflicting_constraint_ids": [],
+              "consistency_state": "consistent",
+              "coverage": "exact",
+              "diagnostics": [],
+              "fixed_entity_ids": [
+                "point_a"
+              ],
+              "freedom_state": "under_constrained",
+              "independent_equation_count": 3,
+              "invalid_constraint_ids": [],
+              "redundancy_state": "none",
+              "redundant_constraint_ids": [],
+              "remaining_dof": 1,
+              "remaining_tracked_dof_upper_bound": 1,
+              "schema_version": "1.0",
+              "supported_constraint_ids": [
+                "constraint_horizontal"
+              ],
+              "tolerance_policy": {
+                "coordinate_abs_mm": 1e-09,
+                "linear_rank_abs": 1e-10,
+                "scalar_rel": 1e-09,
+                "version": "1.0"
+              },
+              "tracked_variable_count": 4,
+              "unmodeled_entity_ids": [],
+              "unsupported_constraint_ids": []
+            },
+            "backend": "closed_form_v1",
+            "changed_entity_ids": [],
+            "diagnostics": [],
+            "feasible": true,
+            "mode": "analyze",
+            "outcome": "analyzed",
+            "proposed_patch": [],
+            "requested_constraint_ids": [
+              "constraint_horizontal"
+            ],
+            "residual_norm": null,
+            "schema_version": "1.0",
+            "termination_reason": "analysis_complete"
           }
         },
         "status": "preview",
