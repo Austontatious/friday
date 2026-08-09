@@ -18,8 +18,8 @@ import type {
   SketchMathHistoryEntry,
   SketchMathMode,
   SketchMathOperationResult,
+  SketchMathPlanarTopology,
   SketchMathPreviewMesh,
-  SketchMathProfileCandidate,
   SketchMathSelectionContext,
   SketchMathSessionSnapshot,
   SketchMathSolverAnalysis,
@@ -75,7 +75,9 @@ import {
   buildOffsetCurveCommand,
   buildCopyLinearCommand,
   buildMirrorCommand,
-  buildDetectProfilesCommand,
+  buildDetectRegionsCommand,
+  buildSelectRegionCommand,
+  buildMakeRegionProfileCommand,
   buildMovePointCommand,
   buildSetLengthCommand,
   buildSetHorizontalDistanceCommand,
@@ -187,6 +189,21 @@ const solverRunFromMetadata = (value: unknown): SketchMathSolverRun | null => {
     return null;
   }
   return candidate as SketchMathSolverRun;
+};
+
+const topologyFromMetadata = (value: unknown): SketchMathPlanarTopology | null => {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<SketchMathPlanarTopology>;
+  if (
+    candidate.schema_version !== "1.0" ||
+    !Array.isArray(candidate.regions) ||
+    !Array.isArray(candidate.diagnostics) ||
+    !candidate.selection ||
+    !["not_requested", "selected", "none", "boundary", "ambiguous"].includes(String(candidate.selection.status))
+  ) {
+    return null;
+  }
+  return candidate as SketchMathPlanarTopology;
 };
 
 const isPointEntity = (entity: SketchMathEntity): entity is Extract<SketchMathEntity, { type: "point_2d" }> => entity.type === "point_2d";
@@ -430,7 +447,8 @@ const SketchMathWorkspace = () => {
   const [slotDraft, setSlotDraft] = useState<SlotDraft | null>(null);
   const [polygonDraft, setPolygonDraft] = useState<PolygonDraft | null>(null);
   const [selectionBox, setSelectionBox] = useState<SelectionBoxDraft | null>(null);
-  const [profileCandidates, setProfileCandidates] = useState<SketchMathProfileCandidate[]>([]);
+  const [topology, setTopology] = useState<SketchMathPlanarTopology | null>(null);
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [solverOutcome, setSolverOutcome] = useState<"Conflict" | "Solve failed" | null>(null);
   const [solverAnalysis, setSolverAnalysis] = useState<SketchMathSolverAnalysis | null>(null);
   const [solverRun, setSolverRun] = useState<SketchMathSolverRun | null>(null);
@@ -481,7 +499,7 @@ const SketchMathWorkspace = () => {
   const pointDragRef = useRef<{ entityId: string; start: Point; current: Point; moved: boolean } | null>(null);
   const dragPreviewTimerRef = useRef<number | null>(null);
   const ignoreNextCanvasClickRef = useRef(false);
-  const profileCandidateRequestRef = useRef(0);
+  const topologyRequestRef = useRef(0);
   const solverAnalysisRequestRef = useRef(0);
   const notifiedArtifactPathsRef = useRef<Set<string>>(new Set());
   const lastSelectedHoleIdRef = useRef<string | null>(null);
@@ -1307,20 +1325,30 @@ const SketchMathWorkspace = () => {
     window.localStorage.setItem(SESSION_STORAGE_KEY, response.session_id);
   };
 
-  const refreshProfileCandidates = async () => {
-    if (!sessionId) return;
-    const requestId = profileCandidateRequestRef.current + 1;
-    profileCandidateRequestRef.current = requestId;
+  const refreshTopology = useCallback(async (activeSessionId: string) => {
+    const requestId = topologyRequestRef.current + 1;
+    topologyRequestRef.current = requestId;
     try {
-      const response = await previewSketchMathCommand(sessionId, buildDetectProfilesCommand());
-      const raw = response.result.metadata.profile_candidates;
-      if (requestId === profileCandidateRequestRef.current) {
-        setProfileCandidates(Array.isArray(raw) ? raw as SketchMathProfileCandidate[] : []);
+      const response = await previewSketchMathCommand(activeSessionId, buildDetectRegionsCommand());
+      const detected = topologyFromMetadata(response.result.metadata.topology);
+      if (requestId === topologyRequestRef.current) {
+        setTopology(detected);
+        setSelectedRegionId((current) =>
+          current && detected?.regions.some((region) => region.region_id === current) ? current : null,
+        );
       }
     } catch {
-      if (requestId === profileCandidateRequestRef.current) setProfileCandidates([]);
+      if (requestId === topologyRequestRef.current) {
+        setTopology(null);
+        setSelectedRegionId(null);
+      }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId || loading) return;
+    void refreshTopology(sessionId);
+  }, [committedContext, loading, refreshTopology, sessionId]);
 
   const refreshSession = async () => {
     if (!sessionId) {
@@ -1341,12 +1369,6 @@ const SketchMathWorkspace = () => {
       syncCommandResponse(response);
       setPreviewResult(response.result);
       clearErrorState();
-      const topologyCommands = new Set(["define_line", "batch", "move_point", "make_horizontal", "make_vertical", "make_coincident", "delete_entity"]);
-      if (topologyCommands.has(nextCommand.command_type)) {
-        void refreshProfileCandidates();
-      } else if (["make_profile", "make_circle_profile"].includes(nextCommand.command_type)) {
-        setProfileCandidates([]);
-      }
       if (nextCommand.command_type === "solve_constraints") setSolverOutcome(null);
       return response.result;
     } catch (err) {
@@ -1663,6 +1685,40 @@ const SketchMathWorkspace = () => {
       }
       setHolePlacement((current) => (current ? { ...current, center } : current));
       void commitProfileHole(center);
+      return;
+    }
+    if (tool === "region_select") {
+      if (!sessionId) return;
+      void (async () => {
+        try {
+          const response = await previewSketchMathCommand(sessionId, buildSelectRegionCommand(point));
+          const selectedTopology = topologyFromMetadata(response.result.metadata.topology);
+          if (!selectedTopology) {
+            setUserError("The backend returned an invalid topology selection payload.");
+            return;
+          }
+          setTopology(selectedTopology);
+          setPreviewResult(response.result);
+          const selectedIds = selectedTopology.selection.region_ids;
+          if (selectedTopology.selection.status === "selected" && selectedIds.length === 1) {
+            setSelectedRegionId(selectedIds[0]);
+            clearErrorState();
+            return;
+          }
+          setSelectedRegionId(null);
+          if (selectedTopology.selection.status === "boundary") {
+            setUserError("The point is on a region boundary. Click clearly inside a region.");
+          } else if (selectedTopology.selection.status === "ambiguous") {
+            setUserError("The point matches multiple regions. Choose one from the region list.");
+          } else {
+            setUserError("No bounded region exists at that point.");
+          }
+        } catch (selectionError) {
+          const { message, debugText } = normalizeCaughtError(selectionError, "Region selection failed");
+          setSelectedRegionId(null);
+          setUserError(message, debugText);
+        }
+      })();
       return;
     }
     if (tool === "point") {
@@ -2971,6 +3027,17 @@ const SketchMathWorkspace = () => {
     await commitCommand(buildMirrorCommand(selectedEntityIds, 0));
   };
 
+  const promoteRegion = async (regionId: string) => {
+    const result = await commitCommand(
+      buildMakeRegionProfileCommand(regionId, `profile_region_${Date.now().toString(36)}`),
+    );
+    if (!result) return;
+    const profileId = typeof result.metadata.profile_id === "string" ? result.metadata.profile_id : null;
+    if (profileId) setSelectedEntityIds([profileId]);
+    setSelectedRegionId(null);
+    setTool("select");
+  };
+
   const handleToolChange = (nextTool: SketchMathMode) => {
     if (nextTool !== tool) {
       clearRectangleInteraction();
@@ -3004,6 +3071,9 @@ const SketchMathWorkspace = () => {
         void handleAddProfileHole();
       }
       return;
+    }
+    if (nextTool === "region_select" && sessionId) {
+      void refreshTopology(sessionId);
     }
     setTool(nextTool);
   };
@@ -3052,6 +3122,8 @@ const SketchMathWorkspace = () => {
         ? slotDraft ? "Click the second slot center." : "Click the first slot center, then the second center."
       : tool === "polygon"
         ? polygonDraft ? "Click a polygon vertex to set its radius." : "Click the polygon center, then a vertex."
+      : tool === "region_select"
+        ? "Click clearly inside a bounded region. Boundary clicks are refused so region choice stays deterministic."
       : tool === "box_select"
         ? "Drag a box around complete sketch entities to select them together."
       : tool === "hole"
@@ -3197,8 +3269,10 @@ const SketchMathWorkspace = () => {
                   dragPreviewPoint={dragPreviewPoint}
                   holePlacementPreview={holePlacementPreview}
                   holePlacementActive={Boolean(holePlacement)}
+                  regionSelectionActive={tool === "region_select"}
                   showDebugLabels={showDebugLabels}
-                  profileCandidates={profileCandidates}
+                  topologyRegions={tool === "region_select" || selectedRegionId ? topology?.regions || [] : []}
+                  selectedRegionId={selectedRegionId}
                   onCanvasClick={handleCanvasClick}
                   onCanvasMouseDown={handleCanvasMouseDown}
                   onCanvasMouseMove={handleCanvasMouseMove}
@@ -3226,7 +3300,7 @@ const SketchMathWorkspace = () => {
               ) : null}
               <Box className="sketchmath-workflow-step" data-testid="sketchmath-tool-mode">
                 <Text className="sketchmath-step-label">Current mode</Text>
-                <Text fontWeight="600">{tool === "select" ? "Select" : tool === "rectangle" ? "Draw rectangle" : tool === "center_rectangle" ? "Center rectangle" : tool === "polyline" ? "Polyline" : tool === "slot" ? "Slot" : tool === "polygon" ? "Polygon" : tool === "box_select" ? "Box select" : tool === "hole" ? "Add hole" : tool === "pan" ? "Pan / view" : tool}</Text>
+                <Text fontWeight="600">{tool === "select" ? "Select" : tool === "rectangle" ? "Draw rectangle" : tool === "center_rectangle" ? "Center rectangle" : tool === "polyline" ? "Polyline" : tool === "slot" ? "Slot" : tool === "polygon" ? "Polygon" : tool === "region_select" ? "Region select" : tool === "box_select" ? "Box select" : tool === "hole" ? "Add hole" : tool === "pan" ? "Pan / view" : tool}</Text>
                 <Text fontSize="sm" opacity={0.8}>
                   {canvasHelperText}
                 </Text>
@@ -3483,22 +3557,50 @@ const SketchMathWorkspace = () => {
                 ) : null}
               </Box>
 
-              {profileCandidates.length > 0 ? (
-                <Box className="sketchmath-workflow-step" data-testid="sketchmath-profile-candidates">
-                  <Text className="sketchmath-step-label">Detected profiles</Text>
-                  {profileCandidates.map((candidate) => (
-                    <Box key={candidate.candidate_id} mt={2}>
-                      <Text fontSize="sm">{candidate.valid ? "Valid closed loop" : "Invalid loop"} • {candidate.area.toFixed(2)} mm²</Text>
-                      <Button
-                        size="sm"
-                        mt={1}
-                        isDisabled={!candidate.valid}
-                        onClick={() => void commitCommand(buildMakeProfileCommand(candidate.line_ids))}
-                      >
-                        Create profile
-                      </Button>
+              {topology ? (
+                <Box className="sketchmath-workflow-step" data-testid="sketchmath-topology-panel">
+                  <Text className="sketchmath-step-label">Planar regions</Text>
+                  <Text fontSize="sm" opacity={0.85}>
+                    {topology.regions.length === 0
+                      ? "No bounded regions detected."
+                      : `${topology.regions.length} deterministic region${topology.regions.length === 1 ? "" : "s"} detected.`}
+                  </Text>
+                  <HStack spacing={2} flexWrap="wrap" mt={2}>
+                    <Button size="sm" variant={tool === "region_select" ? "solid" : "outline"} onClick={() => handleToolChange("region_select")}>
+                      Select on canvas
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => sessionId && void refreshTopology(sessionId)}>
+                      Rescan
+                    </Button>
+                  </HStack>
+                  {topology.regions.map((region, index) => (
+                    <Box key={region.region_id} mt={2} data-testid={`sketchmath-region-card-${region.region_id}`}>
+                      <Text fontSize="sm">
+                        Region {index + 1} • {region.area.toFixed(2)} mm² • {region.holes.length} hole{region.holes.length === 1 ? "" : "s"}
+                      </Text>
+                      <HStack spacing={2} flexWrap="wrap" mt={1}>
+                        <Button
+                          size="sm"
+                          variant={selectedRegionId === region.region_id ? "solid" : "outline"}
+                          onClick={() => setSelectedRegionId(region.region_id)}
+                        >
+                          {selectedRegionId === region.region_id ? "Region selected" : "Choose region"}
+                        </Button>
+                        <Button size="sm" onClick={() => void promoteRegion(region.region_id)}>
+                          Create region profile {index + 1}
+                        </Button>
+                      </HStack>
                     </Box>
                   ))}
+                  {topology.diagnostics.length > 0 ? (
+                    <Box mt={2} data-testid="sketchmath-topology-diagnostics">
+                      {topology.diagnostics.slice(0, 5).map((diagnostic, index) => (
+                        <Text key={`${diagnostic.code}-${index}`} fontSize="xs" opacity={0.8}>
+                          {diagnostic.severity.toUpperCase()} • {diagnostic.code}: {diagnostic.message}
+                        </Text>
+                      ))}
+                    </Box>
+                  ) : null}
                 </Box>
               ) : null}
 

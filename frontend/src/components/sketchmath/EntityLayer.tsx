@@ -1,5 +1,5 @@
 import React from "react";
-import type { SketchMathEntity, SketchMathProfileCandidate } from "../../services/sketchmath";
+import type { SketchMathEntity, SketchMathPlanarRegion } from "../../services/sketchmath";
 import { arcSvgPath } from "./arcGeometry";
 
 type EntityLayerProps = {
@@ -7,8 +7,10 @@ type EntityLayerProps = {
   selectedEntityIds: string[];
   focusedEntityId: string | null;
   placementActive?: boolean;
+  regionSelectionActive?: boolean;
   showDebugLabels?: boolean;
-  profileCandidates?: SketchMathProfileCandidate[];
+  topologyRegions?: SketchMathPlanarRegion[];
+  selectedRegionId?: string | null;
   onEntityClick: (entityId: string, event: React.MouseEvent<SVGGElement | SVGCircleElement | SVGPolygonElement>) => void;
   onEntityMouseDown?: (entityId: string, entityType: SketchMathEntity["type"], event: React.MouseEvent<SVGGElement>) => void;
   onDimensionLabelEdit?: (baseId: string, dimension: "width" | "height") => void;
@@ -62,7 +64,12 @@ const rectangleBaseIdFromEntityId = (entityId: string): string | null => {
   return profileMatch ? profileMatch[1] : null;
 };
 
-const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementActive = false, showDebugLabels = false, profileCandidates = [], onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
+const regionPath = (region: SketchMathPlanarRegion): string =>
+  [region.outer_loop, ...region.holes]
+    .map((loop) => `${loop.vertices.map((vertex, index) => `${index === 0 ? "M" : "L"} ${vertex[0]} ${vertex[1]}`).join(" ")} Z`)
+    .join(" ");
+
+const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementActive = false, regionSelectionActive = false, showDebugLabels = false, topologyRegions = [], selectedRegionId = null, onEntityClick, onEntityMouseDown, onDimensionLabelEdit }: EntityLayerProps) => {
   const linesById = new Map(entities.filter(isLine).map((entity) => [entity.id, entity] as const));
   const profileById = new Map(entities.filter(isProfile).map((entity) => [entity.id, entity] as const));
   const profileHoleIds = new Set(
@@ -76,9 +83,19 @@ const EntityLayer = ({ entities, selectedEntityIds, focusedEntityId, placementAc
   );
 
   return (
-  <g data-testid="sketchmath-entities" className={placementActive ? "sketchmath-placement-active" : undefined}>
-    {profileCandidates.filter((candidate) => candidate.valid).map((candidate) => (
-      <polygon key={candidate.candidate_id} points={candidate.vertices.map((vertex) => vertex.join(",")).join(" ")} fill="none" className="sketchmath-profile-target-selected" data-testid={`profile-candidate-${candidate.candidate_id}`} />
+  <g
+    data-testid="sketchmath-entities"
+    className={[placementActive ? "sketchmath-placement-active" : "", regionSelectionActive ? "sketchmath-region-select-active" : ""].filter(Boolean).join(" ") || undefined}
+  >
+    {topologyRegions.map((region) => (
+      <path
+        key={region.region_id}
+        d={regionPath(region)}
+        fillRule="evenodd"
+        clipRule="evenodd"
+        className={region.region_id === selectedRegionId ? "sketchmath-region sketchmath-region-selected" : "sketchmath-region"}
+        data-testid={`topology-region-${region.region_id}`}
+      />
     ))}
     {Array.from(selectedRectangleBaseIds).map((baseId) => {
       const top = linesById.get(`${baseId}_ab`);

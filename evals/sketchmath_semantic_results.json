@@ -1,7 +1,7 @@
 {
-  "case_count": 52,
+  "case_count": 55,
   "failed": 0,
-  "passed": 52,
+  "passed": 55,
   "results": [
     {
       "diagnostic": "ok",
@@ -4137,6 +4137,1168 @@
         "status": "committed",
         "unit": "square_mm",
         "value": 210.01067516807598
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v09_detect_regions",
+      "path": "evals/cases/sketchmath_v09_detect_regions.json",
+      "result": {
+        "after": {
+          "inner_bottom": {
+            "end": [
+              7.0,
+              3.0
+            ],
+            "start": [
+              3.0,
+              3.0
+            ]
+          },
+          "inner_left": {
+            "end": [
+              3.0,
+              3.0
+            ],
+            "start": [
+              3.0,
+              7.0
+            ]
+          },
+          "inner_right": {
+            "end": [
+              7.0,
+              7.0
+            ],
+            "start": [
+              7.0,
+              3.0
+            ]
+          },
+          "inner_top": {
+            "end": [
+              3.0,
+              7.0
+            ],
+            "start": [
+              7.0,
+              7.0
+            ]
+          },
+          "outer_bottom": {
+            "end": [
+              10.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "outer_left": {
+            "end": [
+              0.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              10.0
+            ]
+          },
+          "outer_right": {
+            "end": [
+              10.0,
+              10.0
+            ],
+            "start": [
+              10.0,
+              0.0
+            ]
+          },
+          "outer_top": {
+            "end": [
+              0.0,
+              10.0
+            ],
+            "start": [
+              10.0,
+              10.0
+            ]
+          }
+        },
+        "changed_entity_ids": [],
+        "metadata": {
+          "diagnostics": [
+            {
+              "code": "disconnected_components",
+              "curve_ids": [
+                "inner_bottom",
+                "inner_left",
+                "inner_right",
+                "inner_top",
+                "outer_bottom",
+                "outer_left",
+                "outer_right",
+                "outer_top"
+              ],
+              "detail": {
+                "component_count": 2,
+                "components": [
+                  [
+                    "inner_bottom",
+                    "inner_left",
+                    "inner_right",
+                    "inner_top"
+                  ],
+                  [
+                    "outer_bottom",
+                    "outer_left",
+                    "outer_right",
+                    "outer_top"
+                  ]
+                ]
+              },
+              "message": "The sketch contains disconnected curve components; each component was analyzed.",
+              "point": null,
+              "severity": "info"
+            }
+          ],
+          "history_length": 0,
+          "region_count": 2,
+          "regions": [
+            {
+              "area": 16.0,
+              "bounds": [
+                3.0,
+                3.0,
+                7.0,
+                7.0
+              ],
+              "centroid": [
+                5.0,
+                5.0
+              ],
+              "holes": [],
+              "nesting_depth": 1,
+              "outer_loop": {
+                "area": 16.0,
+                "loop_id": "loop_a9a679504ea1884f",
+                "source_curve_ids": [
+                  "inner_bottom",
+                  "inner_left",
+                  "inner_right",
+                  "inner_top"
+                ],
+                "vertices": [
+                  [
+                    3.0,
+                    3.0
+                  ],
+                  [
+                    7.0,
+                    3.0
+                  ],
+                  [
+                    7.0,
+                    7.0
+                  ],
+                  [
+                    3.0,
+                    7.0
+                  ],
+                  [
+                    3.0,
+                    3.0
+                  ]
+                ],
+                "winding": "counterclockwise"
+              },
+              "region_id": "region_62982813611dccd0",
+              "source_curve_ids": [
+                "inner_bottom",
+                "inner_left",
+                "inner_right",
+                "inner_top"
+              ]
+            },
+            {
+              "area": 84.0,
+              "bounds": [
+                0.0,
+                0.0,
+                10.0,
+                10.0
+              ],
+              "centroid": [
+                1.5,
+                5.0
+              ],
+              "holes": [
+                {
+                  "area": 16.0,
+                  "loop_id": "loop_5097be8d83d538b6",
+                  "source_curve_ids": [
+                    "inner_bottom",
+                    "inner_left",
+                    "inner_right",
+                    "inner_top"
+                  ],
+                  "vertices": [
+                    [
+                      3.0,
+                      3.0
+                    ],
+                    [
+                      3.0,
+                      7.0
+                    ],
+                    [
+                      7.0,
+                      7.0
+                    ],
+                    [
+                      7.0,
+                      3.0
+                    ],
+                    [
+                      3.0,
+                      3.0
+                    ]
+                  ],
+                  "winding": "clockwise"
+                }
+              ],
+              "nesting_depth": 0,
+              "outer_loop": {
+                "area": 100.0,
+                "loop_id": "loop_53fca3ec04272015",
+                "source_curve_ids": [
+                  "outer_bottom",
+                  "outer_left",
+                  "outer_right",
+                  "outer_top"
+                ],
+                "vertices": [
+                  [
+                    0.0,
+                    0.0
+                  ],
+                  [
+                    10.0,
+                    0.0
+                  ],
+                  [
+                    10.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    0.0
+                  ]
+                ],
+                "winding": "counterclockwise"
+              },
+              "region_id": "region_abcdc9af008d38fb",
+              "source_curve_ids": [
+                "inner_bottom",
+                "inner_left",
+                "inner_right",
+                "inner_top",
+                "outer_bottom",
+                "outer_left",
+                "outer_right",
+                "outer_top"
+              ]
+            }
+          ],
+          "topology": {
+            "approximation": {
+              "curve_mode": "piecewise_linear",
+              "max_arc_step_deg": 2.0,
+              "near_vertex_warning_mm": 1e-05,
+              "node_tolerance_mm": 1.0000000000000001e-07
+            },
+            "diagnostics": [
+              {
+                "code": "disconnected_components",
+                "curve_ids": [
+                  "inner_bottom",
+                  "inner_left",
+                  "inner_right",
+                  "inner_top",
+                  "outer_bottom",
+                  "outer_left",
+                  "outer_right",
+                  "outer_top"
+                ],
+                "detail": {
+                  "component_count": 2,
+                  "components": [
+                    [
+                      "inner_bottom",
+                      "inner_left",
+                      "inner_right",
+                      "inner_top"
+                    ],
+                    [
+                      "outer_bottom",
+                      "outer_left",
+                      "outer_right",
+                      "outer_top"
+                    ]
+                  ]
+                },
+                "message": "The sketch contains disconnected curve components; each component was analyzed.",
+                "point": null,
+                "severity": "info"
+              }
+            ],
+            "regions": [
+              {
+                "area": 16.0,
+                "bounds": [
+                  3.0,
+                  3.0,
+                  7.0,
+                  7.0
+                ],
+                "centroid": [
+                  5.0,
+                  5.0
+                ],
+                "holes": [],
+                "nesting_depth": 1,
+                "outer_loop": {
+                  "area": 16.0,
+                  "loop_id": "loop_a9a679504ea1884f",
+                  "source_curve_ids": [
+                    "inner_bottom",
+                    "inner_left",
+                    "inner_right",
+                    "inner_top"
+                  ],
+                  "vertices": [
+                    [
+                      3.0,
+                      3.0
+                    ],
+                    [
+                      7.0,
+                      3.0
+                    ],
+                    [
+                      7.0,
+                      7.0
+                    ],
+                    [
+                      3.0,
+                      7.0
+                    ],
+                    [
+                      3.0,
+                      3.0
+                    ]
+                  ],
+                  "winding": "counterclockwise"
+                },
+                "region_id": "region_62982813611dccd0",
+                "source_curve_ids": [
+                  "inner_bottom",
+                  "inner_left",
+                  "inner_right",
+                  "inner_top"
+                ]
+              },
+              {
+                "area": 84.0,
+                "bounds": [
+                  0.0,
+                  0.0,
+                  10.0,
+                  10.0
+                ],
+                "centroid": [
+                  1.5,
+                  5.0
+                ],
+                "holes": [
+                  {
+                    "area": 16.0,
+                    "loop_id": "loop_5097be8d83d538b6",
+                    "source_curve_ids": [
+                      "inner_bottom",
+                      "inner_left",
+                      "inner_right",
+                      "inner_top"
+                    ],
+                    "vertices": [
+                      [
+                        3.0,
+                        3.0
+                      ],
+                      [
+                        3.0,
+                        7.0
+                      ],
+                      [
+                        7.0,
+                        7.0
+                      ],
+                      [
+                        7.0,
+                        3.0
+                      ],
+                      [
+                        3.0,
+                        3.0
+                      ]
+                    ],
+                    "winding": "clockwise"
+                  }
+                ],
+                "nesting_depth": 0,
+                "outer_loop": {
+                  "area": 100.0,
+                  "loop_id": "loop_53fca3ec04272015",
+                  "source_curve_ids": [
+                    "outer_bottom",
+                    "outer_left",
+                    "outer_right",
+                    "outer_top"
+                  ],
+                  "vertices": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      10.0,
+                      0.0
+                    ],
+                    [
+                      10.0,
+                      10.0
+                    ],
+                    [
+                      0.0,
+                      10.0
+                    ],
+                    [
+                      0.0,
+                      0.0
+                    ]
+                  ],
+                  "winding": "counterclockwise"
+                },
+                "region_id": "region_abcdc9af008d38fb",
+                "source_curve_ids": [
+                  "inner_bottom",
+                  "inner_left",
+                  "inner_right",
+                  "inner_top",
+                  "outer_bottom",
+                  "outer_left",
+                  "outer_right",
+                  "outer_top"
+                ]
+              }
+            ],
+            "schema_version": "1.0",
+            "selection": {
+              "boundary_region_ids": [],
+              "point": null,
+              "region_ids": [],
+              "status": "not_requested"
+            },
+            "source_curve_ids": [
+              "inner_bottom",
+              "inner_left",
+              "inner_right",
+              "inner_top",
+              "outer_bottom",
+              "outer_left",
+              "outer_right",
+              "outer_top"
+            ]
+          }
+        },
+        "status": "preview",
+        "unit": null,
+        "value": null
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v09_make_region_profile",
+      "path": "evals/cases/sketchmath_v09_make_region_profile.json",
+      "result": {
+        "after": {
+          "inner_bottom": {
+            "end": [
+              7.0,
+              3.0
+            ],
+            "start": [
+              3.0,
+              3.0
+            ]
+          },
+          "inner_left": {
+            "end": [
+              3.0,
+              3.0
+            ],
+            "start": [
+              3.0,
+              7.0
+            ]
+          },
+          "inner_right": {
+            "end": [
+              7.0,
+              7.0
+            ],
+            "start": [
+              7.0,
+              3.0
+            ]
+          },
+          "inner_top": {
+            "end": [
+              3.0,
+              7.0
+            ],
+            "start": [
+              7.0,
+              7.0
+            ]
+          },
+          "outer_bottom": {
+            "end": [
+              10.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "outer_left": {
+            "end": [
+              0.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              10.0
+            ]
+          },
+          "outer_right": {
+            "end": [
+              10.0,
+              10.0
+            ],
+            "start": [
+              10.0,
+              0.0
+            ]
+          },
+          "outer_top": {
+            "end": [
+              0.0,
+              10.0
+            ],
+            "start": [
+              10.0,
+              10.0
+            ]
+          },
+          "profile_annulus": {
+            "area": 100.0,
+            "vertices": [
+              [
+                0.0,
+                0.0
+              ],
+              [
+                10.0,
+                0.0
+              ],
+              [
+                10.0,
+                10.0
+              ],
+              [
+                0.0,
+                10.0
+              ],
+              [
+                0.0,
+                0.0
+              ]
+            ],
+            "warnings": [],
+            "winding": "counterclockwise"
+          },
+          "profile_annulus_hole_1_5097be8d": {
+            "area": 16.0,
+            "vertices": [
+              [
+                3.0,
+                3.0
+              ],
+              [
+                3.0,
+                7.0
+              ],
+              [
+                7.0,
+                7.0
+              ],
+              [
+                7.0,
+                3.0
+              ],
+              [
+                3.0,
+                3.0
+              ]
+            ],
+            "warnings": [],
+            "winding": "clockwise"
+          }
+        },
+        "changed_entity_ids": [
+          "profile_annulus_hole_1_5097be8d",
+          "profile_annulus"
+        ],
+        "metadata": {
+          "history_length": 1,
+          "hole_profile_ids": [
+            "profile_annulus_hole_1_5097be8d"
+          ],
+          "net_area": 84.0,
+          "profile_id": "profile_annulus",
+          "region_id": "region_abcdc9af008d38fb",
+          "topology_schema_version": "1.0"
+        },
+        "status": "committed",
+        "unit": "square_mm",
+        "value": 84.0
+      },
+      "status": "pass"
+    },
+    {
+      "diagnostic": "ok",
+      "name": "sketchmath_v09_select_region",
+      "path": "evals/cases/sketchmath_v09_select_region.json",
+      "result": {
+        "after": {
+          "inner_bottom": {
+            "end": [
+              7.0,
+              3.0
+            ],
+            "start": [
+              3.0,
+              3.0
+            ]
+          },
+          "inner_left": {
+            "end": [
+              3.0,
+              3.0
+            ],
+            "start": [
+              3.0,
+              7.0
+            ]
+          },
+          "inner_right": {
+            "end": [
+              7.0,
+              7.0
+            ],
+            "start": [
+              7.0,
+              3.0
+            ]
+          },
+          "inner_top": {
+            "end": [
+              3.0,
+              7.0
+            ],
+            "start": [
+              7.0,
+              7.0
+            ]
+          },
+          "outer_bottom": {
+            "end": [
+              10.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              0.0
+            ]
+          },
+          "outer_left": {
+            "end": [
+              0.0,
+              0.0
+            ],
+            "start": [
+              0.0,
+              10.0
+            ]
+          },
+          "outer_right": {
+            "end": [
+              10.0,
+              10.0
+            ],
+            "start": [
+              10.0,
+              0.0
+            ]
+          },
+          "outer_top": {
+            "end": [
+              0.0,
+              10.0
+            ],
+            "start": [
+              10.0,
+              10.0
+            ]
+          }
+        },
+        "changed_entity_ids": [],
+        "metadata": {
+          "diagnostics": [
+            {
+              "code": "disconnected_components",
+              "curve_ids": [
+                "inner_bottom",
+                "inner_left",
+                "inner_right",
+                "inner_top",
+                "outer_bottom",
+                "outer_left",
+                "outer_right",
+                "outer_top"
+              ],
+              "detail": {
+                "component_count": 2,
+                "components": [
+                  [
+                    "inner_bottom",
+                    "inner_left",
+                    "inner_right",
+                    "inner_top"
+                  ],
+                  [
+                    "outer_bottom",
+                    "outer_left",
+                    "outer_right",
+                    "outer_top"
+                  ]
+                ]
+              },
+              "message": "The sketch contains disconnected curve components; each component was analyzed.",
+              "point": null,
+              "severity": "info"
+            }
+          ],
+          "history_length": 0,
+          "regions": [
+            {
+              "area": 16.0,
+              "bounds": [
+                3.0,
+                3.0,
+                7.0,
+                7.0
+              ],
+              "centroid": [
+                5.0,
+                5.0
+              ],
+              "holes": [],
+              "nesting_depth": 1,
+              "outer_loop": {
+                "area": 16.0,
+                "loop_id": "loop_a9a679504ea1884f",
+                "source_curve_ids": [
+                  "inner_bottom",
+                  "inner_left",
+                  "inner_right",
+                  "inner_top"
+                ],
+                "vertices": [
+                  [
+                    3.0,
+                    3.0
+                  ],
+                  [
+                    7.0,
+                    3.0
+                  ],
+                  [
+                    7.0,
+                    7.0
+                  ],
+                  [
+                    3.0,
+                    7.0
+                  ],
+                  [
+                    3.0,
+                    3.0
+                  ]
+                ],
+                "winding": "counterclockwise"
+              },
+              "region_id": "region_62982813611dccd0",
+              "source_curve_ids": [
+                "inner_bottom",
+                "inner_left",
+                "inner_right",
+                "inner_top"
+              ]
+            },
+            {
+              "area": 84.0,
+              "bounds": [
+                0.0,
+                0.0,
+                10.0,
+                10.0
+              ],
+              "centroid": [
+                1.5,
+                5.0
+              ],
+              "holes": [
+                {
+                  "area": 16.0,
+                  "loop_id": "loop_5097be8d83d538b6",
+                  "source_curve_ids": [
+                    "inner_bottom",
+                    "inner_left",
+                    "inner_right",
+                    "inner_top"
+                  ],
+                  "vertices": [
+                    [
+                      3.0,
+                      3.0
+                    ],
+                    [
+                      3.0,
+                      7.0
+                    ],
+                    [
+                      7.0,
+                      7.0
+                    ],
+                    [
+                      7.0,
+                      3.0
+                    ],
+                    [
+                      3.0,
+                      3.0
+                    ]
+                  ],
+                  "winding": "clockwise"
+                }
+              ],
+              "nesting_depth": 0,
+              "outer_loop": {
+                "area": 100.0,
+                "loop_id": "loop_53fca3ec04272015",
+                "source_curve_ids": [
+                  "outer_bottom",
+                  "outer_left",
+                  "outer_right",
+                  "outer_top"
+                ],
+                "vertices": [
+                  [
+                    0.0,
+                    0.0
+                  ],
+                  [
+                    10.0,
+                    0.0
+                  ],
+                  [
+                    10.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    0.0
+                  ]
+                ],
+                "winding": "counterclockwise"
+              },
+              "region_id": "region_abcdc9af008d38fb",
+              "source_curve_ids": [
+                "inner_bottom",
+                "inner_left",
+                "inner_right",
+                "inner_top",
+                "outer_bottom",
+                "outer_left",
+                "outer_right",
+                "outer_top"
+              ]
+            }
+          ],
+          "selection": {
+            "boundary_region_ids": [],
+            "point": [
+              1.0,
+              1.0
+            ],
+            "region_ids": [
+              "region_abcdc9af008d38fb"
+            ],
+            "status": "selected"
+          },
+          "topology": {
+            "approximation": {
+              "curve_mode": "piecewise_linear",
+              "max_arc_step_deg": 2.0,
+              "near_vertex_warning_mm": 1e-05,
+              "node_tolerance_mm": 1.0000000000000001e-07
+            },
+            "diagnostics": [
+              {
+                "code": "disconnected_components",
+                "curve_ids": [
+                  "inner_bottom",
+                  "inner_left",
+                  "inner_right",
+                  "inner_top",
+                  "outer_bottom",
+                  "outer_left",
+                  "outer_right",
+                  "outer_top"
+                ],
+                "detail": {
+                  "component_count": 2,
+                  "components": [
+                    [
+                      "inner_bottom",
+                      "inner_left",
+                      "inner_right",
+                      "inner_top"
+                    ],
+                    [
+                      "outer_bottom",
+                      "outer_left",
+                      "outer_right",
+                      "outer_top"
+                    ]
+                  ]
+                },
+                "message": "The sketch contains disconnected curve components; each component was analyzed.",
+                "point": null,
+                "severity": "info"
+              }
+            ],
+            "regions": [
+              {
+                "area": 16.0,
+                "bounds": [
+                  3.0,
+                  3.0,
+                  7.0,
+                  7.0
+                ],
+                "centroid": [
+                  5.0,
+                  5.0
+                ],
+                "holes": [],
+                "nesting_depth": 1,
+                "outer_loop": {
+                  "area": 16.0,
+                  "loop_id": "loop_a9a679504ea1884f",
+                  "source_curve_ids": [
+                    "inner_bottom",
+                    "inner_left",
+                    "inner_right",
+                    "inner_top"
+                  ],
+                  "vertices": [
+                    [
+                      3.0,
+                      3.0
+                    ],
+                    [
+                      7.0,
+                      3.0
+                    ],
+                    [
+                      7.0,
+                      7.0
+                    ],
+                    [
+                      3.0,
+                      7.0
+                    ],
+                    [
+                      3.0,
+                      3.0
+                    ]
+                  ],
+                  "winding": "counterclockwise"
+                },
+                "region_id": "region_62982813611dccd0",
+                "source_curve_ids": [
+                  "inner_bottom",
+                  "inner_left",
+                  "inner_right",
+                  "inner_top"
+                ]
+              },
+              {
+                "area": 84.0,
+                "bounds": [
+                  0.0,
+                  0.0,
+                  10.0,
+                  10.0
+                ],
+                "centroid": [
+                  1.5,
+                  5.0
+                ],
+                "holes": [
+                  {
+                    "area": 16.0,
+                    "loop_id": "loop_5097be8d83d538b6",
+                    "source_curve_ids": [
+                      "inner_bottom",
+                      "inner_left",
+                      "inner_right",
+                      "inner_top"
+                    ],
+                    "vertices": [
+                      [
+                        3.0,
+                        3.0
+                      ],
+                      [
+                        3.0,
+                        7.0
+                      ],
+                      [
+                        7.0,
+                        7.0
+                      ],
+                      [
+                        7.0,
+                        3.0
+                      ],
+                      [
+                        3.0,
+                        3.0
+                      ]
+                    ],
+                    "winding": "clockwise"
+                  }
+                ],
+                "nesting_depth": 0,
+                "outer_loop": {
+                  "area": 100.0,
+                  "loop_id": "loop_53fca3ec04272015",
+                  "source_curve_ids": [
+                    "outer_bottom",
+                    "outer_left",
+                    "outer_right",
+                    "outer_top"
+                  ],
+                  "vertices": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      10.0,
+                      0.0
+                    ],
+                    [
+                      10.0,
+                      10.0
+                    ],
+                    [
+                      0.0,
+                      10.0
+                    ],
+                    [
+                      0.0,
+                      0.0
+                    ]
+                  ],
+                  "winding": "counterclockwise"
+                },
+                "region_id": "region_abcdc9af008d38fb",
+                "source_curve_ids": [
+                  "inner_bottom",
+                  "inner_left",
+                  "inner_right",
+                  "inner_top",
+                  "outer_bottom",
+                  "outer_left",
+                  "outer_right",
+                  "outer_top"
+                ]
+              }
+            ],
+            "schema_version": "1.0",
+            "selection": {
+              "boundary_region_ids": [],
+              "point": [
+                1.0,
+                1.0
+              ],
+              "region_ids": [
+                "region_abcdc9af008d38fb"
+              ],
+              "status": "selected"
+            },
+            "source_curve_ids": [
+              "inner_bottom",
+              "inner_left",
+              "inner_right",
+              "inner_top",
+              "outer_bottom",
+              "outer_left",
+              "outer_right",
+              "outer_top"
+            ]
+          }
+        },
+        "status": "preview",
+        "unit": null,
+        "value": null
       },
       "status": "pass"
     }

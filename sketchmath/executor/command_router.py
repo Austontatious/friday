@@ -61,7 +61,7 @@ from sketchmath.models.entities import (
     Profile2DEntity,
     SelectionEntity,
 )
-from sketchmath.geometry.topology import detect_line_profiles
+from sketchmath.geometry.topology import detect_line_profiles, detect_planar_regions
 from sketchmath.models.geometry_command import GeometryCommand, SUPPORTED_GEOMETRY_COMMAND_TYPES
 from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
@@ -198,6 +198,9 @@ def apply_geometry_command(
         "update_circle": _handle_update_circle,
         "make_circle_profile": _handle_make_circle_profile,
         "move_point": _handle_move_point,
+        "detect_regions": _handle_detect_regions,
+        "select_region": _handle_select_region,
+        "make_region_profile": _handle_make_region_profile,
     })
     declared = set(SUPPORTED_GEOMETRY_COMMAND_TYPES)
     implemented = set(handlers)
@@ -307,6 +310,7 @@ def _handle_define_profile(command: GeometryCommand, state: SelectionContext) ->
         source_line_ids=[str(item) for item in command.parameters.get("source_line_ids", [])],
         source_curve_ids=[str(item) for item in command.parameters.get("source_curve_ids", [])],
         source_circle_id=command.parameters.get("source_circle_id"),
+        source_region_id=command.parameters.get("source_region_id"),
     )
     state.replace_entity(profile)
     _sync_named_reference(state, profile.id, label)
@@ -1376,6 +1380,127 @@ def _handle_move_point(command: GeometryCommand, state: SelectionContext) -> tup
 def _handle_detect_profiles(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
     candidates = detect_line_profiles(state)
     return state, [], None, None, {"profile_candidates": candidates, "candidate_count": len(candidates)}
+
+
+def _topology_selection_point(command: GeometryCommand) -> Point2D | None:
+    raw_point = command.parameters.get("point")
+    if raw_point is None:
+        return None
+    return _point_tuple(raw_point)
+
+
+def _handle_detect_regions(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    if command.mode != "preview":
+        raise CommandValidationError(
+            "detect_regions is a non-mutating preview command",
+            detail={"command_type": command.command_type, "mode": command.mode},
+        )
+    topology = detect_planar_regions(state, selection_point=_topology_selection_point(command))
+    payload = topology.model_dump(mode="json")
+    return state, [], None, None, {
+        "topology": payload,
+        "regions": payload["regions"],
+        "diagnostics": payload["diagnostics"],
+        "region_count": len(topology.regions),
+    }
+
+
+def _handle_select_region(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    if command.mode != "preview":
+        raise CommandValidationError(
+            "select_region is a non-mutating preview command",
+            detail={"command_type": command.command_type, "mode": command.mode},
+        )
+    point = _topology_selection_point(command)
+    if point is None:
+        raise MissingParameterError(
+            "select_region requires a point",
+            detail={"command_type": command.command_type, "parameter": "point"},
+        )
+    topology = detect_planar_regions(state, selection_point=point)
+    payload = topology.model_dump(mode="json")
+    return state, [], None, None, {
+        "topology": payload,
+        "selection": payload["selection"],
+        "regions": payload["regions"],
+        "diagnostics": payload["diagnostics"],
+    }
+
+
+def _handle_make_region_profile(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    selection_point = _topology_selection_point(command)
+    topology = detect_planar_regions(state, selection_point=selection_point)
+    region_id = str(command.parameters.get("region_id") or "")
+    if not region_id and topology.selection.status == "selected" and len(topology.selection.region_ids) == 1:
+        region_id = topology.selection.region_ids[0]
+    if not region_id:
+        raise SelectionResolutionError(
+            "Region selection is missing or ambiguous",
+            detail={
+                "command_type": command.command_type,
+                "error_code": "region_selection_required",
+                "selection": topology.selection.model_dump(mode="json"),
+            },
+        )
+    region = next((candidate for candidate in topology.regions if candidate.region_id == region_id), None)
+    if region is None:
+        raise SelectionResolutionError(
+            "Selected region no longer exists",
+            detail={
+                "command_type": command.command_type,
+                "error_code": "stale_region_reference",
+                "region_id": region_id,
+                "available_region_ids": [candidate.region_id for candidate in topology.regions],
+            },
+        )
+    profile_id = str(command.parameters.get("name") or f"profile_{region.region_id}")
+    hole_ids: list[str] = []
+    changed: list[str] = []
+    for index, hole_loop in enumerate(region.holes, start=1):
+        hole_id = f"{profile_id}_hole_{index}_{hole_loop.loop_id.removeprefix('loop_')[:8]}"
+        hole = Profile2DEntity(
+            id=hole_id,
+            vertices=hole_loop.vertices,
+            area=hole_loop.area,
+            winding=hole_loop.winding,
+            closed=True,
+            source_line_ids=[
+                curve_id
+                for curve_id in hole_loop.source_curve_ids
+                if isinstance(state.get_entity(curve_id), Line2DEntity)
+            ],
+            source_curve_ids=hole_loop.source_curve_ids,
+            source_region_id=region.region_id,
+            label=f"{profile_id} hole {index}",
+        )
+        state.replace_entity(hole)
+        hole_ids.append(hole.id)
+        changed.append(hole.id)
+    outer = Profile2DEntity(
+        id=profile_id,
+        vertices=region.outer_loop.vertices,
+        area=region.outer_loop.area,
+        winding=region.outer_loop.winding,
+        closed=True,
+        holes=hole_ids,
+        source_line_ids=[
+            curve_id
+            for curve_id in region.outer_loop.source_curve_ids
+            if isinstance(state.get_entity(curve_id), Line2DEntity)
+        ],
+        source_curve_ids=region.outer_loop.source_curve_ids,
+        source_region_id=region.region_id,
+        label=str(command.parameters.get("label") or "Planar region profile"),
+    )
+    state.replace_entity(outer)
+    changed.append(outer.id)
+    return state, changed, region.area, "square_mm", {
+        "region_id": region.region_id,
+        "profile_id": outer.id,
+        "hole_profile_ids": hole_ids,
+        "net_area": region.area,
+        "topology_schema_version": topology.schema_version,
+    }
 
 
 def _circle_profile(circle: Circle2DEntity, profile_id: str, *, segments: int = 48) -> Profile2DEntity:
@@ -2709,6 +2834,8 @@ def _curve_profile_vertices(entities: list[SelectionEntity]) -> list[Point2D]:
     for entity in entities:
         if isinstance(entity, (Line2DEntity, ConstructionLine2DEntity)):
             curve_points = list(_line_points(entity))
+        elif isinstance(entity, Circle2DEntity):
+            curve_points = _circle_profile_vertices(entity.center, entity.radius, 180)
         elif isinstance(entity, Arc2DEntity):
             segment_count = max(8, int(math.ceil(abs(entity.sweep_angle_deg) / 10.0)))
             curve_points = []
@@ -2722,7 +2849,7 @@ def _curve_profile_vertices(entities: list[SelectionEntity]) -> list[Point2D]:
                 )
         else:
             raise SelectionResolutionError(
-                "Profile source curves must be lines or arcs",
+                "Profile source curves must be lines, circles, or arcs",
                 detail={"entity_id": entity.id, "actual": entity.type},
             )
         if not vertices:
@@ -2740,6 +2867,100 @@ def _curve_profile_vertices(entities: list[SelectionEntity]) -> list[Point2D]:
         raise SelectionResolutionError("Profile source curves are open", detail={"first": vertices[0], "last": vertices[-1]})
     vertices[-1] = vertices[0]
     return vertices
+
+
+def _topology_source_line_ids(state: SelectionContext, curve_ids: list[str]) -> list[str]:
+    return [curve_id for curve_id in curve_ids if isinstance(state.get_entity(curve_id), Line2DEntity)]
+
+
+def _sync_topology_profiles(state: SelectionContext) -> None:
+    topology_profiles = [
+        entity
+        for entity in state.items
+        if isinstance(entity, Profile2DEntity) and entity.source_region_id
+    ]
+    if not topology_profiles:
+        return
+    hole_profile_ids = {
+        hole_id
+        for profile in topology_profiles
+        for hole_id in profile.holes
+    }
+    topology = detect_planar_regions(state)
+    for profile in topology_profiles:
+        if profile.id in hole_profile_ids:
+            continue
+        expected_source_ids = set(profile.source_curve_ids)
+        stored_holes: list[Profile2DEntity] = []
+        for hole_id in profile.holes:
+            hole = state.get_entity(hole_id)
+            if not isinstance(hole, Profile2DEntity):
+                raise SolverError(
+                    "Topology-backed profile hole is missing",
+                    detail={"error_code": "topology_profile_hole_missing", "profile_id": profile.id, "hole_id": hole_id},
+                )
+            stored_holes.append(hole)
+            expected_source_ids.update(hole.source_curve_ids)
+        exact = [
+            region
+            for region in topology.regions
+            if region.region_id == profile.source_region_id
+            and set(region.source_curve_ids) == expected_source_ids
+        ]
+        matches = exact or [
+            region
+            for region in topology.regions
+            if set(region.source_curve_ids) == expected_source_ids
+        ]
+        if len(matches) != 1:
+            raise SolverError(
+                "Topology-backed profile requires reference repair",
+                detail={
+                    "error_code": "topology_region_reference_ambiguous" if matches else "topology_region_reference_missing",
+                    "profile_id": profile.id,
+                    "source_region_id": profile.source_region_id,
+                    "source_curve_ids": sorted(expected_source_ids),
+                    "candidate_region_ids": [region.region_id for region in matches],
+                },
+            )
+        region = matches[0]
+        if len(region.holes) != len(stored_holes):
+            raise SolverError(
+                "Topology-backed profile hole structure changed",
+                detail={
+                    "error_code": "topology_region_hole_count_changed",
+                    "profile_id": profile.id,
+                    "expected_hole_count": len(stored_holes),
+                    "actual_hole_count": len(region.holes),
+                },
+            )
+        for stored_hole, region_hole in zip(stored_holes, region.holes, strict=True):
+            state.replace_entity(
+                Profile2DEntity(
+                    **{
+                        **stored_hole.model_dump(),
+                        "vertices": region_hole.vertices,
+                        "area": region_hole.area,
+                        "winding": region_hole.winding,
+                        "source_line_ids": _topology_source_line_ids(state, region_hole.source_curve_ids),
+                        "source_curve_ids": region_hole.source_curve_ids,
+                        "source_region_id": region.region_id,
+                    }
+                )
+            )
+        state.replace_entity(
+            Profile2DEntity(
+                **{
+                    **profile.model_dump(),
+                    "vertices": region.outer_loop.vertices,
+                    "area": region.outer_loop.area,
+                    "winding": region.outer_loop.winding,
+                    "source_line_ids": _topology_source_line_ids(state, region.outer_loop.source_curve_ids),
+                    "source_curve_ids": region.outer_loop.source_curve_ids,
+                    "source_region_id": region.region_id,
+                }
+            )
+        )
 
 
 def _sync_linked_geometry(state: SelectionContext) -> None:
@@ -2801,11 +3022,14 @@ def _sync_linked_geometry(state: SelectionContext) -> None:
                     }
                 )
             )
+    _sync_topology_profiles(state)
     entity_map = state.entity_map()
     for entity in list(state.items):
+        if isinstance(entity, Profile2DEntity) and entity.source_region_id:
+            continue
         if isinstance(entity, Profile2DEntity) and entity.source_curve_ids:
             source_curves = [entity_map.get(curve_id) for curve_id in entity.source_curve_ids]
-            if all(isinstance(curve, (Line2DEntity, ConstructionLine2DEntity, Arc2DEntity)) for curve in source_curves):
+            if all(isinstance(curve, (Line2DEntity, ConstructionLine2DEntity, Circle2DEntity, Arc2DEntity)) for curve in source_curves):
                 analysis = analyze_closed_polygon(_curve_profile_vertices(source_curves))  # type: ignore[arg-type]
                 state.replace_entity(Profile2DEntity(**{**entity.model_dump(), "vertices": analysis.vertices, "area": analysis.area, "winding": analysis.winding, "warnings": analysis.warnings}))
         elif isinstance(entity, Profile2DEntity) and entity.source_line_ids:

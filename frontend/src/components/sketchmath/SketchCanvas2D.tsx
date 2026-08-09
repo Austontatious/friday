@@ -2,7 +2,7 @@ import React from "react";
 import GridLayer from "./GridLayer";
 import EntityLayer from "./EntityLayer";
 import PreviewLayer from "./PreviewLayer";
-import type { SketchMathEntity, SketchMathOperationResult, SketchMathProfileCandidate } from "../../services/sketchmath";
+import type { SketchMathEntity, SketchMathOperationResult, SketchMathPlanarRegion } from "../../services/sketchmath";
 
 type Point = { x: number; y: number };
 type ViewBox = { x: number; y: number; width: number; height: number };
@@ -26,8 +26,10 @@ type SketchCanvas2DProps = {
   dragPreviewPoint: { id: string; point: Point } | null;
   holePlacementPreview?: { center: Point; diameter: number } | null;
   holePlacementActive?: boolean;
+  regionSelectionActive?: boolean;
   showDebugLabels?: boolean;
-  profileCandidates?: SketchMathProfileCandidate[];
+  topologyRegions?: SketchMathPlanarRegion[];
+  selectedRegionId?: string | null;
   onCanvasClick: (point: Point) => void;
   onCanvasMouseDown: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
   onCanvasMouseMove: (point: Point, event: React.MouseEvent<SVGSVGElement>) => void;
@@ -57,8 +59,10 @@ const SketchCanvas2D = ({
   dragPreviewPoint,
   holePlacementPreview,
   holePlacementActive = false,
+  regionSelectionActive = false,
   showDebugLabels = false,
-  profileCandidates = [],
+  topologyRegions = [],
+  selectedRegionId = null,
   onCanvasClick,
   onCanvasMouseDown,
   onCanvasMouseMove,
@@ -193,11 +197,13 @@ const SketchCanvas2D = ({
         selectedEntityIds={selectedEntityIds}
         focusedEntityId={focusedEntityId}
         placementActive={holePlacementActive}
+        regionSelectionActive={regionSelectionActive}
         onEntityClick={onEntityClick}
         onEntityMouseDown={onEntityMouseDown}
         onDimensionLabelEdit={onDimensionLabelEdit}
         showDebugLabels={showDebugLabels}
-        profileCandidates={profileCandidates}
+        topologyRegions={topologyRegions}
+        selectedRegionId={selectedRegionId}
       />
       {draftPoint ? <circle cx={draftPoint.x} cy={draftPoint.y} r={7} className="sketchmath-draft-point" data-testid="sketchmath-draft-point" /> : null}
       <PreviewLayer previewResult={previewResult} committedEntityIds={entities.map((entity) => entity.id)} />

@@ -102,6 +102,7 @@ class Profile2DEntity(_EntityBase):
     source_line_ids: list[str] = Field(default_factory=list)
     source_curve_ids: list[str] = Field(default_factory=list)
     source_circle_id: str | None = None
+    source_region_id: str | None = None
 
 
 SelectionEntity = Annotated[

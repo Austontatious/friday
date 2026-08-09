@@ -10,6 +10,7 @@ export type SketchMathMode =
   | "center_rectangle"
   | "slot"
   | "polygon"
+  | "region_select"
   | "box_select"
   | "polyline"
   | "hole"
@@ -87,6 +88,7 @@ export type SketchMathProfileEntity = {
   source_line_ids?: string[];
   source_curve_ids?: string[];
   source_circle_id?: string | null;
+  source_region_id?: string | null;
 };
 
 export type SketchMathEntity =
@@ -196,6 +198,9 @@ export const SKETCHMATH_COMMAND_TYPES = [
   "analyze_constraints",
   "move_point",
   "detect_profiles",
+  "detect_regions",
+  "select_region",
+  "make_region_profile",
   "make_profile",
   "define_circle",
   "update_circle",
@@ -217,7 +222,7 @@ export const SKETCHMATH_COMMAND_TYPES = [
 export type SketchMathCommandType = typeof SKETCHMATH_COMMAND_TYPES[number];
 
 export type SketchMathCommand = {
-  version: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6" | "0.7" | "0.8";
+  version: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6" | "0.7" | "0.8" | "0.9";
   command_id: string;
   mode?: "preview" | "commit";
   command_type: SketchMathCommandType;
@@ -296,6 +301,50 @@ export type SketchMathProfileCandidate = {
   area: number;
   winding: string;
   warnings: string[];
+};
+
+export type SketchMathTopologyDiagnostic = {
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+  curve_ids: string[];
+  point?: [number, number] | null;
+  detail: Record<string, unknown>;
+};
+
+export type SketchMathPlanarLoop = {
+  loop_id: string;
+  vertices: [number, number][];
+  winding: "clockwise" | "counterclockwise";
+  area: number;
+  source_curve_ids: string[];
+};
+
+export type SketchMathPlanarRegion = {
+  region_id: string;
+  outer_loop: SketchMathPlanarLoop;
+  holes: SketchMathPlanarLoop[];
+  area: number;
+  centroid: [number, number];
+  bounds: [number, number, number, number];
+  source_curve_ids: string[];
+  nesting_depth: number;
+};
+
+export type SketchMathRegionSelection = {
+  status: "not_requested" | "selected" | "none" | "boundary" | "ambiguous";
+  point?: [number, number] | null;
+  region_ids: string[];
+  boundary_region_ids: string[];
+};
+
+export type SketchMathPlanarTopology = {
+  schema_version: "1.0";
+  regions: SketchMathPlanarRegion[];
+  diagnostics: SketchMathTopologyDiagnostic[];
+  selection: SketchMathRegionSelection;
+  source_curve_ids: string[];
+  approximation: Record<string, unknown>;
 };
 
 export type SketchMathCommandResponse = {

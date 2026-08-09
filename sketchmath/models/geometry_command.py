@@ -5,7 +5,7 @@ from typing import Any, Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field
 
 
-GeometryCommandVersion = Literal["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8"]
+GeometryCommandVersion = Literal["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9"]
 GeometryCommandType = Literal[
     "measure_distance",
     "measure_angle",
@@ -45,6 +45,9 @@ GeometryCommandType = Literal[
     "analyze_constraints",
     "move_point",
     "detect_profiles",
+    "detect_regions",
+    "select_region",
+    "make_region_profile",
     "make_profile",
     "define_circle",
     "update_circle",

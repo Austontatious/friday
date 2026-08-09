@@ -199,6 +199,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByRole("button", { name: "Select", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Line", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Circle" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Region select" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Dimension" }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Parallel" })).toHaveCount(0);
     await expect(page.getByTestId("sketchmath-command-panel")).toHaveCount(0);
@@ -480,7 +481,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" })).toBeDisabled();
   });
 
-  test("detects and extrudes a profile built from four independent lines", async ({ page }) => {
+  test("detects and extrudes a topology region built from four independent lines", async ({ page }) => {
     await openSketchMath(page);
     await page.getByRole("button", { name: "Line" }).first().click();
     const segments = [
@@ -500,9 +501,9 @@ test.describe("SketchMath workspace", () => {
     await makePointsCoincident(page, 5, 6);
     await makePointsCoincident(page, 7, 0);
 
-    const candidates = page.getByTestId("sketchmath-profile-candidates");
-    await expect(candidates).toContainText("Valid closed loop", { timeout: 20000 });
-    await candidates.getByRole("button", { name: "Create profile" }).click();
+    const topologyPanel = page.getByTestId("sketchmath-topology-panel");
+    await expect(topologyPanel).toContainText("1 deterministic region detected", { timeout: 20000 });
+    await topologyPanel.getByRole("button", { name: "Create region profile 1" }).click();
     const profile = page.locator('[data-entity-type="profile_2d"]').last();
     await expect(profile).toBeAttached();
     await profile.dispatchEvent("click");
@@ -513,6 +514,87 @@ test.describe("SketchMath workspace", () => {
     await page.getByRole("button", { name: "Commit Preview" }).click();
     await expect(page.getByRole("link", { name: "Download STEP" })).toBeVisible();
     await page.screenshot({ path: screenshotPath("sketchmath-detected-line-profile-step.png"), fullPage: true });
+  });
+
+  test("selects a nested region by point, preserves its hole, reports branch diagnostics, and reloads stable references", async ({ page }) => {
+    await openSketchMath(page);
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+
+    const line = (name: string, start: [number, number], end: [number, number]) => ({
+      version: "0.9",
+      command_id: `define_${name}`,
+      mode: "commit",
+      command_type: "define_line",
+      selection: [],
+      parameters: { name, start, end },
+    });
+    const commands = [
+      line("outer_bottom", [100, 100], [400, 100]),
+      line("outer_right", [400, 100], [400, 400]),
+      line("outer_top", [400, 400], [100, 400]),
+      line("outer_left", [100, 400], [100, 100]),
+      line("inner_bottom", [200, 200], [300, 200]),
+      line("inner_right", [300, 200], [300, 300]),
+      line("inner_top", [300, 300], [200, 300]),
+      line("inner_left", [200, 300], [200, 200]),
+      line("outer_branch", [400, 250], [450, 250]),
+    ];
+    const seeded = await page.request.post(`/api/sketchmath/sessions/${sessionId}/commands/commit`, {
+      data: {
+        command: {
+          version: "0.9",
+          command_id: "seed_nested_topology",
+          mode: "commit",
+          command_type: "batch",
+          selection: [],
+          parameters: { commands },
+        },
+      },
+    });
+    expect(seeded.ok()).toBeTruthy();
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+
+    const topologyPanel = page.getByTestId("sketchmath-topology-panel");
+    await expect(topologyPanel).toContainText("2 deterministic regions detected", { timeout: 20000 });
+    await expect(topologyPanel).toContainText("1 hole");
+    await expect(page.getByTestId("sketchmath-topology-diagnostics")).toContainText("t_junction");
+
+    await page.getByRole("button", { name: "Region select" }).click();
+    await clickSvgViewBoxPoint(page, 150, 150);
+    const selectedButton = page.getByRole("button", { name: "Region selected" });
+    await expect(selectedButton).toBeVisible();
+    const selectedCard = page.locator('[data-testid^="sketchmath-region-card-"]').filter({ has: selectedButton });
+    await expect(selectedCard).toContainText("80000.00 mm²");
+    await expect(selectedCard).toContainText("1 hole");
+    await expect(page.locator("path.sketchmath-region-selected")).toHaveCount(1);
+    const selectedRegionTestId = await selectedCard.getAttribute("data-testid");
+    const selectedRegionId = selectedRegionTestId?.replace("sketchmath-region-card-", "");
+    expect(selectedRegionId).toBeTruthy();
+
+    await selectedCard.getByRole("button", { name: /Create region profile/ }).click();
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+    const committed = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    expect(committed.ok()).toBeTruthy();
+    const committedState = await committed.json() as {
+      history_length: number;
+      selection_context: { items: Array<{ id: string; type: string; holes?: string[]; source_region_id?: string | null }> };
+    };
+    const promoted = committedState.selection_context.items.find(
+      (entity) => entity.type === "profile_2d" && entity.source_region_id === selectedRegionId && (entity.holes?.length || 0) === 1,
+    );
+    expect(promoted).toBeTruthy();
+    expect(committedState.history_length).toBe(2);
+
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    const reloaded = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const reloadedState = await reloaded.json() as typeof committedState;
+    const restored = reloadedState.selection_context.items.find((entity) => entity.id === promoted?.id);
+    expect(restored?.source_region_id).toBe(selectedRegionId);
+    expect(restored?.holes).toEqual(promoted?.holes);
+    await page.screenshot({ path: screenshotPath("sketchmath-general-topology-nested-region.png"), fullPage: true });
   });
 
   test("preserves horizontal, vertical, and coincident constraints during endpoint dragging", async ({ page }) => {

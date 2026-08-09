@@ -1068,6 +1068,26 @@ input {
   filter: drop-shadow(0 0 10px rgba(116, 187, 255, 0.32));
 }
 
+.sketchmath-region {
+  fill: rgba(73, 221, 177, 0.045);
+  stroke: rgba(73, 221, 177, 0.5);
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+  pointer-events: none;
+}
+
+.sketchmath-region-selected {
+  fill: rgba(73, 221, 177, 0.2);
+  stroke: #49ddb1;
+  stroke-width: 3;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 10px rgba(73, 221, 177, 0.34));
+}
+
+.sketchmath-region-select-active [data-entity-id] {
+  pointer-events: none;
+}
+
 .sketchmath-hole-profile-selected {
   stroke-width: 3.2;
   filter: drop-shadow(0 0 8px rgba(255, 207, 90, 0.45));

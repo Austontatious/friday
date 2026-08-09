@@ -106,6 +106,20 @@ export const buildCopyLinearCommand = (selection: string[], vector: Point, count
 export const buildDetectProfilesCommand = (): SketchMathCommand =>
   baseCommand("detect_profiles", [], {});
 
+const topologyCommand = (commandType: SketchMathCommandType, parameters: Record<string, unknown>): SketchMathCommand => ({
+  ...baseCommand(commandType, [], parameters),
+  version: "0.9",
+});
+
+export const buildDetectRegionsCommand = (): SketchMathCommand =>
+  topologyCommand("detect_regions", {});
+
+export const buildSelectRegionCommand = (point: Point): SketchMathCommand =>
+  topologyCommand("select_region", { point: [Number(point.x.toFixed(2)), Number(point.y.toFixed(2))] });
+
+export const buildMakeRegionProfileCommand = (regionId: string, name?: string): SketchMathCommand =>
+  topologyCommand("make_region_profile", { region_id: regionId, ...(name ? { name } : {}) });
+
 export const buildMovePointCommand = (pointId: string, point: Point): SketchMathCommand =>
   baseCommand("move_point", [pointId], { coords: [Number(point.x.toFixed(2)), Number(point.y.toFixed(2))] });
 

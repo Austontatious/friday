@@ -120,6 +120,62 @@ def _command(command_type: str, command_id: str, *, mode: str = "preview", selec
     }
 
 
+def _topology_loop(prefix: str, minimum: float, maximum: float) -> list[dict[str, object]]:
+    return [
+        {"id": f"{prefix}_bottom", "type": "line_2d", "start": [minimum, minimum], "end": [maximum, minimum]},
+        {"id": f"{prefix}_right", "type": "line_2d", "start": [maximum, minimum], "end": [maximum, maximum]},
+        {"id": f"{prefix}_top", "type": "line_2d", "start": [maximum, maximum], "end": [minimum, maximum]},
+        {"id": f"{prefix}_left", "type": "line_2d", "start": [minimum, maximum], "end": [minimum, minimum]},
+    ]
+
+
+def test_v09_general_topology_select_promote_and_reload_round_trip(monkeypatch, tmp_path):
+    from backend.sketchmath.service import SESSION_STORE
+
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = _client(monkeypatch)
+    created = client.post(
+        "/api/sketchmath/sessions",
+        json={"selection_context": _selection_context([*_topology_loop("outer", 0, 10), *_topology_loop("inner", 3, 7)])},
+    )
+    assert created.status_code == 200
+    session_id = created.json()["session_id"]
+
+    detect_command = _command("detect_regions", "detect_regions_v09", parameters={"point": [1, 1]})
+    detect_command["version"] = "0.9"
+    detected = client.post(f"/api/sketchmath/sessions/{session_id}/commands/preview", json={"command": detect_command})
+    assert detected.status_code == 200
+    topology = detected.json()["result"]["metadata"]["topology"]
+    assert [region["area"] for region in topology["regions"]] == [16.0, 84.0]
+    assert topology["selection"]["status"] == "selected"
+    assert len(topology["selection"]["region_ids"]) == 1
+
+    promote_command = _command(
+        "make_region_profile",
+        "promote_region_v09",
+        mode="commit",
+        parameters={"point": [1, 1], "name": "profile_annulus"},
+    )
+    promote_command["version"] = "0.9"
+    promoted = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": promote_command})
+    assert promoted.status_code == 200
+    metadata = promoted.json()["result"]["metadata"]
+    assert metadata["net_area"] == 84.0
+    assert len(metadata["hole_profile_ids"]) == 1
+    outer = next(item for item in promoted.json()["selection_context"]["items"] if item["id"] == "profile_annulus")
+    assert outer["source_region_id"] == metadata["region_id"]
+    assert outer["holes"] == metadata["hole_profile_ids"]
+
+    SESSION_STORE._sessions.clear()
+    reloaded = client.get(f"/api/sketchmath/sessions/{session_id}")
+    assert reloaded.status_code == 200
+    restored_outer = next(item for item in reloaded.json()["selection_context"]["items"] if item["id"] == "profile_annulus")
+    assert restored_outer["source_region_id"] == metadata["region_id"]
+    assert restored_outer["holes"] == metadata["hole_profile_ids"]
+    assert reloaded.json()["history_length"] == 1
+    client.close()
+
+
 def test_sketchmath_session_preview_commit_and_revert(monkeypatch):
     client = _client(monkeypatch)
     created = client.post(

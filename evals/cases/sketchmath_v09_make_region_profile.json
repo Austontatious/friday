@@ -1,0 +1,47 @@
+{
+  "name": "sketchmath_v09_make_region_profile",
+  "input": {
+    "command": {
+      "version": "0.9",
+      "command_id": "cmd_eval_make_region_profile",
+      "mode": "commit",
+      "command_type": "make_region_profile",
+      "selection": [],
+      "parameters": {"point": [1, 1], "name": "profile_annulus"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_region_promotion",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "outer_bottom", "type": "line_2d", "start": [0, 0], "end": [10, 0]},
+        {"id": "outer_right", "type": "line_2d", "start": [10, 0], "end": [10, 10]},
+        {"id": "outer_top", "type": "line_2d", "start": [10, 10], "end": [0, 10]},
+        {"id": "outer_left", "type": "line_2d", "start": [0, 10], "end": [0, 0]},
+        {"id": "inner_bottom", "type": "line_2d", "start": [3, 3], "end": [7, 3]},
+        {"id": "inner_right", "type": "line_2d", "start": [7, 3], "end": [7, 7]},
+        {"id": "inner_top", "type": "line_2d", "start": [7, 7], "end": [3, 7]},
+        {"id": "inner_left", "type": "line_2d", "start": [3, 7], "end": [3, 3]}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "value": 84.0,
+    "unit": "square_mm",
+    "changed_entity_ids": ["profile_annulus_hole_1_5097be8d", "profile_annulus"],
+    "metadata": {
+      "region_id": "region_abcdc9af008d38fb",
+      "profile_id": "profile_annulus",
+      "hole_profile_ids": ["profile_annulus_hole_1_5097be8d"],
+      "net_area": 84.0,
+      "topology_schema_version": "1.0"
+    },
+    "after": {
+      "profile_annulus": {"area": 100.0, "winding": "counterclockwise"},
+      "profile_annulus_hole_1_5097be8d": {"area": 16.0, "winding": "clockwise"}
+    }
+  }
+}

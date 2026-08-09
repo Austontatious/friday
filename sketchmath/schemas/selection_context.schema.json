@@ -1402,6 +1402,18 @@
           "title": "Source Line Ids",
           "type": "array"
         },
+        "source_region_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Region Id"
+        },
         "type": {
           "const": "profile_2d",
           "default": "profile_2d",

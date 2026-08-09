@@ -1,0 +1,42 @@
+{
+  "name": "sketchmath_v09_select_region",
+  "input": {
+    "command": {
+      "version": "0.9",
+      "command_id": "cmd_eval_select_region",
+      "mode": "preview",
+      "command_type": "select_region",
+      "selection": [],
+      "parameters": {"point": [1, 1]}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_region_selection",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "outer_bottom", "type": "line_2d", "start": [0, 0], "end": [10, 0]},
+        {"id": "outer_right", "type": "line_2d", "start": [10, 0], "end": [10, 10]},
+        {"id": "outer_top", "type": "line_2d", "start": [10, 10], "end": [0, 10]},
+        {"id": "outer_left", "type": "line_2d", "start": [0, 10], "end": [0, 0]},
+        {"id": "inner_bottom", "type": "line_2d", "start": [3, 3], "end": [7, 3]},
+        {"id": "inner_right", "type": "line_2d", "start": [7, 3], "end": [7, 7]},
+        {"id": "inner_top", "type": "line_2d", "start": [7, 7], "end": [3, 7]},
+        {"id": "inner_left", "type": "line_2d", "start": [3, 7], "end": [3, 3]}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "preview",
+    "changed_entity_ids": [],
+    "metadata": {
+      "selection": {
+        "status": "selected",
+        "point": [1.0, 1.0],
+        "region_ids": ["region_abcdc9af008d38fb"],
+        "boundary_region_ids": []
+      }
+    }
+  }
+}

@@ -928,6 +928,9 @@
             "analyze_constraints",
             "move_point",
             "detect_profiles",
+            "detect_regions",
+            "select_region",
+            "make_region_profile",
             "make_profile",
             "define_circle",
             "update_circle",
@@ -979,7 +982,8 @@
             "0.5",
             "0.6",
             "0.7",
-            "0.8"
+            "0.8",
+            "0.9"
           ],
           "title": "Version",
           "type": "string"
@@ -1512,6 +1516,18 @@
           },
           "title": "Source Line Ids",
           "type": "array"
+        },
+        "source_region_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Region Id"
         },
         "type": {
           "const": "profile_2d",

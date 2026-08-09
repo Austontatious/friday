@@ -1,0 +1,45 @@
+{
+  "name": "sketchmath_v09_detect_regions",
+  "input": {
+    "command": {
+      "version": "0.9",
+      "command_id": "cmd_eval_detect_regions",
+      "mode": "preview",
+      "command_type": "detect_regions",
+      "selection": [],
+      "parameters": {}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_general_topology",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [
+        {"id": "outer_bottom", "type": "line_2d", "start": [0, 0], "end": [10, 0]},
+        {"id": "outer_right", "type": "line_2d", "start": [10, 0], "end": [10, 10]},
+        {"id": "outer_top", "type": "line_2d", "start": [10, 10], "end": [0, 10]},
+        {"id": "outer_left", "type": "line_2d", "start": [0, 10], "end": [0, 0]},
+        {"id": "inner_bottom", "type": "line_2d", "start": [3, 3], "end": [7, 3]},
+        {"id": "inner_right", "type": "line_2d", "start": [7, 3], "end": [7, 7]},
+        {"id": "inner_top", "type": "line_2d", "start": [7, 7], "end": [3, 7]},
+        {"id": "inner_left", "type": "line_2d", "start": [3, 7], "end": [3, 3]}
+      ],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "preview",
+    "changed_entity_ids": [],
+    "metadata": {
+      "region_count": 2,
+      "topology": {
+        "schema_version": "1.0",
+        "regions": [
+          {"region_id": "region_62982813611dccd0", "area": 16.0, "nesting_depth": 1, "holes": []},
+          {"region_id": "region_abcdc9af008d38fb", "area": 84.0, "nesting_depth": 0}
+        ],
+        "selection": {"status": "not_requested"}
+      }
+    }
+  }
+}

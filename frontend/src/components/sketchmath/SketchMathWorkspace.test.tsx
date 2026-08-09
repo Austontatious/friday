@@ -73,7 +73,9 @@ type Entity =
       locked: boolean;
       holes?: string[];
       source_line_ids?: string[];
+      source_curve_ids?: string[];
       source_circle_id?: string | null;
+      source_region_id?: string | null;
       label?: string | null;
     };
 
@@ -770,6 +772,53 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
     return response;
   };
 
+  const topologyPayload = (selectionPoint?: [number, number]) => {
+    const profile = snapshot.selection_context.items.find((item): item is Extract<Entity, { type: "profile_2d" }> => item.type === "profile_2d");
+    if (!profile) {
+      return {
+        schema_version: "1.0",
+        regions: [],
+        diagnostics: [{ code: "no_regions", severity: "info", message: "No bounded regions were detected.", curve_ids: [], detail: {} }],
+        selection: { status: selectionPoint ? "none" : "not_requested", point: selectionPoint || null, region_ids: [], boundary_region_ids: [] },
+        source_curve_ids: [],
+        approximation: {},
+      };
+    }
+    const regionId = "region_mock_stable";
+    const vertices = profile.vertices;
+    const xs = vertices.map((vertex) => vertex[0]);
+    const ys = vertices.map((vertex) => vertex[1]);
+    const region = {
+      region_id: regionId,
+      outer_loop: {
+        loop_id: "loop_mock_outer",
+        vertices,
+        winding: "counterclockwise",
+        area: profile.area,
+        source_curve_ids: profile.source_line_ids || [],
+      },
+      holes: [],
+      area: profile.area,
+      centroid: [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2],
+      bounds: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)],
+      source_curve_ids: profile.source_line_ids || [],
+      nesting_depth: 0,
+    };
+    return {
+      schema_version: "1.0",
+      regions: [region],
+      diagnostics: [],
+      selection: {
+        status: selectionPoint ? "selected" : "not_requested",
+        point: selectionPoint || null,
+        region_ids: selectionPoint ? [regionId] : [],
+        boundary_region_ids: [],
+      },
+      source_curve_ids: profile.source_line_ids || [],
+      approximation: {},
+    };
+  };
+
   async function fetchMockImpl(input: RequestInfo | URL, init?: RequestInit): Promise<any> {
     const url = String(input);
     const method = (init?.method || "GET").toUpperCase();
@@ -976,6 +1025,37 @@ const createSketchmathMock = (options: { failDefineLine?: boolean; failAddProfil
         response.result.metadata = { profile_candidates: [] };
         return makeResponse(response);
       }
+      if (command.command_type === "detect_regions" || command.command_type === "select_region") {
+        const response = setSnapshot(snapshot.selection_context.items, [], command, false);
+        const topology = topologyPayload(command.command_type === "select_region" ? command.parameters.point : undefined);
+        response.result.metadata = {
+          topology,
+          regions: topology.regions,
+          diagnostics: topology.diagnostics,
+          selection: topology.selection,
+          region_count: topology.regions.length,
+        };
+        return makeResponse(response);
+      }
+      if (command.command_type === "make_region_profile") {
+        const source = snapshot.selection_context.items.find((item): item is Extract<Entity, { type: "profile_2d" }> => item.type === "profile_2d");
+        if (!source) throw new Error("Mock region promotion requires a source profile");
+        const entity: Entity = {
+          ...source,
+          id: command.parameters.name,
+          source_region_id: command.parameters.region_id,
+          label: "Planar region profile",
+        };
+        const response = setSnapshot([...snapshot.selection_context.items.filter((item) => item.id !== entity.id), entity], [entity.id], command, mutate);
+        response.result.metadata = {
+          region_id: command.parameters.region_id,
+          profile_id: entity.id,
+          hole_profile_ids: [],
+          net_area: entity.area,
+          topology_schema_version: "1.0",
+        };
+        return makeResponse(response);
+      }
       if (command.command_type === "analyze_constraints") {
         return makeResponse(analyzeConstraints(command));
       }
@@ -1078,6 +1158,7 @@ describe("SketchMath workspace", () => {
     expect(screen.getByRole("button", { name: "Line" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Slot" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Polygon" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Region select" })).toBeVisible();
     expect(screen.getAllByRole("button", { name: "Box select" }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("sketchmath-editing-tools")).toHaveTextContent("Split midpoint");
     expect(screen.getAllByRole("button", { name: "Dimension" }).length).toBeGreaterThan(0);
@@ -1096,6 +1177,39 @@ describe("SketchMath workspace", () => {
     expect(screen.queryByTestId("friday-session-map")).toBeNull();
     expect(screen.queryByTestId("sketchmath-command-panel")).toBeNull();
     expect(screen.queryByTestId("sketchmath-command-box")).toBeNull();
+  });
+
+  it("selects a backend topology region by canvas point and promotes it", async () => {
+    const { fetchMock } = createSketchmathMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    renderWorkspace();
+
+    await screen.findByText("SketchMath");
+    const canvas = screen.getByTestId("sketchmath-canvas");
+    await userEvent.click(screen.getByRole("button", { name: "Draw rectangle" }));
+    clickCanvasAt(canvas, 100, 100);
+    clickCanvasAt(canvas, 300, 220);
+
+    await waitFor(() => expect(screen.getByTestId("sketchmath-topology-panel")).toHaveTextContent("1 deterministic region detected"));
+    await userEvent.click(screen.getByRole("button", { name: "Region select" }));
+    clickCanvasAt(canvas, 180, 150);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Region selected" })).toBeVisible());
+    expect(screen.getByTestId("topology-region-region_mock_stable")).toHaveClass("sketchmath-region-selected");
+    await userEvent.click(screen.getByRole("button", { name: "Create region profile 1" }));
+
+    await waitFor(() => {
+      const promoted = fetchMock.mock.calls
+        .filter(([url]) => String(url).includes("/commands/commit"))
+        .map(([, init]) => JSON.parse(String(init?.body || "{}")).command)
+        .find((command) => command?.command_type === "make_region_profile");
+      expect(promoted).toMatchObject({
+        version: "0.9",
+        mode: "commit",
+        command_type: "make_region_profile",
+        parameters: { region_id: "region_mock_stable" },
+      });
+    });
   });
 
   it("draws geometry, selects it, and exposes dimensions and constraints in the normal workspace", async () => {

@@ -19,6 +19,9 @@ import {
   buildExtendLineCommand,
   buildOffsetCurveCommand,
   buildCopyLinearCommand,
+  buildDetectRegionsCommand,
+  buildSelectRegionCommand,
+  buildMakeRegionProfileCommand,
   buildSetDiameterCommand,
   buildSetHorizontalDistanceCommand,
   buildSetLengthCommand,
@@ -143,6 +146,26 @@ describe("SketchMath command builders", () => {
     expect(buildExtendLineCommand("target", "cutter")).toMatchObject({ version: "0.8", command_type: "extend_line" });
     expect(buildOffsetCurveCommand("arc", 4)).toMatchObject({ version: "0.8", command_type: "offset_curve", parameters: { distance: 4 } });
     expect(buildCopyLinearCommand(["profile"], { x: 25, y: 0 }, 3)).toMatchObject({ command_type: "copy_linear", parameters: { vector: [25, 0], count: 3 } });
+  });
+
+  it("generates v0.9 general-topology detection, selection, and promotion commands", () => {
+    expect(buildDetectRegionsCommand()).toMatchObject({
+      version: "0.9",
+      mode: "preview",
+      command_type: "detect_regions",
+      selection: [],
+      parameters: {},
+    });
+    expect(buildSelectRegionCommand({ x: 12.345, y: 6.789 })).toMatchObject({
+      version: "0.9",
+      command_type: "select_region",
+      parameters: { point: [12.35, 6.79] },
+    });
+    expect(buildMakeRegionProfileCommand("region_stable", "profile_selected")).toMatchObject({
+      version: "0.9",
+      command_type: "make_region_profile",
+      parameters: { region_id: "region_stable", name: "profile_selected" },
+    });
   });
 
   it("generates a typed delete command for the full selected set", () => {
