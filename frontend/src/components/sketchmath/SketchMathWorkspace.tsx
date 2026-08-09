@@ -28,6 +28,7 @@ import type {
   SketchMathPreviewMesh,
   SketchMathSelectionContext,
   SketchMathSessionSnapshot,
+  SketchMathSemanticTopologyReference,
   SketchMathSolverAnalysis,
   SketchMathSolverRun,
   SketchMathTranslationOutcome,
@@ -42,6 +43,7 @@ import {
   isSketchMathArtifactJobsEnabled,
   isSketchMathEnabled,
   isSketchMathFeatureHistoryEnabled,
+  isSketchMathHoleFeaturesEnabled,
   previewSketchMathCommand,
   redoSketchMathSession,
   redoSketchMathFeature,
@@ -447,6 +449,7 @@ const SketchMathWorkspace = () => {
   const toast = useToast();
   const [enabled] = useState<boolean>(isSketchMathEnabled());
   const [featureHistoryEnabled] = useState<boolean>(isSketchMathFeatureHistoryEnabled());
+  const [holeFeaturesEnabled] = useState<boolean>(isSketchMathHoleFeaturesEnabled());
   const [artifactJobsEnabled] = useState<boolean>(isSketchMathArtifactJobsEnabled());
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -1712,7 +1715,10 @@ const SketchMathWorkspace = () => {
     });
   };
 
-  const handleUpdateFeatureDepth = async (feature: SketchMathFeature, depth: number) => {
+  const handleUpdateFeatureDepth = async (
+    feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
+    depth: number,
+  ) => {
     if (!sketchDocument) return;
     await commitFeatureOperation({
       version: "1.0",
@@ -1727,6 +1733,62 @@ const SketchMathWorkspace = () => {
           parameters: { ...feature.parameters, depth_mm: depth },
         },
       },
+    });
+  };
+
+  const handleAddSimpleHole = async (
+    target: Extract<SketchMathFeature, { feature_type: "extrude" }>,
+    topReference: SketchMathSemanticTopologyReference,
+    position: [number, number],
+    diameter: number,
+    termination: "through" | "blind",
+    depth: number | null,
+  ) => {
+    if (!sketchDocument || !holeFeaturesEnabled) return;
+    const stem = `hole_${target.feature_id.replace(/[^a-zA-Z0-9_-]+/g, "_")}`;
+    const existingIds = new Set(sketchDocument.features.map((feature) => feature.feature_id));
+    let featureId = stem;
+    let suffix = 2;
+    while (existingIds.has(featureId)) {
+      featureId = `${stem}_${suffix}`;
+      suffix += 1;
+    }
+    const feature: SketchMathFeature = {
+      feature_id: featureId,
+      feature_type: "hole",
+      name: `Hole ${sketchDocument.features.filter((item) => item.feature_type === "hole").length + 1}`,
+      body_id: target.body_id,
+      sketch_id: target.sketch_id,
+      profile_id: null,
+      source_region_id: null,
+      dependencies: [target.feature_id],
+      topology_references: [
+        {
+          reference_id: topReference.reference_id,
+          owner_feature_id: target.feature_id,
+          topology_type: "face",
+          role: "top",
+          source_entity_id: topReference.source_entity_id || null,
+          expected_signature: topReference.geometric_signature,
+        },
+      ],
+      parameters: {
+        style: "simple",
+        termination,
+        position_mm: position,
+        diameter_mm: diameter,
+        depth_mm: termination === "blind" ? depth : null,
+        operation: "cut",
+      },
+      suppressed: false,
+    };
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `add_${featureId}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "add_feature",
+      parameters: { feature },
     });
   };
 
@@ -3976,11 +4038,15 @@ const SketchMathWorkspace = () => {
                   busy={featureBusy}
                   canUndo={canFeatureUndo}
                   canRedo={canFeatureRedo}
+                  holeFeaturesEnabled={holeFeaturesEnabled}
                   artifactJobsEnabled={artifactJobsEnabled}
                   artifactJobs={artifactJobs}
                   onNewDepthValueChange={setExtrudeDepthValue}
                   onAddExtrusion={(profile, depth) => void handleAddFeatureExtrusion(profile, depth)}
                   onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
+                  onAddSimpleHole={(feature, topReference, position, diameter, termination, depth) => (
+                    void handleAddSimpleHole(feature, topReference, position, diameter, termination, depth)
+                  )}
                   onBuildArtifact={(feature) => void handleBuildFeatureArtifact(feature)}
                   onRetryArtifact={(job) => void handleRetryFeatureArtifact(job)}
                   artifactDownloadUrl={sketchMathStlDownloadUrl}

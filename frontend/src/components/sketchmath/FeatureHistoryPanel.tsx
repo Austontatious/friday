@@ -7,7 +7,16 @@ import type {
   SketchMathFeature,
   SketchMathFeatureBuildRecord,
   SketchMathProfileEntity,
+  SketchMathSemanticTopologyReference,
 } from "../../services/sketchmath";
+
+type HoleDraft = {
+  x: string;
+  y: string;
+  diameter: string;
+  depth: string;
+  termination: "through" | "blind";
+};
 
 type FeatureHistoryPanelProps = {
   document: SketchMathDocument;
@@ -16,11 +25,20 @@ type FeatureHistoryPanelProps = {
   busy: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  holeFeaturesEnabled: boolean;
   artifactJobsEnabled: boolean;
   artifactJobs: Record<string, SketchMathArtifactJobManifest>;
   onNewDepthValueChange: (value: string) => void;
   onAddExtrusion: (profile: SketchMathProfileEntity, depth: number) => void;
-  onUpdateDepth: (feature: SketchMathFeature, depth: number) => void;
+  onUpdateDepth: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, depth: number) => void;
+  onAddSimpleHole: (
+    feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
+    topReference: SketchMathSemanticTopologyReference,
+    position: [number, number],
+    diameter: number,
+    termination: "through" | "blind",
+    depth: number | null,
+  ) => void;
   onBuildArtifact: (feature: SketchMathFeature) => void;
   onRetryArtifact: (job: SketchMathArtifactJobManifest) => void;
   artifactDownloadUrl: (path: string) => string;
@@ -43,11 +61,13 @@ const FeatureHistoryPanel = ({
   busy,
   canUndo,
   canRedo,
+  holeFeaturesEnabled,
   artifactJobsEnabled,
   artifactJobs,
   onNewDepthValueChange,
   onAddExtrusion,
   onUpdateDepth,
+  onAddSimpleHole,
   onBuildArtifact,
   onRetryArtifact,
   artifactDownloadUrl,
@@ -55,6 +75,7 @@ const FeatureHistoryPanel = ({
   onRedo,
 }: FeatureHistoryPanelProps) => {
   const [depthDrafts, setDepthDrafts] = useState<Record<string, string>>({});
+  const [holeDrafts, setHoleDrafts] = useState<Record<string, HoleDraft>>({});
   const buildRecords = useMemo(
     () => recordByFeature(document.last_rebuild?.records || []),
     [document.last_rebuild?.records],
@@ -62,9 +83,29 @@ const FeatureHistoryPanel = ({
 
   useEffect(() => {
     setDepthDrafts(Object.fromEntries(
-      document.features.map((feature) => [feature.feature_id, String(feature.parameters.depth_mm)]),
+      document.features
+        .filter((feature): feature is Extract<SketchMathFeature, { feature_type: "extrude" }> => feature.feature_type === "extrude")
+        .map((feature) => [feature.feature_id, String(feature.parameters.depth_mm)]),
     ));
   }, [document.features]);
+
+  useEffect(() => {
+    setHoleDrafts((current) => Object.fromEntries(
+      document.features
+        .filter((feature): feature is Extract<SketchMathFeature, { feature_type: "extrude" }> => feature.feature_type === "extrude")
+        .map((feature) => {
+          const record = buildRecords[feature.feature_id];
+          const bounds = record?.measurements?.bounds_mm;
+          return [feature.feature_id, current[feature.feature_id] || {
+            x: bounds ? String((bounds[0] + bounds[1]) / 2) : "0",
+            y: bounds ? String((bounds[2] + bounds[3]) / 2) : "0",
+            diameter: "4",
+            depth: bounds ? String((bounds[5] - bounds[4]) / 2) : "5",
+            termination: "through",
+          }];
+        }),
+    ));
+  }, [buildRecords, document.features]);
 
   const newDepth = validDepth(newDepthValue);
 
@@ -109,8 +150,10 @@ const FeatureHistoryPanel = ({
           <Text fontSize="sm" opacity={0.72}>No committed features yet.</Text>
         ) : document.features.map((feature) => {
           const record = buildRecords[feature.feature_id];
-          const depthDraft = depthDrafts[feature.feature_id] ?? String(feature.parameters.depth_mm);
-          const nextDepth = validDepth(depthDraft);
+          const depthDraft = feature.feature_type === "extrude"
+            ? depthDrafts[feature.feature_id] ?? String(feature.parameters.depth_mm)
+            : "";
+          const nextDepth = feature.feature_type === "extrude" ? validDepth(depthDraft) : null;
           const artifactJob = artifactJobs[feature.feature_id];
           const registeredArtifact = artifactJob?.result?.artifact
             || document.artifacts.find((artifact) => (
@@ -118,17 +161,33 @@ const FeatureHistoryPanel = ({
               && artifact.revision === document.revision
               && artifact.format === "stl"
             ));
-          const canBuildArtifact = record?.status === "succeeded"
+          const canBuildArtifact = feature.feature_type === "extrude"
+            && record?.status === "succeeded"
             && feature.parameters.operation === "new_body"
             && feature.parameters.extent === "one_sided"
             && feature.parameters.direction === "positive"
             && feature.dependencies.length === 0;
           const artifactBusy = artifactJob?.state === "READY" || artifactJob?.state === "RUNNING";
+          const topReference = record?.generated_topology.find((reference) => reference.topology_type === "face" && reference.role === "top");
+          const holeDraft = holeDrafts[feature.feature_id];
+          const holeX = Number(holeDraft?.x);
+          const holeY = Number(holeDraft?.y);
+          const holeDiameter = Number(holeDraft?.diameter);
+          const holeDepth = Number(holeDraft?.depth);
+          const validHoleDraft = Boolean(
+            holeDraft
+            && Number.isFinite(holeX)
+            && Number.isFinite(holeY)
+            && Number.isFinite(holeDiameter)
+            && holeDiameter > 0
+            && (holeDraft.termination === "through" || (Number.isFinite(holeDepth) && holeDepth > 0)),
+          );
           return (
             <Box key={feature.feature_id} className="sketchmath-history-row" data-testid={`sketchmath-feature-${feature.feature_id}`}>
               <Text fontWeight="600">{feature.name}</Text>
               <Text fontSize="sm" opacity={0.75}>
-                {feature.parameters.operation} · {record?.status || "not rebuilt"} · profile {feature.profile_id}
+                {feature.feature_type} · {feature.parameters.operation} · {record?.status || "not rebuilt"}
+                {feature.feature_type === "extrude" ? ` · profile ${feature.profile_id}` : ` · ${feature.parameters.style} ${feature.parameters.termination}`}
                 {record ? ` · ${record.generated_topology.length} semantic refs` : ""}
               </Text>
               {record?.measurements ? (
@@ -141,25 +200,109 @@ const FeatureHistoryPanel = ({
                   Signature {record.output_signature.slice(0, 12)}
                 </Text>
               ) : null}
-              <HStack spacing={2} flexWrap="wrap" mt={2}>
-                <Input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  aria-label={`Feature depth ${feature.feature_id}`}
-                  value={depthDraft}
-                  onChange={(event) => setDepthDrafts((current) => ({ ...current, [feature.feature_id]: event.target.value }))}
-                  width="110px"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => nextDepth != null && onUpdateDepth(feature, nextDepth)}
-                  isDisabled={nextDepth == null || nextDepth === feature.parameters.depth_mm || busy}
-                >
-                  Apply depth
-                </Button>
-              </HStack>
+              {feature.feature_type === "extrude" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2}>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    aria-label={`Feature depth ${feature.feature_id}`}
+                    value={depthDraft}
+                    onChange={(event) => setDepthDrafts((current) => ({ ...current, [feature.feature_id]: event.target.value }))}
+                    width="110px"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => nextDepth != null && onUpdateDepth(feature, nextDepth)}
+                    isDisabled={nextDepth == null || nextDepth === feature.parameters.depth_mm || busy}
+                  >
+                    Apply depth
+                  </Button>
+                </HStack>
+              ) : null}
+              {holeFeaturesEnabled && feature.feature_type === "extrude" ? (
+                <Box mt={2} data-testid={`sketchmath-hole-editor-${feature.feature_id}`}>
+                  <Text fontSize="sm" fontWeight="600">Simple hole</Text>
+                  <HStack spacing={2} flexWrap="wrap" mt={1}>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      aria-label={`Hole X ${feature.feature_id}`}
+                      value={holeDraft?.x || ""}
+                      onChange={(event) => setHoleDrafts((current) => ({
+                        ...current,
+                        [feature.feature_id]: { ...current[feature.feature_id], x: event.target.value },
+                      }))}
+                      width="90px"
+                    />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      aria-label={`Hole Y ${feature.feature_id}`}
+                      value={holeDraft?.y || ""}
+                      onChange={(event) => setHoleDrafts((current) => ({
+                        ...current,
+                        [feature.feature_id]: { ...current[feature.feature_id], y: event.target.value },
+                      }))}
+                      width="90px"
+                    />
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      aria-label={`Hole diameter ${feature.feature_id}`}
+                      value={holeDraft?.diameter || ""}
+                      onChange={(event) => setHoleDrafts((current) => ({
+                        ...current,
+                        [feature.feature_id]: { ...current[feature.feature_id], diameter: event.target.value },
+                      }))}
+                      width="90px"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setHoleDrafts((current) => ({
+                        ...current,
+                        [feature.feature_id]: {
+                          ...current[feature.feature_id],
+                          termination: current[feature.feature_id]?.termination === "blind" ? "through" : "blind",
+                        },
+                      }))}
+                    >
+                      {holeDraft?.termination === "blind" ? "Blind" : "Through"}
+                    </Button>
+                    {holeDraft?.termination === "blind" ? (
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        aria-label={`Hole depth ${feature.feature_id}`}
+                        value={holeDraft.depth}
+                        onChange={(event) => setHoleDrafts((current) => ({
+                          ...current,
+                          [feature.feature_id]: { ...current[feature.feature_id], depth: event.target.value },
+                        }))}
+                        width="90px"
+                      />
+                    ) : null}
+                    <Button
+                      size="sm"
+                      onClick={() => topReference && holeDraft && onAddSimpleHole(
+                        feature,
+                        topReference,
+                        [holeX, holeY],
+                        holeDiameter,
+                        holeDraft.termination,
+                        holeDraft.termination === "blind" ? holeDepth : null,
+                      )}
+                      isDisabled={!topReference || !validHoleDraft || busy}
+                    >
+                      Add simple hole
+                    </Button>
+                  </HStack>
+                </Box>
+              ) : null}
               {artifactJobsEnabled ? (
                 <Box mt={2} data-testid={`sketchmath-artifact-job-${feature.feature_id}`}>
                   <HStack spacing={2} flexWrap="wrap">

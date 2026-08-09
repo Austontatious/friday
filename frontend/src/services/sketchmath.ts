@@ -289,6 +289,19 @@ export type SketchMathExtrudeParameters = {
   operation: "new_body" | "add" | "cut";
 };
 
+export type SketchMathHoleParameters = {
+  style: "simple" | "counterbore" | "countersink";
+  termination: "through" | "blind";
+  position_mm: [number, number];
+  diameter_mm: number;
+  depth_mm?: number | null;
+  counterbore_diameter_mm?: number | null;
+  counterbore_depth_mm?: number | null;
+  countersink_diameter_mm?: number | null;
+  countersink_angle_deg?: number | null;
+  operation: "cut";
+};
+
 export type SketchMathTopologyReferenceSelector = {
   reference_id: string;
   owner_feature_id: string;
@@ -309,19 +322,30 @@ export type SketchMathSemanticTopologyReference = {
   measurements: Record<string, number | string>;
 };
 
-export type SketchMathFeature = {
+type SketchMathFeatureBase = {
   feature_id: string;
-  feature_type: "extrude";
   name: string;
   body_id: string;
   sketch_id: string;
-  profile_id: string;
   source_region_id?: string | null;
   dependencies: string[];
   topology_references: SketchMathTopologyReferenceSelector[];
-  parameters: SketchMathExtrudeParameters;
   suppressed: boolean;
 };
+
+export type SketchMathExtrudeFeature = SketchMathFeatureBase & {
+  feature_type: "extrude";
+  profile_id: string;
+  parameters: SketchMathExtrudeParameters;
+};
+
+export type SketchMathHoleFeature = SketchMathFeatureBase & {
+  feature_type: "hole";
+  profile_id?: null;
+  parameters: SketchMathHoleParameters;
+};
+
+export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature;
 
 export type SketchMathFeatureBuildRecord = {
   feature_id: string;
@@ -701,6 +725,14 @@ export const isSketchMathEnabled = (): boolean => {
 
 export const isSketchMathFeatureHistoryEnabled = (): boolean => {
   const raw = process.env.REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED;
+  if (raw == null || String(raw).trim() === "") {
+    return false;
+  }
+  return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
+};
+
+export const isSketchMathHoleFeaturesEnabled = (): boolean => {
+  const raw = process.env.REACT_APP_SKETCHMATH_HOLE_FEATURES_ENABLED;
   if (raw == null || String(raw).trim() === "") {
     return false;
   }

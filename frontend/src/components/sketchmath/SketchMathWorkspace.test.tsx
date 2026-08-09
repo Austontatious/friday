@@ -1106,6 +1106,7 @@ describe("SketchMath workspace", () => {
     window.localStorage.clear();
     process.env.REACT_APP_SKETCHMATH_ENABLED = "1";
     delete process.env.REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED;
+    delete process.env.REACT_APP_SKETCHMATH_HOLE_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED;
     stamp.value = 1710000000000;
     jest.spyOn(Date, "now").mockImplementation(() => stamp.value);

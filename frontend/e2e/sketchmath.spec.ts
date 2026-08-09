@@ -370,7 +370,11 @@ test.describe("SketchMath workspace", () => {
     type FeatureSnapshot = {
       document: {
         revision: number;
-        features: Array<{ feature_id: string; parameters: { depth_mm: number } }>;
+        features: Array<{
+          feature_id: string;
+          feature_type: "extrude" | "hole";
+          parameters: { depth_mm?: number; diameter_mm?: number };
+        }>;
         artifacts: Array<{ feature_id: string; revision: number; format: string; path: string }>;
         last_rebuild: { records: Array<{ feature_id: string; output_signature: string }> };
       };
@@ -424,6 +428,29 @@ test.describe("SketchMath workspace", () => {
     await stlDownload.click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.stl$/);
+
+    await page.getByLabel(`Hole diameter ${featureId}`).fill("20");
+    await page.getByTestId(`sketchmath-hole-editor-${featureId}`).getByRole("button", { name: "Add simple hole" }).click();
+    await expect(page.getByTestId("sketchmath-feature-history-panel")).toContainText("Revision 6");
+    const holeResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const withHole = await holeResponse.json() as FeatureSnapshot;
+    const holeFeature = withHole.document.features.find((feature) => feature.feature_type === "hole");
+    expect(holeFeature?.parameters.diameter_mm).toBe(20);
+    expect(withHole.document.last_rebuild.records[1]).toMatchObject({ feature_id: holeFeature?.feature_id });
+
+    await page.getByLabel(`Feature depth ${featureId}`).fill("30");
+    await page.getByTestId(`sketchmath-feature-${featureId}`).getByRole("button", { name: "Apply depth" }).click();
+    await expect(page.getByTestId("sketchmath-feature-history-panel")).toContainText("Revision 7");
+    const recoveredResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const recovered = await recoveredResponse.json() as FeatureSnapshot & {
+      document: FeatureSnapshot["document"] & {
+        last_rebuild: { records: Array<{ feature_id: string; output_signature: string; resolved_references?: Array<{ recovery_state: string }> }> };
+      };
+    };
+    expect(recovered.document.last_rebuild.records[1].resolved_references?.[0].recovery_state).toBe("recovered");
+
+    await page.reload();
+    await expect(page.getByTestId(`sketchmath-feature-${holeFeature?.feature_id}`)).toContainText("hole · cut · succeeded");
   });
 
   test("creates a center-defined rectangle through the canonical rectangle bundle", async ({ page }) => {
