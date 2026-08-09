@@ -11,8 +11,8 @@ from sketchmath.cad.solid_validation import validate_solid_measurements
 from sketchmath.cad.stl_export import write_ascii_stl
 from sketchmath.executor.errors import CadExportError, FeatureRebuildError, MissingEntityError, UnsupportedCadFormatError
 from sketchmath.features.rebuild import rebuild_document
-from sketchmath.models.document import ChamferParameters, ExtrudeParameters, FeatureBuildRecord, FeatureRecord, FilletParameters, SketchMathDocument
-from sketchmath.models.entities import Profile2DEntity
+from sketchmath.models.document import ChamferParameters, ExtrudeParameters, FeatureBuildRecord, FeatureRecord, FilletParameters, HoleParameters, SketchMathDocument
+from sketchmath.models.entities import Circle2DEntity, Profile2DEntity
 
 
 def _safe_segment(value: str) -> str:
@@ -34,6 +34,24 @@ def _source_geometry(document: SketchMathDocument, feature: FeatureRecord) -> tu
             raise CadExportError("Feature hole source is not a profile", detail={"hole_id": hole_id})
         holes.append(hole)
     return profile, holes
+
+
+def _profile_payload(document: SketchMathDocument, sketch_id: str, profile: Profile2DEntity) -> dict[str, Any]:
+    payload = profile.model_dump(mode="json")
+    if profile.source_circle_id:
+        sketch = next((item for item in document.sketches if item.sketch_id == sketch_id), None)
+        circle = sketch.state.get_entity(profile.source_circle_id) if sketch is not None else None
+        if not isinstance(circle, Circle2DEntity):
+            raise CadExportError(
+                "Circular feature profile references a missing source circle",
+                detail={"profile_id": profile.id, "source_circle_id": profile.source_circle_id},
+            )
+        payload["analytic_circle"] = {
+            "source_entity_id": circle.id,
+            "center_mm": list(circle.center),
+            "radius_mm": circle.radius,
+        }
+    return payload
 
 
 def _validated_feature(document: SketchMathDocument, feature_id: str) -> tuple[FeatureRecord, FeatureBuildRecord]:
@@ -98,14 +116,71 @@ def _edge_finish_step_payload(document: SketchMathDocument, feature: FeatureReco
         for item in document.features[: terminal_index + 1]
         if item.body_id == feature.body_id and not item.suppressed
     ]
-    if [item.feature_id for item in body_features] != [target.feature_id, feature.feature_id]:
+    build_features = body_features[:-1]
+    if not build_features or build_features[0].feature_type != "extrude":
         raise CadExportError(
-            f"Canonical {feature_name} STEP currently supports exactly one base extrusion followed by one edge finish",
+            f"Canonical {feature_name} STEP requires a base extrusion before the terminal edge finish",
             detail={"feature_ids": [item.feature_id for item in body_features], "error_code": "unsupported_edge_finish_graph"},
         )
     report = rebuild_document(document)
+    records_by_id = {item.feature_id: item for item in report.records}
+    operations: list[dict[str, Any]] = []
+    for index, item in enumerate(build_features):
+        record = records_by_id[item.feature_id]
+        if record.measurements is None:
+            raise CadExportError(
+                "Canonical edge-finish STEP requires analytic bounds before the terminal kernel feature",
+                detail={"feature_id": item.feature_id, "error_code": "unsupported_edge_finish_graph"},
+            )
+        z_min, z_max = record.measurements.bounds_mm[-2:]
+        if item.feature_type == "extrude" and isinstance(item.parameters, ExtrudeParameters):
+            if (
+                item.parameters.operation not in {"new_body", "add"}
+                or item.parameters.extent != "one_sided"
+                or item.parameters.direction != "positive"
+                or (index == 0 and (item.parameters.operation != "new_body" or item.dependencies))
+                or (index > 0 and item.parameters.operation != "add")
+            ):
+                raise CadExportError(
+                    "Canonical edge-finish STEP supports one positive base plus positive additive extrusions",
+                    detail={"feature_id": item.feature_id, "error_code": "unsupported_edge_finish_graph"},
+                )
+            profile, holes = _source_geometry(document, item)
+            operations.append(
+                {
+                    "feature_id": item.feature_id,
+                    "feature_type": "extrude",
+                    "operation": item.parameters.operation,
+                    "profile": _profile_payload(document, item.sketch_id, profile),
+                    "holes": [_profile_payload(document, item.sketch_id, hole) for hole in holes],
+                    "z_min_mm": z_min,
+                    "z_max_mm": z_max,
+                }
+            )
+        elif item.feature_type == "hole" and isinstance(item.parameters, HoleParameters):
+            if item.parameters.style != "simple":
+                raise CadExportError(
+                    "Canonical edge-finish STEP currently supports simple holes",
+                    detail={"feature_id": item.feature_id, "style": item.parameters.style, "error_code": "unsupported_edge_finish_graph"},
+                )
+            operations.append(
+                {
+                    "feature_id": item.feature_id,
+                    "feature_type": "hole",
+                    "operation": "cut",
+                    "center_mm": list(item.parameters.position_mm),
+                    "diameter_mm": item.parameters.diameter_mm,
+                    "z_min_mm": z_min,
+                    "z_max_mm": z_max,
+                }
+            )
+        else:
+            raise CadExportError(
+                "Canonical edge-finish STEP graph contains an unsupported intermediate feature",
+                detail={"feature_id": item.feature_id, "feature_type": item.feature_type, "error_code": "unsupported_edge_finish_graph"},
+            )
     target_record = next(item for item in report.records if item.feature_id == target.feature_id)
-    fillet_record = next(item for item in report.records if item.feature_id == feature.feature_id)
+    fillet_record = records_by_id[feature.feature_id]
     edge_payloads: list[dict[str, Any]] = []
     for resolved in fillet_record.resolved_references:
         edge = next(
@@ -123,14 +198,31 @@ def _edge_finish_step_payload(document: SketchMathDocument, feature: FeatureReco
                 ],
             }
         )
-    profile, holes = _source_geometry(document, target)
+    positive_bounds = [
+        records_by_id[item.feature_id].measurements.bounds_mm
+        for item in build_features
+        if records_by_id[item.feature_id].measurements is not None
+        and records_by_id[item.feature_id].measurements.volume_delta_mm3 > 0
+    ]
+    expected_bounds = {
+        "xmin": min(item[0] for item in positive_bounds),
+        "xmax": max(item[1] for item in positive_bounds),
+        "ymin": min(item[2] for item in positive_bounds),
+        "ymax": max(item[3] for item in positive_bounds),
+        "zmin": min(item[4] for item in positive_bounds),
+        "zmax": max(item[5] for item in positive_bounds),
+    }
     return {
         "feature_type": feature_name,
-        "base_extrusion": {
-            "feature_id": target.feature_id,
-            "profile": profile.model_dump(mode="json"),
-            "holes": [hole.model_dump(mode="json") for hole in holes],
-            "depth_mm": target.parameters.depth_mm,
+        "operations": operations,
+        "expected_pre_finish": {
+            "bbox": expected_bounds,
+            "volume_mm3": sum(
+                records_by_id[item.feature_id].measurements.volume_delta_mm3
+                for item in build_features
+                if records_by_id[item.feature_id].measurements is not None
+            ),
+            "hole_count": sum(item.feature_type == "hole" for item in build_features),
         },
         feature_name: {
             "feature_id": feature.feature_id,

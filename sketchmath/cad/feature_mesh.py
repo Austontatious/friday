@@ -236,12 +236,31 @@ def build_feature_body_mesh(document: SketchMathDocument, terminal_feature_id: s
         if feature.body_id == terminal.body_id and not feature.suppressed
     ]
     records = {record.feature_id: record for record in report.records}
+    unsupported = next(
+        (
+            feature
+            for feature in features
+            if not isinstance(feature.parameters, (ExtrudeParameters, HoleParameters))
+            or records[feature.feature_id].measurements is None
+        ),
+        None,
+    )
+    if unsupported is not None:
+        raise CadExportError(
+            "Layered STL currently supports extrusion and simple-hole feature graphs",
+            detail={
+                "feature_id": unsupported.feature_id,
+                "feature_type": unsupported.feature_type,
+                "error_code": "unsupported_stl_feature_type",
+            },
+        )
     levels = sorted(
         {
             value
             for feature in features
-            for value in (records[feature.feature_id].measurements.bounds_mm[-2:])
-            if records[feature.feature_id].measurements is not None
+            for record in [records[feature.feature_id]]
+            if record.measurements is not None
+            for value in record.measurements.bounds_mm[-2:]
         }
     )
     if len(levels) < 2:

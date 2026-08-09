@@ -8,6 +8,7 @@ import sys
 from typing import Any
 
 import FreeCAD  # type: ignore
+import Part  # type: ignore
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -30,32 +31,111 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _build_base(payload: dict[str, Any]) -> tuple[Any, str]:
-    base = payload["base_extrusion"]
-    profile = base["profile"]
-    holes = base.get("holes") or []
+def _profile_face(profile: dict[str, Any], holes: list[dict[str, Any]]) -> tuple[Any, str]:
+    analytic_circle = profile.get("analytic_circle")
+    if analytic_circle:
+        if holes:
+            raise ValueError("Analytic circular extrusion with profile holes is not supported")
+        center = analytic_circle["center_mm"]
+        radius_mm = float(analytic_circle["radius_mm"])
+        if not math.isfinite(radius_mm) or radius_mm <= 0:
+            raise ValueError("Analytic circle radius must be positive and finite")
+        edge = Part.makeCircle(radius_mm, FreeCAD.Vector(float(center[0]), float(center[1]), 0.0))
+        return Part.Face(Part.Wire([edge])), "analytic_circle"
     outer_vertices = _vertices_to_points(profile["vertices"])
     hole_vertices = [_vertices_to_points(hole["vertices"]) for hole in holes]
     if len(outer_vertices) < 4 or outer_vertices[0] != outer_vertices[-1]:
-        raise ValueError("Base extrusion profile must be a closed polygon")
+        raise ValueError("Extrusion profile must be a closed polygon")
     ok, reason = _validate_hole_geometry(outer_vertices, hole_vertices)
     if not ok:
         raise ValueError(reason or "Invalid base extrusion profile")
     normalized_outer, _ = _normalize_winding(outer_vertices, clockwise=False)
     normalized_holes = [_normalize_winding(vertices, clockwise=True)[0] for vertices in hole_vertices]
-    depth_mm = float(base["depth_mm"])
-    if not math.isfinite(depth_mm) or depth_mm <= 0:
-        raise ValueError("Base extrusion depth must be positive and finite")
     try:
-        face = _face_with_holes(normalized_outer, normalized_holes)
-        return _extrude_shape(face, depth_mm, "positive_normal"), "face_with_holes"
+        return _face_with_holes(normalized_outer, normalized_holes), "face_with_holes"
     except Exception:
         face = _face_with_holes(normalized_outer, [])
-        solid = _extrude_shape(face, depth_mm, "positive_normal")
         for vertices in normalized_holes:
-            cutter = _extrude_shape(_face_with_holes(vertices, []), depth_mm, "positive_normal")
+            cutter = _face_with_holes(vertices, [])
+            face = face.cut(cutter)
+        return face, "boolean_subtraction"
+
+
+def _build_extrusion(operation: dict[str, Any]) -> tuple[Any, str]:
+    z_min = float(operation["z_min_mm"])
+    z_max = float(operation["z_max_mm"])
+    depth_mm = z_max - z_min
+    if not math.isfinite(depth_mm) or depth_mm <= 0:
+        raise ValueError("Extrusion bounds must define a positive finite depth")
+    face, strategy = _profile_face(operation["profile"], operation.get("holes") or [])
+    solid = _extrude_shape(face, depth_mm, "positive_normal")
+    if abs(z_min) > 1e-12:
+        solid.translate(FreeCAD.Vector(0.0, 0.0, z_min))
+    return solid, strategy
+
+
+def _build_body(operations: list[dict[str, Any]]) -> tuple[Any, list[dict[str, Any]]]:
+    if not operations:
+        raise ValueError("Feature graph requires at least one pre-finish operation")
+    solid = None
+    execution: list[dict[str, Any]] = []
+    for index, operation in enumerate(operations):
+        feature_type = operation.get("feature_type")
+        if feature_type == "extrude":
+            candidate, strategy = _build_extrusion(operation)
+            mode = operation.get("operation")
+            if index == 0:
+                if mode != "new_body":
+                    raise ValueError("First feature-graph operation must be a new-body extrusion")
+                solid = candidate
+            elif mode == "add":
+                solid = solid.fuse(candidate)
+            else:
+                raise ValueError("Feature-graph extrusions after the base must be additive")
+            execution.append(
+                {
+                    "feature_id": operation.get("feature_id"),
+                    "feature_type": feature_type,
+                    "operation": mode,
+                    "strategy": strategy,
+                }
+            )
+        elif feature_type == "hole":
+            if solid is None:
+                raise ValueError("Hole operation requires an existing solid")
+            center = operation["center_mm"]
+            radius_mm = float(operation["diameter_mm"]) / 2.0
+            z_min = float(operation["z_min_mm"])
+            z_max = float(operation["z_max_mm"])
+            depth_mm = z_max - z_min
+            if not all(math.isfinite(value) for value in (float(center[0]), float(center[1]), radius_mm, depth_mm)):
+                raise ValueError("Hole geometry must be finite")
+            if radius_mm <= 0 or depth_mm <= 0:
+                raise ValueError("Hole diameter and depth must be positive")
+            epsilon = 1e-5
+            cutter = Part.makeCylinder(
+                radius_mm,
+                depth_mm + 2 * epsilon,
+                FreeCAD.Vector(float(center[0]), float(center[1]), z_min - epsilon),
+            )
             solid = solid.cut(cutter)
-        return solid, "boolean_subtraction"
+            execution.append(
+                {
+                    "feature_id": operation.get("feature_id"),
+                    "feature_type": feature_type,
+                    "operation": "cut",
+                    "diameter_mm": radius_mm * 2.0,
+                    "depth_mm": depth_mm,
+                }
+            )
+        else:
+            raise ValueError(f"Unsupported feature-graph operation: {feature_type}")
+        if hasattr(solid, "removeSplitter"):
+            solid = solid.removeSplitter()
+        intermediate = _solid_measurements(solid)
+        if intermediate["is_valid_solid"] is not True or intermediate["volume_mm3"] <= 0:
+            raise ValueError(f"Feature-graph operation {operation.get('feature_id')} produced an invalid solid")
+    return solid, execution
 
 
 def _point(edge_vertex: Any) -> tuple[float, float, float]:
@@ -117,6 +197,19 @@ def _bounds_equal(left: dict[str, float | None], right: dict[str, float | None],
     )
 
 
+def _cylindrical_face_radii(solid: Any) -> list[float]:
+    radii: list[float] = []
+    for face in getattr(solid, "Faces", []):
+        surface = getattr(face, "Surface", None)
+        radius = getattr(surface, "Radius", None)
+        if radius is None:
+            continue
+        value = float(radius)
+        if math.isfinite(value) and value > 0:
+            radii.append(value)
+    return sorted(radii)
+
+
 def main() -> int:
     args = _parse_args()
     input_path = Path(args.input_json)
@@ -138,8 +231,18 @@ def main() -> int:
     if not selectors:
         raise ValueError(f"{feature_type.title()} requires at least one semantic edge selector")
 
-    base_solid, base_strategy = _build_base(payload)
+    operations = payload.get("operations") or []
+    base_solid, operation_execution = _build_body(operations)
     base_measurements = _solid_measurements(base_solid)
+    expected = payload.get("expected_pre_finish") or {}
+    expected_bbox = expected.get("bbox")
+    expected_volume = expected.get("volume_mm3")
+    if expected_bbox and not _bounds_equal(base_measurements["bbox"], expected_bbox):
+        raise ValueError("Feature graph did not preserve canonical pre-finish bounds")
+    if expected_volume is not None:
+        volume_tolerance = max(1e-5, abs(float(expected_volume)) * 1e-8)
+        if abs(base_measurements["volume_mm3"] - float(expected_volume)) > volume_tolerance:
+            raise ValueError("Feature graph did not preserve canonical pre-finish volume")
     selected_edges, edge_resolution = _resolve_edges(base_solid, selectors)
     finished = (
         base_solid.makeFillet(size_mm, selected_edges)
@@ -161,7 +264,7 @@ def main() -> int:
     finished.exportStep(str(step_path))
     validation = {
         "status": "export_ready",
-        "profile_id": payload["base_extrusion"]["profile"]["id"],
+        "profile_id": operations[0]["profile"]["id"],
         "command_id": payload["command_id"],
         "command_type": f"{feature_type}_feature_graph",
         "artifacts": {
@@ -173,13 +276,16 @@ def main() -> int:
         "warnings": [],
         "metadata": {
             "freecad_version": getattr(FreeCAD, "__version__", None),
-            "base_strategy": base_strategy,
-            "base_volume_mm3": base_measurements["volume_mm3"],
+            "operation_execution": operation_execution,
+            "pre_finish_volume_mm3": base_measurements["volume_mm3"],
+            "pre_finish_bbox": base_measurements["bbox"],
             "volume_delta_mm3": measurements["volume_mm3"] - base_measurements["volume_mm3"],
             f"{size_name}_mm": size_mm,
             "selected_edge_count": len(selected_edges),
             "semantic_edge_resolution": edge_resolution,
             "reference_policy": "semantic_endpoints_unique_match",
+            "canonical_hole_count": int(expected.get("hole_count") or 0),
+            "cylindrical_face_radii_mm": _cylindrical_face_radii(finished),
         },
     }
     validation_path.write_text(json.dumps(validation, indent=2, sort_keys=True), encoding="utf-8")
