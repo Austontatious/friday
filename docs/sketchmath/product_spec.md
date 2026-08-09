@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `53a39ed` (guarded kernel-backed fillet slice; evidence: `fillet_feature_contract.md` and `status.md`)
+Last validated SketchMath code milestone: `f1b0b2c` (guarded kernel-backed chamfer slice; evidence: `chamfer_feature_contract.md` and `status.md`)
 
 ## Mission
 
@@ -106,7 +106,7 @@ Phase 2 status: passed for the documented v0.9 regular-line, circle, and finite-
 - `SM-REF-001`: downstream references use semantic source/signature/recovery data rather than permanent raw kernel indices.
 - `SM-REF-002`: upstream edits either preserve references correctly or fail explicitly and repairably.
 
-Phase 3 status: `SM-FEAT-001` passes for the default-off v1 extrusion/hole/full-revolve/terminal-fillet envelope. `SM-FEAT-002/003/004` remain bounded as recorded in traceability. `SM-FEAT-005` now includes a kernel-backed convex outer-vertical-edge fillet over one independent extrusion, with semantic endpoint reconciliation, editable radius, asynchronous STEP, and live browser evidence; chamfer and broader edge/body graphs remain open. `SM-REF-001/002` pass for the documented generated-reference envelope, while arbitrary viewport picking and general kernel-topology reconciliation remain open. See `feature_history_contract.md` and `fillet_feature_contract.md`.
+Phase 3 status: `SM-FEAT-001` passes for the default-off v1 extrusion/hole/full-revolve/terminal-fillet-or-chamfer envelope. `SM-FEAT-002/003/004` remain bounded as recorded in traceability. `SM-FEAT-005` now includes kernel-backed convex outer-vertical-edge fillet and equal-distance chamfer over one independent extrusion, with semantic endpoint reconciliation, editable parameters, asynchronous STEP, and live browser evidence; broader edge/body graphs, pattern/mirror, and shell remain open. `SM-REF-001/002` pass for the documented generated-reference envelope, while arbitrary viewport picking and general kernel-topology reconciliation remain open. See the feature-history and edge-finish contracts.
 
 ## Workspace and Document Requirements
 

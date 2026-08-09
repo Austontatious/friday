@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-08-09 - SketchMath Semantic Chamfer and Native Kernel STEP
+
+### What Changed
+- Added typed equal-distance chamfer features over the same stable convex outer-vertical-edge selectors used by fillet, with distance bounds, exact/recovered resolution, deterministic `chamfer_surface` identity, and `kernel_required` measurements.
+- Generalized the narrow feature worker to call native FreeCAD `makeFillet` or `makeChamfer` only after unique semantic endpoint matching. Added revision-bound chamfer STEP materialization and validation.
+- Added default-off API/frontend gates plus browser chamfer creation, distance replacement, STEP polling/download, and reload coverage.
+
+### Why
+- Chamfer must inherit fillet's persistent-reference guarantees rather than introduce a second transient edge-index path.
+- Native kernel volume/solid validation is authoritative for this edge operation.
+
+### New Env Flags
+- `FRIDAY_SKETCHMATH_CHAMFER_FEATURES_ENABLED=0` gates backend chamfer creation.
+- `REACT_APP_SKETCHMATH_CHAMFER_FEATURES_ENABLED=0` exposes the guarded outer-edge chamfer editor.
+
+### How To Test
+- The focused feature/API/CAD/artifact/golden command now passes 78 tests.
+- Generated schemas, TypeScript, Compose, and all 68 frontend tests pass.
+- `cd frontend && npx playwright test e2e/sketchmath.spec.ts --grep "outer-edge chamfer"` passes the live native STEP workflow in 8.7 seconds.
+
+### Checkpoints and Remaining Work
+- Code checkpoints: `24dfc70`, `3be0baa`, `d06b014`, `f1b0b2c`.
+- Arbitrary edge selection, unequal-distance chamfer, broader graphs, edge-finish STL, pattern/mirror, shell, minimum model-tree completion, and final release hardening remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Semantic Edge Fillet and Kernel STEP
 
 ### What Changed

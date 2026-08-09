@@ -2,14 +2,14 @@
 
 Updated: 2026-08-09
 
-Current phase: Phase 3/4/6 bounded solid-feature slice — feature history, semantic references, full revolve, kernel fillet, and revisioned artifacts
+Current phase: Phase 3/4/6 bounded solid-feature slice — feature history, semantic references, full revolve, kernel edge finishes, and revisioned artifacts
 
 Gate: `SM-FEAT-001` and the documented generated-reference subset pass; `SM-FEAT-002/003/004/005`, `SM-ART-001`, and golden-part evidence pass only for their documented envelopes
 
 ## Baseline
 
 - Audited checkout: `21b8153`
-- Latest SketchMath product code commit: `53a39ed`
+- Latest SketchMath product code commit: `f1b0b2c`
 - Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
@@ -108,6 +108,15 @@ On 2026-08-09 for semantic model `1f1b034`, FreeCAD boundary `30af86a`, API gate
 - Targeted Playwright passes rectangle → extrusion → radius-3 outer fillet → asynchronous STEP → metadata/download → reload in 8.4 seconds, without making transient FreeCAD edge ordinals canonical.
 - The envelope is one independent positive one-sided extrusion followed by one terminal convex outer-vertical-edge fillet. Rebuild truthfully marks measurements `kernel_required`; broader graphs, arbitrary picking, fillet STL, and golden mounting-plate fillets remain open.
 
+## Current Kernel-Chamfer Validation
+
+On 2026-08-09 for semantic model `24dfc70`, FreeCAD boundary `3be0baa`, API gate `d06b014`, and guarded UI `f1b0b2c`:
+
+- 78 focused feature/API/CAD/artifact/golden Python tests pass. Native FreeCAD `makeChamfer` over four uniquely endpoint-matched semantic edges produces the expected `960 mm³` volume for a `20 × 10 × 5 mm` box with `2 mm` chamfers, unchanged bounds, and a valid solid.
+- Generated schemas, TypeScript, Compose, and all 68 frontend tests pass.
+- Targeted Playwright passes rectangle → extrusion → distance-3 outer chamfer → asynchronous STEP → metadata/download → reload in 8.7 seconds.
+- Chamfer shares fillet's durable selector/recovery and kernel-required measurement contract, but keeps typed `distance_mm` and native chamfer execution distinct. Unequal distances and broader edge/body graphs remain open.
+
 ## Active Phase 1 Slice
 
 - ADRs 004-006 define the canonical document migration, solver/licensing, and async execution boundaries.
@@ -150,7 +159,8 @@ On 2026-08-09 for semantic model `1f1b034`, FreeCAD boundary `30af86a`, API gate
 - Typed holes cover simple/counterbore/countersink and through/blind analytic semantics. The guarded React panel exposes simple through/blind placement, extrusion depth editing, rebuild/reference evidence, and dedicated feature undo/redo.
 - Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, and a guarded new-body browser editor.
 - Typed fillet covers convex extrusion vertical edges, semantic adjacency/signature/endpoints, exact/recovered selection, finite radius editing, kernel-required measurement state, and a resumable validated FreeCAD STEP path with guarded browser creation/download.
-- Revision-bound artifact jobs persist READY/RUNNING/DONE/FAILED manifests and resumable step markers. Supported terminal vertical extrusion/simple-hole graphs produce validated layered STL, the bounded terminal-fillet graph produces validated STEP, and stale results never register.
+- Typed chamfer reuses the stable edge contract with finite distance editing, deterministic `chamfer_surface` identity, native FreeCAD STEP validation, and guarded browser creation/download.
+- Revision-bound artifact jobs persist READY/RUNNING/DONE/FAILED manifests and resumable step markers. Supported terminal vertical extrusion/simple-hole graphs produce validated layered STL, bounded terminal-fillet/chamfer graphs produce validated STEP, and stale results never register.
 - Legacy FreeCAD `extrude_profile` preview/export remains separate; canonical feature commits never replay external CAD work. See `feature_history_contract.md`, `artifact_job_contract.md`, and `golden_mounting_plate_v1.md`.
 
 ## Gate A Outcome
@@ -175,7 +185,7 @@ Completed and published:
 - Canonical document v1 remains a single-sketch, single-worker compatibility path; multi-sketch and a full model tree are not implemented.
 - Generated extrusion/hole semantic face/edge references are stable and recoverable, but browser face/edge picking and raw kernel-topology reconciliation are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
-- Layered STL supports vertical extrusion/simple-hole graphs; STEP supports independent extrusion and the documented terminal-fillet graph. Counterbore/countersink/revolve/fillet STL, partial revolve, spatial revolve booleans, broader fillet, chamfer/shell/pattern features, and general full-graph STEP remain open.
+- Layered STL supports vertical extrusion/simple-hole graphs; STEP supports independent extrusion and documented terminal-fillet/chamfer graphs. Counterbore/countersink/revolve/edge-finish STL, partial revolve, spatial revolve booleans, broader edge finishes, shell/pattern features, and general full-graph STEP remain open.
 - Artifact cancellation, automatic TTL/quota cleanup, and worker-process isolation are not implemented.
 - 3D camera mechanics pass automation, but CAD-like pan/tilt feel requires explicit manual acceptance.
 - AI translation covers a small command subset and does not yet plan over a canonical feature model.
@@ -192,7 +202,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Implement basic chamfer with the fillet reference discipline next; then broaden model-tree/property behavior and STEP graphs without weakening the current semantic-reference and artifact gates.
+Implement the minimum model tree/property slice next, then a bounded pattern/mirror or shell feature and broader STEP graphs without weakening current semantic-reference and artifact gates.
 
 ## Release Status
 

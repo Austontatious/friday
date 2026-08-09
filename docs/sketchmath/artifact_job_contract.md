@@ -2,7 +2,7 @@
 
 Updated: 2026-08-09
 
-Status: passed for default-off STL jobs over supported vertical feature graphs and STEP jobs over independent extrusion or extrusion-to-terminal-fillet graphs
+Status: passed for default-off STL jobs over supported vertical feature graphs and STEP jobs over independent extrusion or extrusion-to-terminal-fillet/chamfer graphs
 
 ## Enablement
 
@@ -53,7 +53,7 @@ Each job owns exactly one directory:
 
 Deterministic STL materialization consumes the canonical feature graph through the requested terminal body feature. It supports vertically layered extrusions and simple typed holes, performs Shapely union/difference per Z slab, triangulates transition faces, checks every mesh edge has incidence two, and compares mesh bounds/volume against the analytic rebuild ledger. Circles use a deterministic 360-segment approximation; analytic and mesh volume plus their difference are retained in artifact metadata.
 
-Counterbore/countersink canonical rebuild is implemented, but layered STL for those styles is intentionally refused. Canonical STEP materialization supports either one independent positive one-sided new-body extrusion or exactly that extrusion followed by one terminal convex outer-vertical-edge fillet. The fillet worker uniquely matches semantic 3D endpoints before calling FreeCAD and validates the resulting solid; see `fillet_feature_contract.md`.
+Counterbore/countersink canonical rebuild is implemented, but layered STL for those styles is intentionally refused. Canonical STEP materialization supports either one independent positive one-sided new-body extrusion or exactly that extrusion followed by one terminal convex outer-vertical-edge fillet or chamfer. The worker uniquely matches semantic 3D endpoints before calling FreeCAD and validates the resulting solid; see `fillet_feature_contract.md` and `chamfer_feature_contract.md`.
 
 ## Retention and Cleanup
 
@@ -61,10 +61,10 @@ There is no automatic deletion in this slice. Job manifests and revisioned artif
 
 ## Evidence
 
-- `tests/test_sketchmath_artifact_jobs.py`: READY/RUNNING/DONE/FAILED directory state, idempotent replay, safe resume, revision registration, stale-result refusal, and fillet STEP registration.
-- `tests/test_sketchmath_feature_artifact.py` and `tests/test_sketchmath_stl_export.py`: safe revisioned paths, deterministic STL, hole-aware volume/closure, and live FreeCAD fillet volume/bounds/reference validation.
+- `tests/test_sketchmath_artifact_jobs.py`: READY/RUNNING/DONE/FAILED directory state, idempotent replay, safe resume, revision registration, stale-result refusal, and fillet/chamfer STEP registration.
+- `tests/test_sketchmath_feature_artifact.py` and `tests/test_sketchmath_stl_export.py`: safe revisioned paths, deterministic STL, hole-aware volume/closure, and live FreeCAD edge-finish volume/bounds/reference validation.
 - `tests/test_sketchmath_golden_mounting_plate.py`: seven-feature layered body, deterministic content hash, analytic volume, bounds, and zero non-manifold edges.
 - `tests/test_sketchmath_api.py`: default-off gate, submit/poll/register/download/replay contract.
 - Targeted Playwright acceptance: terminal feature-graph build, visible polling state, reload persistence, and browser download.
 
-Implementation checkpoints: `718ee6b`, `0ef759c`, `9860570`, `217e741`, `b88b1be`, `a3d705c`, `0979dfe`, `30af86a`, and `53a39ed`.
+Implementation checkpoints: `718ee6b`, `0ef759c`, `9860570`, `217e741`, `b88b1be`, `a3d705c`, `0979dfe`, `30af86a`, `53a39ed`, `3be0baa`, and `f1b0b2c`.

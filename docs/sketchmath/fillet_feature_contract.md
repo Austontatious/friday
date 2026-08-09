@@ -45,4 +45,4 @@ Checkpoints: `1f1b034`, `30af86a`, `e6b272f`, `53a39ed`.
 
 ## Explicitly Open
 
-Arbitrary edge picking, concave/horizontal/curved edges, multi-stage body graphs, fillet STL, downstream kernel-topology reconciliation, chamfer, and fillets on the seven-feature golden mounting plate remain open. This slice is a real kernel-backed fillet, not completion of `SM-FEAT-005` or the final golden-part scenario.
+Arbitrary edge picking, concave/horizontal/curved edges, multi-stage body graphs, fillet STL, downstream kernel-topology reconciliation, and fillets on the seven-feature golden mounting plate remain open. Equal-distance chamfer now shares this selector and kernel-job discipline as documented in `chamfer_feature_contract.md`; neither edge finish completes `SM-FEAT-005` or the final golden-part scenario.
