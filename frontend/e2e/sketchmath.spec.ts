@@ -348,6 +348,68 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-selection-inspector")).toContainText("extrude_profile");
   });
 
+  test("commits revisioned extrusion history, edits depth, and preserves stable rebuild identity", async ({ page }) => {
+    await openSketchMath(page);
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+
+    await page.getByRole("button", { name: "Rectangle" }).first().click();
+    await clickSvgViewBoxPoint(page, 140, 120);
+    await clickSvgViewBoxPoint(page, 360, 200);
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+
+    const panel = page.getByTestId("sketchmath-feature-history-panel");
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText("Revision 1");
+    await page.getByLabel("Feature extrusion depth").fill("10");
+    await panel.getByRole("button", { name: "Add extrusion feature" }).click();
+    await expect(panel).toContainText("Revision 2");
+    await expect(panel).toContainText("Rebuild passed · 1 feature");
+    await expect(panel).toContainText("Volume");
+
+    type FeatureSnapshot = {
+      document: {
+        revision: number;
+        features: Array<{ feature_id: string; parameters: { depth_mm: number } }>;
+        last_rebuild: { records: Array<{ feature_id: string; output_signature: string }> };
+      };
+      feature_history_length: number;
+    };
+    const firstResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const first = await firstResponse.json() as FeatureSnapshot;
+    const featureId = first.document.features[0].feature_id;
+    const firstSignature = first.document.last_rebuild.records[0].output_signature;
+    expect(first.document.revision).toBe(2);
+    expect(first.feature_history_length).toBe(1);
+
+    await page.getByLabel(`Feature depth ${featureId}`).fill("25");
+    await panel.getByRole("button", { name: "Apply depth" }).click();
+    await expect(panel).toContainText("Revision 3");
+    const replacedResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const replaced = await replacedResponse.json() as FeatureSnapshot;
+    const replacementSignature = replaced.document.last_rebuild.records[0].output_signature;
+    expect(replaced.document.features[0].feature_id).toBe(featureId);
+    expect(replaced.document.features[0].parameters.depth_mm).toBe(25);
+    expect(replacementSignature).not.toBe(firstSignature);
+
+    await panel.getByRole("button", { name: "Undo feature" }).click();
+    await expect(panel).toContainText("Revision 4");
+    await expect(page.getByLabel(`Feature depth ${featureId}`)).toHaveValue("10");
+    await panel.getByRole("button", { name: "Redo feature" }).click();
+    await expect(panel).toContainText("Revision 5");
+    await expect(page.getByLabel(`Feature depth ${featureId}`)).toHaveValue("25");
+
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    const reloadedResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const reloaded = await reloadedResponse.json() as FeatureSnapshot;
+    expect(reloaded.document.revision).toBe(5);
+    expect(reloaded.document.features[0].feature_id).toBe(featureId);
+    expect(reloaded.document.last_rebuild.records[0].output_signature).toBe(replacementSignature);
+    expect(reloaded.feature_history_length).toBe(2);
+    await expect(page.getByTestId(`sketchmath-feature-${featureId}`)).toContainText("succeeded");
+  });
+
   test("creates a center-defined rectangle through the canonical rectangle bundle", async ({ page }) => {
     await openSketchMath(page);
     await page.getByRole("button", { name: "Center rectangle", exact: true }).click();

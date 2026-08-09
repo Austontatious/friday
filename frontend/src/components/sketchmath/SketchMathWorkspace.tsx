@@ -7,6 +7,7 @@ import SketchMathToolbar from "./SketchMathToolbar";
 import SelectionInspector from "./SelectionInspector";
 import CommandPanel from "./CommandPanel";
 import OperationHistoryPanel from "./OperationHistoryPanel";
+import FeatureHistoryPanel from "./FeatureHistoryPanel";
 import MeasurementPanel from "./MeasurementPanel";
 import TelemetryEventList from "../telemetry/TelemetryEventList";
 import type { TelemetryEvent } from "../../telemetry/sessionTelemetry";
@@ -15,6 +16,10 @@ import type {
   SketchMathCommand,
   SketchMathCommandResponse,
   SketchMathEntity,
+  SketchMathDocument,
+  SketchMathFeature,
+  SketchMathFeatureCommand,
+  SketchMathFeatureCommandResponse,
   SketchMathHistoryEntry,
   SketchMathMode,
   SketchMathOperationResult,
@@ -29,12 +34,16 @@ import type {
 import {
   SketchMathApiError,
   commitSketchMathCommand,
+  commitSketchMathFeature,
   createSketchMathSession,
   getSketchMathSession,
   isSketchMathEnabled,
+  isSketchMathFeatureHistoryEnabled,
   previewSketchMathCommand,
   redoSketchMathSession,
+  redoSketchMathFeature,
   revertSketchMathSession,
+  revertSketchMathFeature,
   sketchMathStepDownloadUrl,
   translateSketchMathUtterance,
   upsertSketchMathEntity,
@@ -431,8 +440,13 @@ const SketchMathWorkspace = () => {
   const { colorMode, toggleColorMode } = useColorMode();
   const toast = useToast();
   const [enabled] = useState<boolean>(isSketchMathEnabled());
+  const [featureHistoryEnabled] = useState<boolean>(isSketchMathFeatureHistoryEnabled());
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sketchDocument, setSketchDocument] = useState<SketchMathDocument | null>(null);
+  const [canFeatureUndo, setCanFeatureUndo] = useState(false);
+  const [canFeatureRedo, setCanFeatureRedo] = useState(false);
+  const [featureBusy, setFeatureBusy] = useState(false);
   const [committedContext, setCommittedContext] = useState<SketchMathSelectionContext>(sketchmathInitialContext());
   const [history, setHistory] = useState<SketchMathHistoryEntry[]>([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -576,6 +590,9 @@ const SketchMathWorkspace = () => {
         window.localStorage.setItem(SESSION_STORAGE_KEY, snapshot.session_id);
         setCommittedContext(snapshot.selection_context);
         setHistory(snapshot.history);
+        setSketchDocument(snapshot.document || null);
+        setCanFeatureUndo(Boolean(snapshot.can_feature_undo));
+        setCanFeatureRedo(Boolean(snapshot.can_feature_redo));
         setPendingCommandText("");
         appendEvents([
           makeTelemetryEvent("workspace_initialized", {
@@ -599,6 +616,9 @@ const SketchMathWorkspace = () => {
           window.localStorage.setItem(SESSION_STORAGE_KEY, snapshot.session_id);
           setCommittedContext(snapshot.selection_context);
           setHistory(snapshot.history);
+          setSketchDocument(snapshot.document || null);
+          setCanFeatureUndo(Boolean(snapshot.can_feature_undo));
+          setCanFeatureRedo(Boolean(snapshot.can_feature_redo));
           setPendingCommandText("");
           appendEvents([
             makeTelemetryEvent("fallback_attempted", {
@@ -1305,23 +1325,40 @@ const SketchMathWorkspace = () => {
     setHistory(snapshot.history);
     setCanUndo(Boolean(snapshot.can_undo ?? snapshot.history_length > 0));
     setCanRedo(Boolean(snapshot.can_redo));
+    setSketchDocument(snapshot.document || null);
+    setCanFeatureUndo(Boolean(snapshot.can_feature_undo));
+    setCanFeatureRedo(Boolean(snapshot.can_feature_redo));
     window.localStorage.setItem(SESSION_STORAGE_KEY, snapshot.session_id);
   };
 
   const syncCommandResponse = (response: SketchMathCommandResponse) => {
     setCommittedContext(response.selection_context || response.result.after);
     reconcileSelection((response.selection_context || response.result.after).items);
-    setHistory((current) => [
-      ...current,
-      {
-        command: response.result.command,
-        committed: response.result.status === "committed",
-        before: response.result.before,
-        after: response.result.after,
-      },
-    ]);
-    setCanUndo(true);
-    setCanRedo(false);
+    if (response.history) {
+      setHistory(response.history);
+    } else {
+      setHistory((current) => [
+        ...current,
+        {
+          command: response.result.command,
+          committed: response.result.status === "committed",
+          before: response.result.before,
+          after: response.result.after,
+        },
+      ]);
+    }
+    setCanUndo(Boolean(response.can_undo ?? true));
+    setCanRedo(Boolean(response.can_redo));
+    setSketchDocument(response.document || null);
+    setCanFeatureUndo(Boolean(response.can_feature_undo));
+    setCanFeatureRedo(Boolean(response.can_feature_redo));
+    window.localStorage.setItem(SESSION_STORAGE_KEY, response.session_id);
+  };
+
+  const syncFeatureResponse = (response: SketchMathFeatureCommandResponse) => {
+    setSketchDocument(response.document || response.result.after);
+    setCanFeatureUndo(Boolean(response.can_feature_undo));
+    setCanFeatureRedo(Boolean(response.can_feature_redo));
     window.localStorage.setItem(SESSION_STORAGE_KEY, response.session_id);
   };
 
@@ -1541,6 +1578,136 @@ const SketchMathWorkspace = () => {
     } catch (err) {
       const { message, debugText } = normalizeCaughtError(err, "Redo failed");
       setUserError(message, debugText);
+    }
+  };
+
+  const commitFeatureOperation = async (command: SketchMathFeatureCommand): Promise<boolean> => {
+    if (!sessionId || !sketchDocument || featureBusy) return false;
+    setFeatureBusy(true);
+    try {
+      const response = await commitSketchMathFeature(sessionId, command);
+      syncFeatureResponse(response);
+      clearErrorState();
+      toast({
+        title: "Feature history updated",
+        status: "success",
+        duration: 1800,
+        isClosable: true,
+      });
+      return true;
+    } catch (err) {
+      const { message, debugText } = normalizeCaughtError(err, "Feature operation failed");
+      setUserError(message, debugText);
+      if (err instanceof SketchMathApiError && err.code === "revision_conflict") {
+        try {
+          syncSnapshot(await getSketchMathSession(sessionId));
+        } catch {
+          // Preserve the original revision-conflict error when refresh also fails.
+        }
+      }
+      toast({
+        title: "Feature operation failed",
+        description: message,
+        status: "error",
+        duration: 2500,
+        isClosable: true,
+      });
+      return false;
+    } finally {
+      setFeatureBusy(false);
+    }
+  };
+
+  const handleAddFeatureExtrusion = async (
+    profile: Extract<SketchMathEntity, { type: "profile_2d" }>,
+    depth: number,
+  ) => {
+    if (!sketchDocument) return;
+    const body = sketchDocument.bodies[0];
+    const sketch = sketchDocument.sketches[0];
+    if (!body || !sketch) {
+      setUserError("The active document does not contain a body and sketch for this feature.");
+      return;
+    }
+    const stem = `feature_${profile.id.replace(/[^a-zA-Z0-9_-]+/g, "_")}`;
+    const existingIds = new Set(sketchDocument.features.map((feature) => feature.feature_id));
+    let featureId = stem;
+    let suffix = 2;
+    while (existingIds.has(featureId)) {
+      featureId = `${stem}_${suffix}`;
+      suffix += 1;
+    }
+    const dependency = sketchDocument.features[sketchDocument.features.length - 1];
+    const feature: SketchMathFeature = {
+      feature_id: featureId,
+      feature_type: "extrude",
+      name: `Extrude ${sketchDocument.features.length + 1}`,
+      body_id: body.body_id,
+      sketch_id: sketch.sketch_id,
+      profile_id: profile.id,
+      source_region_id: profile.source_region_id || null,
+      dependencies: dependency ? [dependency.feature_id] : [],
+      parameters: {
+        depth_mm: depth,
+        extent: "one_sided",
+        direction: "positive",
+        operation: dependency ? "add" : "new_body",
+      },
+      suppressed: false,
+    };
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `add_${featureId}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "add_feature",
+      parameters: { feature },
+    });
+  };
+
+  const handleUpdateFeatureDepth = async (feature: SketchMathFeature, depth: number) => {
+    if (!sketchDocument) return;
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "replace_feature",
+      target_id: feature.feature_id,
+      parameters: {
+        feature: {
+          ...feature,
+          parameters: { ...feature.parameters, depth_mm: depth },
+        },
+      },
+    });
+  };
+
+  const handleFeatureUndo = async () => {
+    if (!sessionId || featureBusy) return;
+    setFeatureBusy(true);
+    try {
+      syncSnapshot(await revertSketchMathFeature(sessionId));
+      clearErrorState();
+    } catch (err) {
+      const { message, debugText } = normalizeCaughtError(err, "Feature undo failed");
+      setUserError(message, debugText);
+    } finally {
+      setFeatureBusy(false);
+    }
+  };
+
+  const handleFeatureRedo = async () => {
+    if (!sessionId || featureBusy) return;
+    setFeatureBusy(true);
+    try {
+      syncSnapshot(await redoSketchMathFeature(sessionId));
+      clearErrorState();
+    } catch (err) {
+      const { message, debugText } = normalizeCaughtError(err, "Feature redo failed");
+      setUserError(message, debugText);
+    } finally {
+      setFeatureBusy(false);
     }
   };
 
@@ -3720,6 +3887,22 @@ const SketchMathWorkspace = () => {
                   </HStack>
                 ) : null}
               </Box>
+
+              {featureHistoryEnabled && sketchDocument ? (
+                <FeatureHistoryPanel
+                  document={sketchDocument}
+                  activeProfile={activeProfileForCad || null}
+                  newDepthValue={extrudeDepthValue}
+                  busy={featureBusy}
+                  canUndo={canFeatureUndo}
+                  canRedo={canFeatureRedo}
+                  onNewDepthValueChange={setExtrudeDepthValue}
+                  onAddExtrusion={(profile, depth) => void handleAddFeatureExtrusion(profile, depth)}
+                  onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
+                  onUndo={() => void handleFeatureUndo()}
+                  onRedo={() => void handleFeatureRedo()}
+                />
+              ) : null}
 
               <Box className="sketchmath-workflow-step" data-testid="sketchmath-workflow-export">
                 <Text className="sketchmath-step-label">5. Export</Text>

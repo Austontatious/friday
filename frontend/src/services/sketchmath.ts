@@ -281,7 +281,107 @@ export type SketchMathHistoryEntry = {
   after: SketchMathSelectionContext;
 };
 
-export type SketchMathSessionSnapshot = {
+export type SketchMathExtrudeParameters = {
+  depth_mm: number;
+  extent: "one_sided" | "symmetric" | "two_sided";
+  second_depth_mm?: number | null;
+  direction: "positive" | "negative";
+  operation: "new_body" | "add" | "cut";
+};
+
+export type SketchMathFeature = {
+  feature_id: string;
+  feature_type: "extrude";
+  name: string;
+  body_id: string;
+  sketch_id: string;
+  profile_id: string;
+  source_region_id?: string | null;
+  dependencies: string[];
+  parameters: SketchMathExtrudeParameters;
+  suppressed: boolean;
+};
+
+export type SketchMathFeatureBuildRecord = {
+  feature_id: string;
+  order: number;
+  status: "succeeded" | "suppressed" | "failed" | "blocked";
+  input_hash: string;
+  output_signature?: string | null;
+  measurements?: {
+    net_profile_area_mm2: number;
+    volume_delta_mm3: number;
+    bounds_mm: [number, number, number, number, number, number];
+    hole_count: number;
+  } | null;
+  error?: {
+    code: string;
+    message: string;
+    detail: Record<string, unknown>;
+  } | null;
+};
+
+export type SketchMathFeatureRebuildReport = {
+  schema_version: "1.0";
+  document_id: string;
+  input_revision: number;
+  ok: boolean;
+  rebuild_order: string[];
+  records: SketchMathFeatureBuildRecord[];
+  content_hash: string;
+};
+
+export type SketchMathDocument = {
+  schema_version: "1.0";
+  document_id: string;
+  name: string;
+  units: string;
+  revision: number;
+  bodies: Array<{
+    body_id: string;
+    name: string;
+    sketch_ids: string[];
+    feature_ids: string[];
+    visible: boolean;
+  }>;
+  sketches: Array<{
+    sketch_id: string;
+    name: string;
+    plane: "xy" | "xz" | "yz";
+    state: SketchMathSelectionContext;
+    visible: boolean;
+  }>;
+  features: SketchMathFeature[];
+  artifacts: Array<Record<string, unknown>>;
+  provenance: Record<string, unknown>;
+  last_rebuild?: SketchMathFeatureRebuildReport | null;
+};
+
+export type SketchMathFeatureCommand = {
+  version: "1.0";
+  operation_id: string;
+  mode: "preview" | "commit";
+  base_revision: number;
+  operation_type: "add_feature" | "replace_feature" | "delete_feature" | "set_feature_suppressed" | "rebuild";
+  target_id?: string | null;
+  parameters: Record<string, unknown>;
+};
+
+export type SketchMathFeatureHistoryEntry = {
+  command: SketchMathFeatureCommand;
+  before: SketchMathDocument;
+  after: SketchMathDocument;
+};
+
+type SketchMathDocumentSnapshotFields = {
+  document?: SketchMathDocument;
+  feature_history_length?: number;
+  feature_history?: SketchMathFeatureHistoryEntry[];
+  can_feature_undo?: boolean;
+  can_feature_redo?: boolean;
+};
+
+export type SketchMathSessionSnapshot = SketchMathDocumentSnapshotFields & {
   session_id: string;
   selection_context: SketchMathSelectionContext;
   session_metadata: Record<string, unknown>;
@@ -347,12 +447,33 @@ export type SketchMathPlanarTopology = {
   approximation: Record<string, unknown>;
 };
 
-export type SketchMathCommandResponse = {
+export type SketchMathCommandResponse = SketchMathDocumentSnapshotFields & {
   session_id: string;
   selection_context: SketchMathSelectionContext;
   result: SketchMathOperationResult;
   history_length: number;
+  history?: SketchMathHistoryEntry[];
+  can_undo?: boolean;
+  can_redo?: boolean;
   session_metadata?: Record<string, unknown>;
+};
+
+export type SketchMathFeatureCommandResponse = SketchMathDocumentSnapshotFields & {
+  session_id: string;
+  selection_context: SketchMathSelectionContext;
+  session_metadata: Record<string, unknown>;
+  history_length: number;
+  history: SketchMathHistoryEntry[];
+  can_undo?: boolean;
+  can_redo?: boolean;
+  result: {
+    command: SketchMathFeatureCommand;
+    status: "preview" | "committed";
+    before: SketchMathDocument;
+    after: SketchMathDocument;
+    changed_feature_ids: string[];
+    rebuild: SketchMathFeatureRebuildReport;
+  };
 };
 
 export type SketchMathTranslationOutcome =
@@ -505,6 +626,14 @@ export const isSketchMathEnabled = (): boolean => {
   return ["1", "true", "yes", "on"].includes(normalized);
 };
 
+export const isSketchMathFeatureHistoryEnabled = (): boolean => {
+  const raw = process.env.REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED;
+  if (raw == null || String(raw).trim() === "") {
+    return false;
+  }
+  return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
+};
+
 export const sketchMathStepDownloadUrl = (stepPath: string): string =>
   `${API_URL}/sketchmath/artifacts/step?path=${encodeURIComponent(stepPath)}`;
 
@@ -542,6 +671,24 @@ export const revertSketchMathSession = async (sessionId: string): Promise<Sketch
 
 export const redoSketchMathSession = async (sessionId: string): Promise<SketchMathSessionSnapshot> =>
   fetchJson<SketchMathSessionSnapshot>(`/sketchmath/sessions/${sessionId}/redo`, {});
+
+export const previewSketchMathFeature = async (
+  sessionId: string,
+  command: SketchMathFeatureCommand,
+): Promise<SketchMathFeatureCommandResponse> =>
+  fetchJson(`/sketchmath/sessions/${sessionId}/features/preview`, { command });
+
+export const commitSketchMathFeature = async (
+  sessionId: string,
+  command: SketchMathFeatureCommand,
+): Promise<SketchMathFeatureCommandResponse> =>
+  fetchJson(`/sketchmath/sessions/${sessionId}/features/commit`, { command });
+
+export const revertSketchMathFeature = async (sessionId: string): Promise<SketchMathSessionSnapshot> =>
+  fetchJson<SketchMathSessionSnapshot>(`/sketchmath/sessions/${sessionId}/features/revert`, {});
+
+export const redoSketchMathFeature = async (sessionId: string): Promise<SketchMathSessionSnapshot> =>
+  fetchJson<SketchMathSessionSnapshot>(`/sketchmath/sessions/${sessionId}/features/redo`, {});
 
 export const upsertSketchMathEntity = async (
   sessionId: string,

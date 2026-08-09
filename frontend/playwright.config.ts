@@ -22,7 +22,9 @@ export default defineConfig({
     timeout: 120000,
     env: {
       FRIDAY_SKETCHMATH_ENABLED: "1",
+      FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED: "1",
       REACT_APP_SKETCHMATH_ENABLED: "1",
+      REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED: "1",
       FRONTEND_E2E_PORT: String(port),
     },
   },
