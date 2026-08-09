@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-08-09 - SketchMath Resumed Release Regression
+
+### What Changed
+- Re-ran the complete release-sheet validation matrix after the golden parameter, semantic-hole, and full-revolve property checkpoints.
+- Refreshed the tracked semantic result artifact to the already-implemented consistent hole-wall triangle winding.
+- Proved the regenerated semantic artifact is deterministic across consecutive full runs with identical SHA-256 `c972db1d00eda08910522e732dd5685286490c340b2b3c00068c7b19d89aceea`.
+
+### Why
+- A green case count is insufficient if the checked-in evidence does not reproduce byte-for-byte.
+- The release train requires current implementation truth across backend, frontend, browser, schema, build, deployment, and repository standards gates.
+
+### New Env Flags
+- None.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py`
+- `python3 -m sketchmath.evals.run_sketchmath_evals`
+- `python3 -m sketchmath.schemas.generate --check`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm test -- --runInBand --watchAll=false src/components/sketchmath/SketchMathWorkspace.test.tsx src/components/sketchmath/arcGeometry.test.ts src/components/sketchmath/commandBuilders.test.ts`
+- `cd frontend && npm run build`
+- `cd frontend && npm run test:e2e`
+- `docker compose config -q`
+- `python3 -m pytest -q tests/test_codex_standards.py --noconftest`
+
+### Evidence
+- 244 Python/runtime tests, 55 semantic cases, 62 frontend tests, and 23 live browser workflows passed.
+- Schema drift, TypeScript, production build, Compose, Python compile, and all 13 repository standards checks passed.
+- The production build retains the pre-existing `syncSnapshot` hook-dependency warning and stale Browserslist notice.
+
+---
+
 ## 2026-08-09 - SketchMath Full-Revolve Axis Property Editing
 
 ### What Changed

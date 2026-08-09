@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `3e309de` (complete golden geometry and native terminal-fillet STEP; evidence: `golden_mounting_plate_v1.md` and `status.md`)
+Last validated SketchMath code milestone: `4002b67` (golden parameter edit, semantic-hole properties, full-revolve axis properties, and complete resumed regression evidence in `golden_mounting_plate_v1.md` and `status.md`)
 
 ## Mission
 

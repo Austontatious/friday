@@ -1188,16 +1188,7 @@
               {
                 "indices": [
                   2,
-                  7,
-                  6
-                ],
-                "ring_id": "profile_inner",
-                "surface": "hole_wall"
-              },
-              {
-                "indices": [
-                  2,
-                  5,
+                  6,
                   7
                 ],
                 "ring_id": "profile_inner",
@@ -1205,9 +1196,9 @@
               },
               {
                 "indices": [
-                  6,
-                  9,
-                  8
+                  2,
+                  7,
+                  5
                 ],
                 "ring_id": "profile_inner",
                 "surface": "hole_wall"
@@ -1215,8 +1206,26 @@
               {
                 "indices": [
                   6,
-                  7,
+                  8,
                   9
+                ],
+                "ring_id": "profile_inner",
+                "surface": "hole_wall"
+              },
+              {
+                "indices": [
+                  6,
+                  9,
+                  7
+                ],
+                "ring_id": "profile_inner",
+                "surface": "hole_wall"
+              },
+              {
+                "indices": [
+                  8,
+                  14,
+                  15
                 ],
                 "ring_id": "profile_inner",
                 "surface": "hole_wall"
@@ -1225,16 +1234,16 @@
                 "indices": [
                   8,
                   15,
-                  14
+                  9
                 ],
                 "ring_id": "profile_inner",
                 "surface": "hole_wall"
               },
               {
                 "indices": [
-                  8,
-                  9,
-                  15
+                  14,
+                  2,
+                  5
                 ],
                 "ring_id": "profile_inner",
                 "surface": "hole_wall"
@@ -1243,16 +1252,7 @@
                 "indices": [
                   14,
                   5,
-                  2
-                ],
-                "ring_id": "profile_inner",
-                "surface": "hole_wall"
-              },
-              {
-                "indices": [
-                  14,
-                  15,
-                  5
+                  15
                 ],
                 "ring_id": "profile_inner",
                 "surface": "hole_wall"

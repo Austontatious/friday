@@ -59,7 +59,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | SM-DOC document architecture | Passed for one-sketch/one-worker v1 envelope | Legacy wrapping, versioned schemas, monotonic revisions, stale-write refusal, disk rehydration; multi-worker coordination remains open |
 | SM-ART artifacts | Passed for supported STL and bounded terminal-edge-finish STEP; overall partial | Revision/hash-bound resumable jobs, stale-result refusal, golden eight-feature STEP with analytic circle/hole/fillet validation, idempotent registration/reload; automated cleanup and broader full-graph STEP remain open |
 | SM-AI model-aware copilot | Early translator only | Structured model context, typed multi-step proposals, state-based semantic benchmark |
-| SM-QA / SM-OPS / SM-SEC hardening | Partial | Artifact jobs and golden geometry pass their bounded envelope; cancellation, TTL/quota, performance, broader instrumentation, and kernel isolation remain open |
+| SM-QA / SM-OPS / SM-SEC hardening | Partial | Current resumed regression passes 244 Python/runtime tests, 55 semantic cases, 62 frontend tests, 23 live browser workflows, schema/TypeScript/build/Compose/standards; artifact jobs and golden geometry pass their bounded envelope. Cancellation, TTL/quota, performance, broader instrumentation, and kernel isolation remain open |
 
 ## Phase 1 Evidence Ledger
 
