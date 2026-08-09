@@ -7,6 +7,29 @@
 
 ---
 
+## 2026-08-09 - SketchMath Clean Production Build
+
+### What Changed
+- Stabilized selection reconciliation and backend snapshot synchronization with memoized callbacks.
+- Added the snapshot synchronizer to the artifact polling effect's real dependency list.
+
+### Why
+- The production build still emitted an actionable SketchMath hook-dependency warning, contradicting Gate A's clean-build requirement.
+
+### New Env Flags
+- None.
+
+### How To Test
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm test -- --runInBand --watchAll=false src/components/sketchmath/SketchMathWorkspace.test.tsx -t "loads canvas-first"`
+- `cd frontend && npm run build`
+
+### Evidence
+- Code checkpoint: `7b62e3e`.
+- Production build reports `Compiled successfully`; only the repository-wide stale Browserslist data notice remains.
+
+---
+
 ## 2026-08-09 - SketchMath Counterbore and Countersink Property Editing
 
 ### What Changed

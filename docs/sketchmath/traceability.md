@@ -9,7 +9,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | SM-GA-001 contract agreement | Passed | `sketchmath/models/`, generated `sketchmath/schemas/`, executor handler discovery, closed frontend command union | 66 focused contract/executor/API tests; schema drift check; 42 semantic evals | `878374b` |
 | SM-GA-002 documentation truth | Passed | `docs/sketchmath/command_catalog.md`, `docs/sketchmath/ui_workspace.md`, translator contract prompt | Circle/topology/constraint contradiction scan; focused translation tests | `578b867` |
 | SM-GA-003 feature-gate agreement | Passed | `core/config.py`, `frontend/src/services/sketchmath.ts`, `.env.example`, Dockerfile, Compose, ADR 003 | Backend unset/off tests; frontend unset/off/on tests; Compose config | `0647568` |
-| SM-GA-004 clean build | Passed | Removed unused `sessionMetadata`; explicit frontend build flag | `npx tsc --noEmit`; production build compiled without SketchMath source warnings | `0647568` |
+| SM-GA-004 clean build | Passed | Removed unused `sessionMetadata`; explicit frontend build flag; memoized snapshot synchronizer with complete polling-effect dependencies | `npx tsc --noEmit`; production build compiled successfully without SketchMath source warnings | `0647568`, `7b62e3e` |
 | SM-GA-005 deliberate landing | Passed | `docs/sketchmath/landing_manifest.md` and dedicated remote branch | Verified `refs/heads/sketchmath-product-gate-a` without force-push or source-branch rewrite | Code baseline `54ff17e`; first published `1a4c853` |
 | SM-GA-006 regression baseline | Passed on 2026-08-08 | Deliberate landing implementation | 99 Python, 42 semantic eval, 37 focused frontend, 9 Playwright, schema check, TypeScript, build, Compose, 13 standards | `54ff17e` |
 

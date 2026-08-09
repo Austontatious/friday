@@ -26,7 +26,7 @@ On 2026-08-09 after published full-revolve property checkpoint `4002b67`:
 - All 55 semantic eval cases passed. Consecutive complete runs produced identical result-artifact SHA-256 `c972db1d00eda08910522e732dd5685286490c340b2b3c00068c7b19d89aceea`; the tracked JSON now reflects the corrected consistent hole-wall triangle winding.
 - Generated schemas match the canonical models.
 - TypeScript and all 62 focused frontend tests passed.
-- The production build passed with the existing `syncSnapshot` hook-dependency warning and stale Browserslist data notice.
+- The production build passed at the resumed regression checkpoint. Follow-up `7b62e3e` removed the actionable `syncSnapshot` hook-dependency warning; only the stale Browserslist data notice remains.
 - Docker Compose config, Python compile, and all 13 repository standards checks passed.
 - All 23 shell/product Playwright workflows passed in 4.2 minutes with no unexpected console/page errors, including Gate B, topology, feature history, golden STEP, semantic hole editing, full-revolve axis editing, fillet, and chamfer.
 
