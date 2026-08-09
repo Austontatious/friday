@@ -1110,6 +1110,7 @@ describe("SketchMath workspace", () => {
     delete process.env.REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_HOLE_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_REVOLVE_FEATURES_ENABLED;
+    delete process.env.REACT_APP_SKETCHMATH_FILLET_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED;
     stamp.value = 1710000000000;
     jest.spyOn(Date, "now").mockImplementation(() => stamp.value);
@@ -1183,13 +1184,16 @@ describe("SketchMath workspace", () => {
       canUndo: false,
       canRedo: false,
       holeFeaturesEnabled: false,
+      filletFeaturesEnabled: false,
       artifactJobsEnabled: false,
       artifactJobs: {},
       revolveAxes: [axis],
       onNewDepthValueChange: jest.fn(),
       onAddExtrusion: jest.fn(),
       onAddFullRevolve,
+      onAddOuterFillet: jest.fn(),
       onUpdateDepth: jest.fn(),
+      onUpdateFilletRadius: jest.fn(),
       onAddSimpleHole: jest.fn(),
       onBuildArtifact: jest.fn(),
       onRetryArtifact: jest.fn(),
@@ -1205,6 +1209,138 @@ describe("SketchMath workspace", () => {
     expect(screen.getByRole("combobox", { name: "Revolve axis" })).toHaveValue("axis_y");
     await userEvent.click(screen.getByRole("button", { name: "Add full revolve" }));
     expect(onAddFullRevolve).toHaveBeenCalledWith(activeProfile, axis);
+  });
+
+  it("creates a semantic outer-edge fillet and routes its terminal artifact to STEP", async () => {
+    const edge = {
+      reference_id: "topo_vertical_0",
+      owner_feature_id: "feature_base",
+      topology_type: "edge" as const,
+      role: "vertical_outer_edge",
+      source_entity_id: "profile_box:vertex:0",
+      ordinal: 0,
+      geometric_signature: "edge_signature",
+      measurements: { x_mm: 0, y_mm: 0, z_min_mm: 0, z_max_mm: 5, corner_class: "convex" },
+    };
+    const baseFeature = {
+      feature_id: "feature_base",
+      feature_type: "extrude" as const,
+      name: "Base",
+      body_id: "body_1",
+      sketch_id: "sketch_1",
+      profile_id: "profile_box",
+      source_region_id: null,
+      dependencies: [],
+      topology_references: [],
+      parameters: { depth_mm: 5, extent: "one_sided" as const, direction: "positive" as const, operation: "new_body" as const },
+      suppressed: false,
+    };
+    const document = {
+      schema_version: "1.0",
+      document_id: "doc_fillet",
+      name: "Fillet test",
+      units: "mm",
+      revision: 1,
+      bodies: [{ body_id: "body_1", name: "Body 1", sketch_ids: ["sketch_1"], feature_ids: ["feature_base"], visible: true }],
+      sketches: [],
+      features: [baseFeature],
+      artifacts: [],
+      provenance: {},
+      last_rebuild: {
+        schema_version: "1.0",
+        document_id: "doc_fillet",
+        input_revision: 1,
+        ok: true,
+        rebuild_order: ["feature_base"],
+        content_hash: "base_hash",
+        records: [{
+          feature_id: "feature_base",
+          order: 0,
+          status: "succeeded",
+          input_hash: "input",
+          output_signature: "base_signature",
+          measurements: { net_profile_area_mm2: 200, volume_delta_mm3: 1000, bounds_mm: [0, 20, 0, 10, 0, 5], hole_count: 0 },
+          generated_topology: [edge],
+          resolved_references: [],
+          measurement_coverage: "exact",
+        }],
+      },
+    } as any;
+    const onAddOuterFillet = jest.fn();
+    const onBuildArtifact = jest.fn();
+    const props = {
+      document,
+      activeProfile: null,
+      newDepthValue: "10",
+      busy: false,
+      canUndo: false,
+      canRedo: false,
+      holeFeaturesEnabled: false,
+      revolveFeaturesEnabled: false,
+      filletFeaturesEnabled: true,
+      artifactJobsEnabled: true,
+      revolveAxes: [],
+      artifactJobs: {},
+      onNewDepthValueChange: jest.fn(),
+      onAddExtrusion: jest.fn(),
+      onAddFullRevolve: jest.fn(),
+      onAddOuterFillet,
+      onUpdateDepth: jest.fn(),
+      onUpdateFilletRadius: jest.fn(),
+      onAddSimpleHole: jest.fn(),
+      onBuildArtifact,
+      onRetryArtifact: jest.fn(),
+      artifactDownloadUrl: jest.fn(),
+      onUndo: jest.fn(),
+      onRedo: jest.fn(),
+    };
+    const { rerender } = render(<FeatureHistoryPanel {...props} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Fillet outer edges" }));
+    expect(onAddOuterFillet).toHaveBeenCalledWith(baseFeature, [edge], 2);
+
+    const filletFeature = {
+      feature_id: "feature_fillet",
+      feature_type: "fillet" as const,
+      name: "Outer edge fillet",
+      body_id: "body_1",
+      sketch_id: "sketch_1",
+      profile_id: null,
+      source_region_id: null,
+      dependencies: ["feature_base"],
+      topology_references: [],
+      parameters: { radius_mm: 2, operation: "modify" as const },
+      suppressed: false,
+    };
+    const filletDocument = {
+      ...document,
+      revision: 2,
+      features: [baseFeature, filletFeature],
+      last_rebuild: {
+        ...document.last_rebuild,
+        input_revision: 2,
+        rebuild_order: ["feature_base", "feature_fillet"],
+        records: [
+          document.last_rebuild.records[0],
+          {
+            feature_id: "feature_fillet",
+            order: 1,
+            status: "succeeded",
+            input_hash: "fillet_input",
+            output_signature: "fillet_signature",
+            measurements: null,
+            generated_topology: [],
+            resolved_references: [],
+            measurement_coverage: "kernel_required",
+          },
+        ],
+      },
+    } as any;
+    rerender(<FeatureHistoryPanel {...props} document={filletDocument} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Build STEP" }));
+    expect(onBuildArtifact).toHaveBeenCalledWith(filletFeature, "step");
+    expect(screen.getByText("Measurements require a validated kernel artifact.")).toBeInTheDocument();
   });
 
   it("loads canvas-first and keeps advanced JSON hidden by default", async () => {

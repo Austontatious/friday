@@ -43,6 +43,7 @@ import {
   isSketchMathArtifactJobsEnabled,
   isSketchMathEnabled,
   isSketchMathFeatureHistoryEnabled,
+  isSketchMathFilletFeaturesEnabled,
   isSketchMathHoleFeaturesEnabled,
   isSketchMathRevolveFeaturesEnabled,
   previewSketchMathCommand,
@@ -452,6 +453,7 @@ const SketchMathWorkspace = () => {
   const [featureHistoryEnabled] = useState<boolean>(isSketchMathFeatureHistoryEnabled());
   const [holeFeaturesEnabled] = useState<boolean>(isSketchMathHoleFeaturesEnabled());
   const [revolveFeaturesEnabled] = useState<boolean>(isSketchMathRevolveFeaturesEnabled());
+  const [filletFeaturesEnabled] = useState<boolean>(isSketchMathFilletFeaturesEnabled());
   const [artifactJobsEnabled] = useState<boolean>(isSketchMathArtifactJobsEnabled());
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -1398,7 +1400,7 @@ const SketchMathWorkspace = () => {
         if (completed.length > 0) {
           syncSnapshot(await getSketchMathSession(sessionId));
           appendEvents(completed.map((job) => makeTelemetryEvent("artifact_created", {
-            detail: `STL artifact available for ${job.feature_id} at revision ${job.input_revision}.`,
+            detail: `${job.format.toUpperCase()} artifact available for ${job.feature_id} at revision ${job.input_revision}.`,
             raw: job,
           })));
         }
@@ -1804,6 +1806,69 @@ const SketchMathWorkspace = () => {
     });
   };
 
+  const handleAddOuterFillet = async (
+    target: Extract<SketchMathFeature, { feature_type: "extrude" }>,
+    edgeReferences: SketchMathSemanticTopologyReference[],
+    radius: number,
+  ) => {
+    if (
+      !sketchDocument
+      || !filletFeaturesEnabled
+      || sketchDocument.features.length !== 1
+      || edgeReferences.length === 0
+    ) return;
+    const featureId = `fillet_${target.feature_id.replace(/[^a-zA-Z0-9_-]+/g, "_")}`;
+    const feature: SketchMathFeature = {
+      feature_id: featureId,
+      feature_type: "fillet",
+      name: "Outer edge fillet",
+      body_id: target.body_id,
+      sketch_id: target.sketch_id,
+      profile_id: null,
+      source_region_id: null,
+      dependencies: [target.feature_id],
+      topology_references: edgeReferences.map((edge) => ({
+        reference_id: edge.reference_id,
+        owner_feature_id: target.feature_id,
+        topology_type: "edge",
+        role: edge.role,
+        source_entity_id: edge.source_entity_id || null,
+        expected_signature: edge.geometric_signature,
+      })),
+      parameters: { radius_mm: radius, operation: "modify" },
+      suppressed: false,
+    };
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `add_${featureId}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "add_feature",
+      parameters: { feature },
+    });
+  };
+
+  const handleUpdateFilletRadius = async (
+    feature: Extract<SketchMathFeature, { feature_type: "fillet" }>,
+    radius: number,
+  ) => {
+    if (!sketchDocument || !filletFeaturesEnabled) return;
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "replace_feature",
+      target_id: feature.feature_id,
+      parameters: {
+        feature: {
+          ...feature,
+          parameters: { ...feature.parameters, radius_mm: radius },
+        },
+      },
+    });
+  };
+
   const handleAddSimpleHole = async (
     target: Extract<SketchMathFeature, { feature_type: "extrude" }>,
     topReference: SketchMathSemanticTopologyReference,
@@ -1888,11 +1953,11 @@ const SketchMathWorkspace = () => {
     }
   };
 
-  const handleBuildFeatureArtifact = async (feature: SketchMathFeature) => {
+  const handleBuildFeatureArtifact = async (feature: SketchMathFeature, format: "step" | "stl") => {
     if (!sessionId || !sketchDocument || featureBusy || !artifactJobsEnabled) return;
     setFeatureBusy(true);
     try {
-      const job = await startSketchMathArtifactJob(sessionId, feature.feature_id, sketchDocument.revision, "stl");
+      const job = await startSketchMathArtifactJob(sessionId, feature.feature_id, sketchDocument.revision, format);
       setArtifactJobs((current) => ({ ...current, [feature.feature_id]: job }));
       if (job.state === "DONE") {
         syncSnapshot(await getSketchMathSession(sessionId));
@@ -4108,19 +4173,26 @@ const SketchMathWorkspace = () => {
                   canRedo={canFeatureRedo}
                   holeFeaturesEnabled={holeFeaturesEnabled}
                   revolveFeaturesEnabled={revolveFeaturesEnabled}
+                  filletFeaturesEnabled={filletFeaturesEnabled}
                   artifactJobsEnabled={artifactJobsEnabled}
                   revolveAxes={revolveAxes}
                   artifactJobs={artifactJobs}
                   onNewDepthValueChange={setExtrudeDepthValue}
                   onAddExtrusion={(profile, depth) => void handleAddFeatureExtrusion(profile, depth)}
                   onAddFullRevolve={(profile, axis) => void handleAddFullRevolve(profile, axis)}
+                  onAddOuterFillet={(feature, edgeReferences, radius) => (
+                    void handleAddOuterFillet(feature, edgeReferences, radius)
+                  )}
                   onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
+                  onUpdateFilletRadius={(feature, radius) => void handleUpdateFilletRadius(feature, radius)}
                   onAddSimpleHole={(feature, topReference, position, diameter, termination, depth) => (
                     void handleAddSimpleHole(feature, topReference, position, diameter, termination, depth)
                   )}
-                  onBuildArtifact={(feature) => void handleBuildFeatureArtifact(feature)}
+                  onBuildArtifact={(feature, format) => void handleBuildFeatureArtifact(feature, format)}
                   onRetryArtifact={(job) => void handleRetryFeatureArtifact(job)}
-                  artifactDownloadUrl={sketchMathStlDownloadUrl}
+                  artifactDownloadUrl={(path, format) => (
+                    format === "step" ? sketchMathStepDownloadUrl(path) : sketchMathStlDownloadUrl(path)
+                  )}
                   onUndo={() => void handleFeatureUndo()}
                   onRedo={() => void handleFeatureRedo()}
                 />

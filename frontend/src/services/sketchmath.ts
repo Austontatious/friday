@@ -308,6 +308,11 @@ export type SketchMathRevolveParameters = {
   operation: "new_body" | "add" | "cut";
 };
 
+export type SketchMathFilletParameters = {
+  radius_mm: number;
+  operation: "modify";
+};
+
 export type SketchMathTopologyReferenceSelector = {
   reference_id: string;
   owner_feature_id: string;
@@ -357,7 +362,13 @@ export type SketchMathRevolveFeature = SketchMathFeatureBase & {
   parameters: SketchMathRevolveParameters;
 };
 
-export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature | SketchMathRevolveFeature;
+export type SketchMathFilletFeature = SketchMathFeatureBase & {
+  feature_type: "fillet";
+  profile_id?: null;
+  parameters: SketchMathFilletParameters;
+};
+
+export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature | SketchMathRevolveFeature | SketchMathFilletFeature;
 
 export type SketchMathFeatureBuildRecord = {
   feature_id: string;
@@ -383,6 +394,7 @@ export type SketchMathFeatureBuildRecord = {
     expected_signature: string;
     current_signature: string;
   }>;
+  measurement_coverage?: "exact" | "kernel_required";
   error?: {
     code: string;
     message: string;
@@ -753,6 +765,14 @@ export const isSketchMathHoleFeaturesEnabled = (): boolean => {
 
 export const isSketchMathRevolveFeaturesEnabled = (): boolean => {
   const raw = process.env.REACT_APP_SKETCHMATH_REVOLVE_FEATURES_ENABLED;
+  if (raw == null || String(raw).trim() === "") {
+    return false;
+  }
+  return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
+};
+
+export const isSketchMathFilletFeaturesEnabled = (): boolean => {
+  const raw = process.env.REACT_APP_SKETCHMATH_FILLET_FEATURES_ENABLED;
   if (raw == null || String(raw).trim() === "") {
     return false;
   }

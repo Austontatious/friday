@@ -28,13 +28,20 @@ type FeatureHistoryPanelProps = {
   canRedo: boolean;
   holeFeaturesEnabled: boolean;
   revolveFeaturesEnabled: boolean;
+  filletFeaturesEnabled: boolean;
   artifactJobsEnabled: boolean;
   revolveAxes: SketchMathLineEntity[];
   artifactJobs: Record<string, SketchMathArtifactJobManifest>;
   onNewDepthValueChange: (value: string) => void;
   onAddExtrusion: (profile: SketchMathProfileEntity, depth: number) => void;
   onAddFullRevolve: (profile: SketchMathProfileEntity, axis: SketchMathLineEntity) => void;
+  onAddOuterFillet: (
+    feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
+    edgeReferences: SketchMathSemanticTopologyReference[],
+    radius: number,
+  ) => void;
   onUpdateDepth: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, depth: number) => void;
+  onUpdateFilletRadius: (feature: Extract<SketchMathFeature, { feature_type: "fillet" }>, radius: number) => void;
   onAddSimpleHole: (
     feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
     topReference: SketchMathSemanticTopologyReference,
@@ -43,9 +50,9 @@ type FeatureHistoryPanelProps = {
     termination: "through" | "blind",
     depth: number | null,
   ) => void;
-  onBuildArtifact: (feature: SketchMathFeature) => void;
+  onBuildArtifact: (feature: SketchMathFeature, format: "step" | "stl") => void;
   onRetryArtifact: (job: SketchMathArtifactJobManifest) => void;
-  artifactDownloadUrl: (path: string) => string;
+  artifactDownloadUrl: (path: string, format: "step" | "stl") => string;
   onUndo: () => void;
   onRedo: () => void;
 };
@@ -67,13 +74,16 @@ const FeatureHistoryPanel = ({
   canRedo,
   holeFeaturesEnabled,
   revolveFeaturesEnabled,
+  filletFeaturesEnabled,
   artifactJobsEnabled,
   revolveAxes,
   artifactJobs,
   onNewDepthValueChange,
   onAddExtrusion,
   onAddFullRevolve,
+  onAddOuterFillet,
   onUpdateDepth,
+  onUpdateFilletRadius,
   onAddSimpleHole,
   onBuildArtifact,
   onRetryArtifact,
@@ -83,6 +93,7 @@ const FeatureHistoryPanel = ({
 }: FeatureHistoryPanelProps) => {
   const [depthDrafts, setDepthDrafts] = useState<Record<string, string>>({});
   const [holeDrafts, setHoleDrafts] = useState<Record<string, HoleDraft>>({});
+  const [filletDrafts, setFilletDrafts] = useState<Record<string, string>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
   const buildRecords = useMemo(
     () => recordByFeature(document.last_rebuild?.records || []),
@@ -114,6 +125,17 @@ const FeatureHistoryPanel = ({
         }),
     ));
   }, [buildRecords, document.features]);
+
+  useEffect(() => {
+    setFilletDrafts((current) => Object.fromEntries(
+      document.features
+        .filter((feature) => feature.feature_type === "extrude" || feature.feature_type === "fillet")
+        .map((feature) => [
+          feature.feature_id,
+          feature.feature_type === "fillet" ? String(feature.parameters.radius_mm) : current[feature.feature_id] || "2",
+        ]),
+    ));
+  }, [document.features]);
 
   const newDepth = validDepth(newDepthValue);
   const revolveAxis = revolveAxes.find((axis) => axis.id === revolveAxisId) || revolveAxes[0] || null;
@@ -204,12 +226,16 @@ const FeatureHistoryPanel = ({
             ? depthDrafts[feature.feature_id] ?? String(feature.parameters.depth_mm)
             : "";
           const nextDepth = feature.feature_type === "extrude" ? validDepth(depthDraft) : null;
+          const filletDraft = filletDrafts[feature.feature_id]
+            ?? (feature.feature_type === "fillet" ? String(feature.parameters.radius_mm) : "2");
+          const nextFilletRadius = validDepth(filletDraft);
           const artifactJob = artifactJobs[feature.feature_id];
+          const artifactFormat: "step" | "stl" = feature.feature_type === "fillet" ? "step" : "stl";
           const registeredArtifact = artifactJob?.result?.artifact
             || document.artifacts.find((artifact) => (
               artifact.feature_id === feature.feature_id
               && artifact.revision === document.revision
-              && artifact.format === "stl"
+              && artifact.format === artifactFormat
             ));
           const laterBodyFeatures = document.features.slice(featureIndex + 1).filter(
             (candidate) => candidate.body_id === feature.body_id && !candidate.suppressed,
@@ -220,11 +246,24 @@ const FeatureHistoryPanel = ({
               || candidate.feature_type === "extrude"
               || (candidate.feature_type === "hole" && candidate.parameters.style === "simple"),
           );
+          const bodyGraph = document.features.slice(0, featureIndex + 1).filter(
+            (candidate) => candidate.body_id === feature.body_id && !candidate.suppressed,
+          );
+          const graphSupportsFilletStep = feature.feature_type === "fillet"
+            && bodyGraph.length === 2
+            && bodyGraph[0].feature_type === "extrude"
+            && bodyGraph[0].parameters.operation === "new_body"
+            && bodyGraph[1].feature_type === "fillet";
           const canBuildArtifact = record?.status === "succeeded"
             && laterBodyFeatures.length === 0
-            && graphSupportsStl;
+            && (artifactFormat === "stl" ? graphSupportsStl : graphSupportsFilletStep);
           const artifactBusy = artifactJob?.state === "READY" || artifactJob?.state === "RUNNING";
           const topReference = record?.generated_topology.find((reference) => reference.topology_type === "face" && reference.role === "top");
+          const verticalOuterEdges = record?.generated_topology.filter(
+            (reference) => reference.topology_type === "edge"
+              && reference.role === "vertical_outer_edge"
+              && reference.measurements.corner_class === "convex",
+          ) || [];
           const holeDraft = holeDrafts[feature.feature_id];
           const holeX = Number(holeDraft?.x);
           const holeY = Number(holeDraft?.y);
@@ -246,12 +285,15 @@ const FeatureHistoryPanel = ({
                 {feature.feature_type === "extrude" ? ` · profile ${feature.profile_id}` : ""}
                 {feature.feature_type === "hole" ? ` · ${feature.parameters.style} ${feature.parameters.termination}` : ""}
                 {feature.feature_type === "revolve" ? ` · ${feature.parameters.angle_deg}° about ${feature.parameters.axis_entity_id}` : ""}
+                {feature.feature_type === "fillet" ? ` · radius ${feature.parameters.radius_mm} mm` : ""}
                 {record ? ` · ${record.generated_topology.length} semantic refs` : ""}
               </Text>
               {record?.measurements ? (
                 <Text fontSize="sm" opacity={0.75} data-testid={`sketchmath-feature-measurements-${feature.feature_id}`}>
                   Volume {record.measurements.volume_delta_mm3} mm³ · {record.measurements.hole_count} hole{record.measurements.hole_count === 1 ? "" : "s"}
                 </Text>
+              ) : record?.measurement_coverage === "kernel_required" ? (
+                <Text fontSize="sm" opacity={0.75}>Measurements require a validated kernel artifact.</Text>
               ) : null}
               {record?.output_signature ? (
                 <Text fontSize="xs" opacity={0.62} data-testid={`sketchmath-feature-signature-${feature.feature_id}`}>
@@ -276,6 +318,52 @@ const FeatureHistoryPanel = ({
                     isDisabled={nextDepth == null || nextDepth === feature.parameters.depth_mm || busy}
                   >
                     Apply depth
+                  </Button>
+                </HStack>
+              ) : null}
+              {filletFeaturesEnabled && feature.feature_type === "extrude" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-fillet-editor-${feature.feature_id}`}>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    aria-label={`Fillet radius ${feature.feature_id}`}
+                    value={filletDraft}
+                    onChange={(event) => setFilletDrafts((current) => ({ ...current, [feature.feature_id]: event.target.value }))}
+                    width="110px"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => nextFilletRadius != null && onAddOuterFillet(feature, verticalOuterEdges, nextFilletRadius)}
+                    isDisabled={
+                      nextFilletRadius == null
+                      || verticalOuterEdges.length === 0
+                      || document.features.length !== 1
+                      || busy
+                    }
+                  >
+                    Fillet outer edges
+                  </Button>
+                </HStack>
+              ) : null}
+              {feature.feature_type === "fillet" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2}>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    aria-label={`Fillet radius ${feature.feature_id}`}
+                    value={filletDraft}
+                    onChange={(event) => setFilletDrafts((current) => ({ ...current, [feature.feature_id]: event.target.value }))}
+                    width="110px"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => nextFilletRadius != null && onUpdateFilletRadius(feature, nextFilletRadius)}
+                    isDisabled={nextFilletRadius == null || nextFilletRadius === feature.parameters.radius_mm || busy}
+                  >
+                    Apply radius
                   </Button>
                 </HStack>
               ) : null}
@@ -367,33 +455,33 @@ const FeatureHistoryPanel = ({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => onBuildArtifact(feature)}
+                      onClick={() => onBuildArtifact(feature, artifactFormat)}
                       isDisabled={!canBuildArtifact || artifactBusy || busy}
                     >
-                      Build STL
+                      Build {artifactFormat.toUpperCase()}
                     </Button>
                     {artifactJob?.state === "FAILED" ? (
                       <Button size="sm" variant="outline" onClick={() => onRetryArtifact(artifactJob)} isDisabled={busy}>
-                        Retry STL
+                        Retry {artifactFormat.toUpperCase()}
                       </Button>
                     ) : null}
                     {registeredArtifact ? (
                       <Link
-                        href={artifactDownloadUrl(registeredArtifact.path)}
+                        href={artifactDownloadUrl(registeredArtifact.path, registeredArtifact.format)}
                         download
                         data-testid={`sketchmath-artifact-download-${feature.feature_id}`}
                       >
-                        Download STL
+                        Download {registeredArtifact.format.toUpperCase()}
                       </Link>
                     ) : null}
                   </HStack>
                   {artifactJob ? (
                     <Text fontSize="xs" opacity={0.72} mt={1} data-testid={`sketchmath-artifact-status-${feature.feature_id}`}>
-                      STL artifact · {artifactJob.state} · {artifactJob.step} · revision {artifactJob.input_revision}
+                      {artifactJob.format.toUpperCase()} artifact · {artifactJob.state} · {artifactJob.step} · revision {artifactJob.input_revision}
                       {artifactJob.error ? ` · ${artifactJob.error.code}: ${artifactJob.error.message}` : ""}
                     </Text>
                   ) : !canBuildArtifact ? (
-                    <Text fontSize="xs" opacity={0.65} mt={1}>STL build is available on the terminal supported body feature.</Text>
+                    <Text fontSize="xs" opacity={0.65} mt={1}>Artifact build is available on the terminal supported body feature.</Text>
                   ) : null}
                 </Box>
               ) : null}

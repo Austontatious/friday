@@ -462,6 +462,69 @@ test.describe("SketchMath workspace", () => {
     expect((await graphDownloadPromise).suggestedFilename()).toMatch(/\.stl$/);
   });
 
+  test("creates an outer-edge fillet and downloads its revisioned kernel STEP", async ({ page }) => {
+    await openSketchMath(page);
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+
+    await page.getByRole("button", { name: "Rectangle" }).first().click();
+    await clickSvgViewBoxPoint(page, 140, 120);
+    await clickSvgViewBoxPoint(page, 360, 200);
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+    const panel = page.getByTestId("sketchmath-feature-history-panel");
+    await page.getByLabel("Feature extrusion depth").fill("10");
+    await panel.getByRole("button", { name: "Add extrusion feature" }).click();
+    await expect(panel).toContainText("Revision 2");
+
+    const baseResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const baseSnapshot = await baseResponse.json() as {
+      document: { features: Array<{ feature_id: string; feature_type: string }> };
+    };
+    const baseFeatureId = baseSnapshot.document.features[0].feature_id;
+    const baseRow = page.getByTestId(`sketchmath-feature-${baseFeatureId}`);
+    await baseRow.getByLabel(`Fillet radius ${baseFeatureId}`).fill("3");
+    await baseRow.getByRole("button", { name: "Fillet outer edges" }).click();
+    await expect(panel).toContainText("Revision 3");
+
+    const filletResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const filletSnapshot = await filletResponse.json() as {
+      document: {
+        features: Array<{ feature_id: string; feature_type: string; parameters: { radius_mm?: number } }>;
+        last_rebuild: { records: Array<{ feature_id: string; measurement_coverage?: string; resolved_references: unknown[] }> };
+      };
+    };
+    const filletFeature = filletSnapshot.document.features.find((feature) => feature.feature_type === "fillet");
+    expect(filletFeature?.parameters.radius_mm).toBe(3);
+    const filletFeatureId = filletFeature!.feature_id;
+    const filletRecord = filletSnapshot.document.last_rebuild.records.find((record) => record.feature_id === filletFeatureId);
+    expect(filletRecord?.measurement_coverage).toBe("kernel_required");
+    expect(filletRecord?.resolved_references).toHaveLength(4);
+
+    const filletRow = page.getByTestId(`sketchmath-feature-${filletFeatureId}`);
+    await expect(filletRow).toContainText("Measurements require a validated kernel artifact.");
+    await filletRow.getByRole("button", { name: "Build STEP" }).click();
+    await expect(page.getByTestId(`sketchmath-artifact-status-${filletFeatureId}`)).toContainText(
+      "STEP artifact · DONE · complete · revision 3",
+      { timeout: 20000 },
+    );
+    const artifactResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const artifactSnapshot = await artifactResponse.json() as {
+      document: { artifacts: Array<{ feature_id: string; revision: number; format: string; metadata: Record<string, any> }> };
+    };
+    expect(artifactSnapshot.document.artifacts).toHaveLength(1);
+    expect(artifactSnapshot.document.artifacts[0]).toMatchObject({ feature_id: filletFeatureId, revision: 3, format: "step" });
+    expect(artifactSnapshot.document.artifacts[0].metadata.measurements.reference_policy).toBe("semantic_endpoints_unique_match");
+
+    const stepDownload = page.getByTestId(`sketchmath-artifact-download-${filletFeatureId}`);
+    const downloadPromise = page.waitForEvent("download");
+    await stepDownload.click();
+    expect((await downloadPromise).suggestedFilename()).toMatch(/\.step$/);
+
+    await page.reload();
+    await expect(page.getByLabel(`Fillet radius ${filletFeatureId}`)).toHaveValue("3");
+    await expect(page.getByTestId(`sketchmath-artifact-download-${filletFeatureId}`)).toBeVisible();
+  });
+
   test("creates a center-defined rectangle through the canonical rectangle bundle", async ({ page }) => {
     await openSketchMath(page);
     await page.getByRole("button", { name: "Center rectangle", exact: true }).click();
