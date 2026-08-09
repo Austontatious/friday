@@ -22,6 +22,7 @@ import type {
   SketchMathFeatureCommand,
   SketchMathFeatureCommandResponse,
   SketchMathHistoryEntry,
+  SketchMathHoleParameters,
   SketchMathMode,
   SketchMathOperationResult,
   SketchMathPlanarTopology,
@@ -2045,13 +2046,11 @@ const SketchMathWorkspace = () => {
     });
   };
 
-  const handleUpdateSimpleHole = async (
+  const handleUpdateHole = async (
     feature: Extract<SketchMathFeature, { feature_type: "hole" }>,
-    diameter: number,
-    termination: "through" | "blind",
-    depth: number | null,
+    parameters: SketchMathHoleParameters,
   ) => {
-    if (!sketchDocument || !holeFeaturesEnabled || feature.parameters.style !== "simple") return;
+    if (!sketchDocument || !holeFeaturesEnabled) return;
     await commitFeatureOperation({
       version: "1.0",
       operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
@@ -2062,12 +2061,7 @@ const SketchMathWorkspace = () => {
       parameters: {
         feature: {
           ...feature,
-          parameters: {
-            ...feature.parameters,
-            diameter_mm: diameter,
-            termination,
-            depth_mm: termination === "blind" ? depth : null,
-          },
+          parameters,
         },
       },
     });
@@ -4338,8 +4332,8 @@ const SketchMathWorkspace = () => {
                   onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
                   onUpdateFilletRadius={(feature, radius) => void handleUpdateFilletRadius(feature, radius)}
                   onUpdateChamferDistance={(feature, distance) => void handleUpdateChamferDistance(feature, distance)}
-                  onUpdateSimpleHole={(feature, diameter, termination, depth) => (
-                    void handleUpdateSimpleHole(feature, diameter, termination, depth)
+                  onUpdateHole={(feature, parameters) => (
+                    void handleUpdateHole(feature, parameters)
                   )}
                   onUpdateFullRevolve={(feature, axisId, angle) => (
                     void handleUpdateFullRevolve(feature, axisId, angle)

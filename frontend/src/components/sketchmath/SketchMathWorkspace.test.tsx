@@ -1200,7 +1200,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
-      onUpdateSimpleHole: jest.fn(),
+      onUpdateHole: jest.fn(),
       onUpdateFullRevolve,
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1323,7 +1323,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
-      onUpdateSimpleHole: jest.fn(),
+      onUpdateHole: jest.fn(),
       onUpdateFullRevolve: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1492,7 +1492,7 @@ describe("SketchMath workspace", () => {
     } as any;
     const onRenameFeature = jest.fn();
     const onSetDesignParameter = jest.fn();
-    const onUpdateSimpleHole = jest.fn();
+    const onUpdateHole = jest.fn();
 
     render(<FeatureHistoryPanel
       document={document}
@@ -1516,7 +1516,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth={jest.fn()}
       onUpdateFilletRadius={jest.fn()}
       onUpdateChamferDistance={jest.fn()}
-      onUpdateSimpleHole={onUpdateSimpleHole}
+      onUpdateHole={onUpdateHole}
       onUpdateFullRevolve={jest.fn()}
       onSetDesignParameter={onSetDesignParameter}
       onRenameFeature={onRenameFeature}
@@ -1552,7 +1552,38 @@ describe("SketchMath workspace", () => {
     await userEvent.click(within(holeEditor).getByRole("button", { name: "Through" }));
     await userEvent.type(screen.getByRole("spinbutton", { name: "Existing hole depth Mount hole" }), "3");
     await userEvent.click(within(holeEditor).getByRole("button", { name: "Apply hole" }));
-    expect(onUpdateSimpleHole).toHaveBeenCalledWith(features[2], 6, "blind", 3);
+    expect(onUpdateHole).toHaveBeenCalledWith(features[2], {
+      ...features[2].parameters,
+      diameter_mm: 6,
+      termination: "blind",
+      depth_mm: 3,
+      counterbore_diameter_mm: null,
+      counterbore_depth_mm: null,
+      countersink_diameter_mm: null,
+      countersink_angle_deg: null,
+    });
+
+    onUpdateHole.mockClear();
+    await userEvent.selectOptions(
+      within(holeEditor).getByRole("combobox", { name: "Existing hole style Mount hole" }),
+      "countersink",
+    );
+    await userEvent.clear(screen.getByRole("spinbutton", { name: "Countersink diameter Mount hole" }));
+    await userEvent.type(screen.getByRole("spinbutton", { name: "Countersink diameter Mount hole" }), "12");
+    await userEvent.clear(screen.getByRole("spinbutton", { name: "Countersink angle Mount hole" }));
+    await userEvent.type(screen.getByRole("spinbutton", { name: "Countersink angle Mount hole" }), "82");
+    await userEvent.click(within(holeEditor).getByRole("button", { name: "Apply hole" }));
+    expect(onUpdateHole).toHaveBeenCalledWith(features[2], {
+      ...features[2].parameters,
+      style: "countersink",
+      diameter_mm: 6,
+      termination: "blind",
+      depth_mm: 3,
+      counterbore_diameter_mm: null,
+      counterbore_depth_mm: null,
+      countersink_diameter_mm: 12,
+      countersink_angle_deg: 82,
+    });
 
     const nameInput = screen.getByRole("textbox", { name: "Selected feature name" });
     await userEvent.clear(nameInput);

@@ -568,6 +568,81 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByLabel("Revolve axis Revolve 1")).toHaveValue(constructionAxisIds[1]);
   });
 
+  test("edits counterbore and countersink hole properties through durable history", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Rectangle" }).first().click();
+    await clickSvgViewBoxPoint(page, 140, 120);
+    await clickSvgViewBoxPoint(page, 360, 240);
+    const panel = page.getByTestId("sketchmath-feature-history-panel");
+    await page.getByLabel("Feature extrusion depth").fill("12");
+    await panel.getByRole("button", { name: "Add extrusion feature" }).click();
+
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+    type AdvancedHoleSnapshot = {
+      document: {
+        features: Array<{
+          feature_id: string;
+          feature_type: string;
+          parameters: Record<string, any>;
+        }>;
+      };
+      feature_history_length: number;
+    };
+    const base = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as AdvancedHoleSnapshot;
+    const baseFeatureId = base.document.features[0].feature_id;
+    const baseRow = page.getByTestId(`sketchmath-feature-${baseFeatureId}`);
+    await baseRow.getByLabel(`Hole diameter ${baseFeatureId}`).fill("4");
+    await baseRow.getByRole("button", { name: "Add simple hole" }).click();
+
+    const withSimple = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as AdvancedHoleSnapshot;
+    const holeFeature = withSimple.document.features.find((feature) => feature.feature_type === "hole");
+    expect(holeFeature).toBeTruthy();
+    const holeFeatureId = holeFeature!.feature_id;
+    const editor = page.getByTestId(`sketchmath-existing-hole-editor-${holeFeatureId}`);
+
+    await editor.getByLabel("Existing hole style Hole 1").selectOption("counterbore");
+    await editor.getByLabel("Counterbore diameter Hole 1").fill("8");
+    await editor.getByLabel("Counterbore depth Hole 1").fill("2");
+    await editor.getByRole("button", { name: "Apply hole" }).click();
+    const counterbored = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as AdvancedHoleSnapshot;
+    expect(counterbored.document.features.find((feature) => feature.feature_id === holeFeatureId)?.parameters).toMatchObject({
+      style: "counterbore",
+      diameter_mm: 4,
+      counterbore_diameter_mm: 8,
+      counterbore_depth_mm: 2,
+    });
+
+    await editor.getByLabel("Existing hole style Hole 1").selectOption("countersink");
+    await editor.getByLabel("Countersink diameter Hole 1").fill("10");
+    await editor.getByLabel("Countersink angle Hole 1").fill("82");
+    await editor.getByRole("button", { name: "Apply hole" }).click();
+    const countersunk = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as AdvancedHoleSnapshot;
+    expect(countersunk.document.features.find((feature) => feature.feature_id === holeFeatureId)?.parameters).toMatchObject({
+      style: "countersink",
+      diameter_mm: 4,
+      countersink_diameter_mm: 10,
+      countersink_angle_deg: 82,
+      counterbore_diameter_mm: null,
+      counterbore_depth_mm: null,
+    });
+
+    await panel.getByRole("button", { name: "Undo feature" }).click();
+    await expect(editor.getByLabel("Existing hole style Hole 1")).toHaveValue("counterbore");
+    await expect(editor.getByLabel("Counterbore diameter Hole 1")).toHaveValue("8");
+    await panel.getByRole("button", { name: "Redo feature" }).click();
+    await expect(editor.getByLabel("Existing hole style Hole 1")).toHaveValue("countersink");
+
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    await expect(page.getByLabel("Existing hole style Hole 1")).toHaveValue("countersink");
+    await expect(page.getByLabel("Countersink diameter Hole 1")).toHaveValue("10");
+    await expect(page.getByLabel("Countersink angle Hole 1")).toHaveValue("82");
+    const reloaded = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as AdvancedHoleSnapshot;
+    expect(reloaded.feature_history_length).toBe(4);
+    expect(reloaded.document.features.find((feature) => feature.feature_id === holeFeatureId)?.feature_id).toBe(holeFeatureId);
+  });
+
   test("selects semantic model-tree nodes and persists a feature rename", async ({ page }) => {
     await openSketchMath(page);
     const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));

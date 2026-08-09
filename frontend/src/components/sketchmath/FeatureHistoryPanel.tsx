@@ -6,6 +6,7 @@ import type {
   SketchMathDocument,
   SketchMathFeature,
   SketchMathFeatureBuildRecord,
+  SketchMathHoleParameters,
   SketchMathLineEntity,
   SketchMathProfileEntity,
   SketchMathSemanticTopologyReference,
@@ -17,6 +18,11 @@ type HoleDraft = {
   diameter: string;
   depth: string;
   termination: "through" | "blind";
+  style: "simple" | "counterbore" | "countersink";
+  counterboreDiameter: string;
+  counterboreDepth: string;
+  countersinkDiameter: string;
+  countersinkAngle: string;
 };
 
 type RevolveDraft = { axisId: string; angle: string };
@@ -51,11 +57,9 @@ type FeatureHistoryPanelProps = {
   onUpdateDepth: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, depth: number) => void;
   onUpdateFilletRadius: (feature: Extract<SketchMathFeature, { feature_type: "fillet" }>, radius: number) => void;
   onUpdateChamferDistance: (feature: Extract<SketchMathFeature, { feature_type: "chamfer" }>, distance: number) => void;
-  onUpdateSimpleHole: (
+  onUpdateHole: (
     feature: Extract<SketchMathFeature, { feature_type: "hole" }>,
-    diameter: number,
-    termination: "through" | "blind",
-    depth: number | null,
+    parameters: SketchMathHoleParameters,
   ) => void;
   onUpdateFullRevolve: (
     feature: Extract<SketchMathFeature, { feature_type: "revolve" }>,
@@ -135,7 +139,7 @@ const FeatureHistoryPanel = ({
   onUpdateDepth,
   onUpdateFilletRadius,
   onUpdateChamferDistance,
-  onUpdateSimpleHole,
+  onUpdateHole,
   onUpdateFullRevolve,
   onSetDesignParameter,
   onRenameFeature,
@@ -203,6 +207,11 @@ const FeatureHistoryPanel = ({
               diameter: String(feature.parameters.diameter_mm),
               depth: String(feature.parameters.depth_mm ?? ""),
               termination: feature.parameters.termination,
+              style: feature.parameters.style,
+              counterboreDiameter: String(feature.parameters.counterbore_diameter_mm ?? ""),
+              counterboreDepth: String(feature.parameters.counterbore_depth_mm ?? ""),
+              countersinkDiameter: String(feature.parameters.countersink_diameter_mm ?? ""),
+              countersinkAngle: String(feature.parameters.countersink_angle_deg ?? ""),
             } satisfies HoleDraft];
           }
           const record = buildRecords[feature.feature_id];
@@ -213,6 +222,11 @@ const FeatureHistoryPanel = ({
             diameter: "4",
             depth: bounds ? String((bounds[5] - bounds[4]) / 2) : "5",
             termination: "through",
+            style: "simple",
+            counterboreDiameter: "",
+            counterboreDepth: "",
+            countersinkDiameter: "",
+            countersinkAngle: "",
           }];
         }),
     ));
@@ -548,6 +562,10 @@ const FeatureHistoryPanel = ({
           const holeY = Number(holeDraft?.y);
           const holeDiameter = Number(holeDraft?.diameter);
           const holeDepth = Number(holeDraft?.depth);
+          const counterboreDiameter = Number(holeDraft?.counterboreDiameter);
+          const counterboreDepth = Number(holeDraft?.counterboreDepth);
+          const countersinkDiameter = Number(holeDraft?.countersinkDiameter);
+          const countersinkAngle = Number(holeDraft?.countersinkAngle);
           const validHoleDraft = Boolean(
             holeDraft
             && Number.isFinite(holeX)
@@ -556,6 +574,42 @@ const FeatureHistoryPanel = ({
             && holeDiameter > 0
             && (holeDraft.termination === "through" || (Number.isFinite(holeDepth) && holeDepth > 0)),
           );
+          const validHoleStyle = Boolean(
+            validHoleDraft
+            && (
+              holeDraft?.style === "simple"
+              || (
+                holeDraft?.style === "counterbore"
+                && Number.isFinite(counterboreDiameter)
+                && counterboreDiameter > holeDiameter
+                && Number.isFinite(counterboreDepth)
+                && counterboreDepth > 0
+                && (holeDraft.termination === "through" || counterboreDepth <= holeDepth)
+              )
+              || (
+                holeDraft?.style === "countersink"
+                && Number.isFinite(countersinkDiameter)
+                && countersinkDiameter > holeDiameter
+                && Number.isFinite(countersinkAngle)
+                && countersinkAngle > 0
+                && countersinkAngle < 180
+              )
+            )
+          );
+          const nextHoleParameters: SketchMathHoleParameters | null = holeDraft && validHoleStyle ? {
+            ...(feature.feature_type === "hole" ? feature.parameters : {
+              operation: "cut" as const,
+              position_mm: [holeX, holeY] as [number, number],
+            }),
+            style: holeDraft.style,
+            termination: holeDraft.termination,
+            diameter_mm: holeDiameter,
+            depth_mm: holeDraft.termination === "blind" ? holeDepth : null,
+            counterbore_diameter_mm: holeDraft.style === "counterbore" ? counterboreDiameter : null,
+            counterbore_depth_mm: holeDraft.style === "counterbore" ? counterboreDepth : null,
+            countersink_diameter_mm: holeDraft.style === "countersink" ? countersinkDiameter : null,
+            countersink_angle_deg: holeDraft.style === "countersink" ? countersinkAngle : null,
+          } : null;
           const featureParameterBound = boundFeatureIds.has(feature.feature_id);
           const revolveDraft = revolveDrafts[feature.feature_id];
           const revolveAngle = Number(revolveDraft?.angle);
@@ -701,8 +755,29 @@ const FeatureHistoryPanel = ({
                   </Button>
                 </HStack>
               ) : null}
-              {holeFeaturesEnabled && feature.feature_type === "hole" && feature.parameters.style === "simple" ? (
+              {holeFeaturesEnabled && feature.feature_type === "hole" ? (
                 <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-existing-hole-editor-${feature.feature_id}`}>
+                  <Select
+                    aria-label={`Existing hole style ${feature.name}`}
+                    value={holeDraft?.style || "simple"}
+                    onChange={(event) => setHoleDrafts((current) => ({
+                      ...current,
+                      [feature.feature_id]: {
+                        ...current[feature.feature_id],
+                        style: event.target.value as HoleDraft["style"],
+                        counterboreDiameter: current[feature.feature_id]?.counterboreDiameter || String(holeDiameter * 2),
+                        counterboreDepth: current[feature.feature_id]?.counterboreDepth || "2",
+                        countersinkDiameter: current[feature.feature_id]?.countersinkDiameter || String(holeDiameter * 2),
+                        countersinkAngle: current[feature.feature_id]?.countersinkAngle || "90",
+                      },
+                    }))}
+                    width="145px"
+                    isDisabled={featureParameterBound}
+                  >
+                    <option value="simple">Simple</option>
+                    <option value="counterbore">Counterbore</option>
+                    <option value="countersink">Countersink</option>
+                  </Select>
                   <Input
                     type="number"
                     min="0.01"
@@ -745,23 +820,63 @@ const FeatureHistoryPanel = ({
                       isDisabled={featureParameterBound}
                     />
                   ) : null}
+                  {holeDraft?.style === "counterbore" ? (
+                    <>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        aria-label={`Counterbore diameter ${feature.name}`}
+                        value={holeDraft.counterboreDiameter}
+                        onChange={(event) => setHoleDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], counterboreDiameter: event.target.value } }))}
+                        width="110px"
+                        isDisabled={featureParameterBound}
+                      />
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        aria-label={`Counterbore depth ${feature.name}`}
+                        value={holeDraft.counterboreDepth}
+                        onChange={(event) => setHoleDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], counterboreDepth: event.target.value } }))}
+                        width="110px"
+                        isDisabled={featureParameterBound}
+                      />
+                    </>
+                  ) : null}
+                  {holeDraft?.style === "countersink" ? (
+                    <>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        aria-label={`Countersink diameter ${feature.name}`}
+                        value={holeDraft.countersinkDiameter}
+                        onChange={(event) => setHoleDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], countersinkDiameter: event.target.value } }))}
+                        width="110px"
+                        isDisabled={featureParameterBound}
+                      />
+                      <Input
+                        type="number"
+                        min="0.01"
+                        max="179.99"
+                        step="0.01"
+                        aria-label={`Countersink angle ${feature.name}`}
+                        value={holeDraft.countersinkAngle}
+                        onChange={(event) => setHoleDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], countersinkAngle: event.target.value } }))}
+                        width="110px"
+                        isDisabled={featureParameterBound}
+                      />
+                    </>
+                  ) : null}
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => holeDraft && onUpdateSimpleHole(
-                      feature,
-                      holeDiameter,
-                      holeDraft.termination,
-                      holeDraft.termination === "blind" ? holeDepth : null,
-                    )}
+                    onClick={() => nextHoleParameters && onUpdateHole(feature, nextHoleParameters)}
                     isDisabled={
                       featureParameterBound
-                      || !validHoleDraft
-                      || (
-                        holeDiameter === feature.parameters.diameter_mm
-                        && holeDraft?.termination === feature.parameters.termination
-                        && (holeDraft?.termination !== "blind" || holeDepth === feature.parameters.depth_mm)
-                      )
+                      || !nextHoleParameters
+                      || JSON.stringify(nextHoleParameters) === JSON.stringify(feature.parameters)
                       || busy
                     }
                   >
