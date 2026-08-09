@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `f1b0b2c` (guarded kernel-backed chamfer slice; evidence: `chamfer_feature_contract.md` and `status.md`)
+Last validated SketchMath code milestone: `bc650ca` (minimum semantic model tree and persistent rename; evidence: `model_tree_contract.md` and `status.md`)
 
 ## Mission
 

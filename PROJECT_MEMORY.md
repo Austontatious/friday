@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-08-09 - SketchMath Minimum Semantic Model Tree
+
+### What Changed
+- Added a guarded body/sketch/feature hierarchy covering Extrude, Revolve, Hole, Fillet, and Chamfer with deterministic node selection and bounded property summaries.
+- Added canonical feature rename through existing immutable-ID `replace_feature` commits, including revisioning, rebuild, undo/redo compatibility, disk persistence, and reload.
+- Removed raw profile and revolve-axis IDs from Normal-mode feature summaries and selection labels.
+
+### Why
+- The release train needs a usable history tree without creating a second feature model or exposing transport identities as product labels.
+- Body/sketch visibility remains read-only until persisted changes affect rendering; presenting a nonfunctional toggle would be misleading.
+
+### Flags and Evidence
+- No new flag: this behavior remains inside the default-off document/feature-history gates.
+- TypeScript and all 69 frontend tests pass.
+- Targeted Playwright proves rectangle → extrusion → selection → rename → immutable ID/depth → reload in 5.4 seconds.
+- Code checkpoint: `bc650ca`.
+
+### Remaining Release Gate
+- The immediate slice is the golden mounting plate with terminal 2 mm outer fillets and deterministic full-graph STEP validation. Multi-sketch/body tree behavior and visibility mutation remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Semantic Chamfer and Native Kernel STEP
 
 ### What Changed

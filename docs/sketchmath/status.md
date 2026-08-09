@@ -9,7 +9,7 @@ Gate: `SM-FEAT-001` and the documented generated-reference subset pass; `SM-FEAT
 ## Baseline
 
 - Audited checkout: `21b8153`
-- Latest SketchMath product code commit: `f1b0b2c`
+- Latest SketchMath product code commit: `bc650ca`
 - Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
@@ -117,6 +117,15 @@ On 2026-08-09 for semantic model `24dfc70`, FreeCAD boundary `3be0baa`, API gate
 - Targeted Playwright passes rectangle → extrusion → distance-3 outer chamfer → asynchronous STEP → metadata/download → reload in 8.7 seconds.
 - Chamfer shares fillet's durable selector/recovery and kernel-required measurement contract, but keeps typed `distance_mm` and native chamfer execution distinct. Unequal distances and broader edge/body graphs remain open.
 
+## Current Minimum Model-Tree Validation
+
+On 2026-08-09 for guarded UI checkpoint `bc650ca`:
+
+- The canonical body and sketch plus Extrude, Revolve, Hole, Fillet, and Chamfer nodes render with user-facing labels and deterministic selection.
+- Selected nodes expose bounded body/sketch or typed feature properties. Feature rename commits through existing immutable-ID replacement; raw profile/axis/entity IDs are not rendered in Normal-mode summaries.
+- TypeScript and all 69 frontend tests pass. Targeted Playwright proves extrusion → tree selection → rename → unchanged ID/depth → backend reload in 5.4 seconds.
+- Persisted body/sketch visibility is currently read-only because the renderer does not yet honor mutation. Multi-sketch/body hierarchy, reordering, and body/sketch rename remain open.
+
 ## Active Phase 1 Slice
 
 - ADRs 004-006 define the canonical document migration, solver/licensing, and async execution boundaries.
@@ -182,7 +191,7 @@ Completed and published:
 - Production solve covers the documented point/circle/arc residual subset. Coordinate-only legacy lines and future geometry/constraint families remain partial/unknown.
 - Split/trim/extend intentionally reject profile- or constraint-referenced targets; automatic topology repair is not implemented.
 - Circle and finite-arc topology uses a deterministic 2-degree piecewise-linear approximation; exact analytic curved-region area is not claimed.
-- Canonical document v1 remains a single-sketch, single-worker compatibility path; multi-sketch and a full model tree are not implemented.
+- Canonical document v1 remains a single-sketch, single-worker compatibility path. The minimum single-body/sketch feature tree passes, while multi-sketch/body workspace behavior and visibility mutation are not implemented.
 - Generated extrusion/hole semantic face/edge references are stable and recoverable, but browser face/edge picking and raw kernel-topology reconciliation are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
 - Layered STL supports vertical extrusion/simple-hole graphs; STEP supports independent extrusion and documented terminal-fillet/chamfer graphs. Counterbore/countersink/revolve/edge-finish STL, partial revolve, spatial revolve booleans, broader edge finishes, shell/pattern features, and general full-graph STEP remain open.
@@ -202,7 +211,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Implement the minimum model tree/property slice next, then a bounded pattern/mirror or shell feature and broader STEP graphs without weakening current semantic-reference and artifact gates.
+Complete the golden mounting-plate model with terminal fillets and deterministically validated STEP next, widening the kernel graph only as required by that acceptance fixture.
 
 ## Release Status
 

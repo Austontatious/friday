@@ -81,6 +81,7 @@ Preview is side-effect free. Feature commits, rebuild, undo, redo, and reload ne
 When the frontend flag is enabled, the workspace shows Feature history with:
 
 - current document revision and rebuild status;
+- a minimum model tree for canonical body, sketch, and typed feature nodes, with selection, bounded properties, and immutable-ID feature rename;
 - selected-profile extrusion creation;
 - stable feature IDs, build status, measurements, and shortened output signatures;
 - in-place extrusion-depth replacement;
@@ -90,13 +91,15 @@ When the frontend flag is enabled, the workspace shows Feature history with:
 - default-off outer-vertical-edge chamfer creation, distance replacement, kernel STEP build, and download for its supported two-feature graph;
 - dedicated feature undo and redo.
 
+Normal-mode tree labels use names and feature types rather than raw body/sketch/feature/profile/axis IDs. Persisted body/sketch visibility is shown read-only until renderer behavior supports a truthful mutation control. See `model_tree_contract.md`.
+
 A revision conflict refreshes the backend-authoritative session before the user retries.
 
 ## Evidence
 
 - Unit/kernel coverage proves the prior envelope plus stable vertical-edge identities, fillet/chamfer recovery/refusal, unique semantic-to-FreeCAD edge resolution, expected rounded/beveled box volumes, bounds/solid validity, and resumable STEP registration.
 - API coverage proves default-off document/hole/revolve/fillet/chamfer gating, preview/commit isolation, disk rehydration, conflict status, geometry/document synchronization, reference recovery, and monotonic feature undo/redo.
-- Frontend type-check and all 68 unit tests pass. Targeted Playwright proves fillet and chamfer create/edit, kernel STEP polling/download, artifact metadata, and reload.
+- Frontend type-check and all 69 unit tests pass. Targeted Playwright proves model-tree selection/rename/reload plus fillet and chamfer create/edit, kernel STEP polling/download, artifact metadata, and reload.
 - A live Playwright workflow creates a rectangle feature, edits depth, observes a changed signature with a stable ID, performs feature undo/redo, reloads, creates a typed through hole, recovers its reference after another base edit, builds/downloads a terminal graph STL, and accepts no console/page errors.
 
 ## Open Boundaries
