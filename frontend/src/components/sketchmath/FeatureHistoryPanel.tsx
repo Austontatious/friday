@@ -49,6 +49,7 @@ type FeatureHistoryPanelProps = {
   onUpdateDepth: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, depth: number) => void;
   onUpdateFilletRadius: (feature: Extract<SketchMathFeature, { feature_type: "fillet" }>, radius: number) => void;
   onUpdateChamferDistance: (feature: Extract<SketchMathFeature, { feature_type: "chamfer" }>, distance: number) => void;
+  onRenameFeature: (feature: SketchMathFeature, name: string) => void;
   onAddSimpleHole: (
     feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
     topReference: SketchMathSemanticTopologyReference,
@@ -70,6 +71,32 @@ const recordByFeature = (records: SketchMathFeatureBuildRecord[]): Record<string
 const validDepth = (value: string): number | null => {
   const depth = Number(value);
   return Number.isFinite(depth) && depth > 0 ? Number(depth.toFixed(2)) : null;
+};
+
+type ModelTreeSelection = {
+  kind: "body" | "sketch" | "feature";
+  id: string;
+};
+
+const selectionKey = (selection: ModelTreeSelection): string => `${selection.kind}:${selection.id}`;
+
+const featureTypeLabel = (feature: SketchMathFeature): string => ({
+  extrude: "Extrude",
+  hole: "Hole",
+  revolve: "Revolve",
+  fillet: "Fillet",
+  chamfer: "Chamfer",
+})[feature.feature_type];
+
+const featurePropertySummary = (feature: SketchMathFeature): string => {
+  if (feature.feature_type === "extrude") return `Depth ${feature.parameters.depth_mm} mm · ${feature.parameters.extent.replace("_", " ")}`;
+  if (feature.feature_type === "hole") {
+    const depth = feature.parameters.termination === "blind" ? ` · depth ${feature.parameters.depth_mm} mm` : "";
+    return `${feature.parameters.style} · ${feature.parameters.termination} · diameter ${feature.parameters.diameter_mm} mm${depth}`;
+  }
+  if (feature.feature_type === "revolve") return `Angle ${feature.parameters.angle_deg}° · construction axis`;
+  if (feature.feature_type === "fillet") return `Radius ${feature.parameters.radius_mm} mm`;
+  return `Distance ${feature.parameters.distance_mm} mm`;
 };
 
 const FeatureHistoryPanel = ({
@@ -94,6 +121,7 @@ const FeatureHistoryPanel = ({
   onUpdateDepth,
   onUpdateFilletRadius,
   onUpdateChamferDistance,
+  onRenameFeature,
   onAddSimpleHole,
   onBuildArtifact,
   onRetryArtifact,
@@ -106,6 +134,16 @@ const FeatureHistoryPanel = ({
   const [filletDrafts, setFilletDrafts] = useState<Record<string, string>>({});
   const [chamferDrafts, setChamferDrafts] = useState<Record<string, string>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
+  const defaultSelection = useMemo<ModelTreeSelection | null>(() => {
+    const feature = document.features[document.features.length - 1];
+    if (feature) return { kind: "feature", id: feature.feature_id };
+    const sketch = document.sketches[0];
+    if (sketch) return { kind: "sketch", id: sketch.sketch_id };
+    const body = document.bodies[0];
+    return body ? { kind: "body", id: body.body_id } : null;
+  }, [document.bodies, document.features, document.sketches]);
+  const [treeSelection, setTreeSelection] = useState<ModelTreeSelection | null>(defaultSelection);
+  const [featureNameDraft, setFeatureNameDraft] = useState("");
   const buildRecords = useMemo(
     () => recordByFeature(document.last_rebuild?.records || []),
     [document.last_rebuild?.records],
@@ -161,6 +199,31 @@ const FeatureHistoryPanel = ({
 
   const newDepth = validDepth(newDepthValue);
   const revolveAxis = revolveAxes.find((axis) => axis.id === revolveAxisId) || revolveAxes[0] || null;
+  const selectedBody = treeSelection?.kind === "body"
+    ? document.bodies.find((body) => body.body_id === treeSelection.id) || null
+    : null;
+  const selectedSketch = treeSelection?.kind === "sketch"
+    ? document.sketches.find((sketch) => sketch.sketch_id === treeSelection.id) || null
+    : null;
+  const selectedFeature = treeSelection?.kind === "feature"
+    ? document.features.find((feature) => feature.feature_id === treeSelection.id) || null
+    : null;
+  const normalizedFeatureName = featureNameDraft.trim();
+
+  useEffect(() => {
+    const validSelections = new Set([
+      ...document.bodies.map((body) => `body:${body.body_id}`),
+      ...document.sketches.map((sketch) => `sketch:${sketch.sketch_id}`),
+      ...document.features.map((feature) => `feature:${feature.feature_id}`),
+    ]);
+    if (!treeSelection || !validSelections.has(selectionKey(treeSelection))) {
+      setTreeSelection(defaultSelection);
+    }
+  }, [defaultSelection, document.bodies, document.features, document.sketches, treeSelection]);
+
+  useEffect(() => {
+    setFeatureNameDraft(selectedFeature?.name || "");
+  }, [selectedFeature?.feature_id, selectedFeature?.name]);
 
   useEffect(() => {
     if (!revolveAxes.some((axis) => axis.id === revolveAxisId)) {
@@ -178,10 +241,102 @@ const FeatureHistoryPanel = ({
         Rebuild {document.last_rebuild?.ok === false ? "failed" : "passed"} · {document.features.length} feature{document.features.length === 1 ? "" : "s"}
       </Text>
 
+      <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-model-tree">
+        <Text fontSize="sm" fontWeight="600">Model tree</Text>
+        <Text fontSize="xs" opacity={0.7} mt={1}>{document.name}</Text>
+        <VStack align="stretch" spacing={1} mt={2}>
+          {document.bodies.map((body) => (
+            <React.Fragment key={body.body_id}>
+              <Button
+                size="xs"
+                variant={selectedBody?.body_id === body.body_id ? "solid" : "ghost"}
+                style={{ justifyContent: "flex-start" }}
+                onClick={() => setTreeSelection({ kind: "body", id: body.body_id })}
+                aria-pressed={selectedBody?.body_id === body.body_id}
+              >
+                Body · {body.name}
+              </Button>
+              {document.sketches
+                .filter((sketch) => body.sketch_ids.includes(sketch.sketch_id))
+                .map((sketch) => (
+                  <Button
+                    key={sketch.sketch_id}
+                    size="xs"
+                    variant={selectedSketch?.sketch_id === sketch.sketch_id ? "solid" : "ghost"}
+                    style={{ justifyContent: "flex-start", marginLeft: "1rem" }}
+                    onClick={() => setTreeSelection({ kind: "sketch", id: sketch.sketch_id })}
+                    aria-pressed={selectedSketch?.sketch_id === sketch.sketch_id}
+                  >
+                    Sketch · {sketch.name}
+                  </Button>
+                ))}
+              {document.features
+                .filter((feature) => feature.body_id === body.body_id)
+                .map((feature) => (
+                  <Button
+                    key={feature.feature_id}
+                    size="xs"
+                    variant={selectedFeature?.feature_id === feature.feature_id ? "solid" : "ghost"}
+                    style={{ justifyContent: "flex-start", marginLeft: "1rem" }}
+                    onClick={() => setTreeSelection({ kind: "feature", id: feature.feature_id })}
+                    aria-pressed={selectedFeature?.feature_id === feature.feature_id}
+                  >
+                    {featureTypeLabel(feature)} · {feature.name}{feature.suppressed ? " · Suppressed" : ""}
+                  </Button>
+                ))}
+            </React.Fragment>
+          ))}
+        </VStack>
+      </Box>
+
+      {treeSelection ? (
+        <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-model-properties">
+          <Text fontSize="sm" fontWeight="600">Properties</Text>
+          {selectedBody ? (
+            <Text fontSize="sm" opacity={0.78} mt={1}>
+              Body · {selectedBody.visible ? "Visible" : "Hidden"} · {selectedBody.feature_ids.length} feature{selectedBody.feature_ids.length === 1 ? "" : "s"}
+            </Text>
+          ) : null}
+          {selectedSketch ? (
+            <Text fontSize="sm" opacity={0.78} mt={1}>
+              Sketch · {selectedSketch.plane.toUpperCase()} plane · {selectedSketch.visible ? "Visible" : "Hidden"}
+            </Text>
+          ) : null}
+          {selectedFeature ? (
+            <>
+              <Text fontSize="sm" opacity={0.78} mt={1}>
+                {featureTypeLabel(selectedFeature)} · {selectedFeature.parameters.operation} · {featurePropertySummary(selectedFeature)}
+              </Text>
+              <HStack spacing={2} flexWrap="wrap" mt={2}>
+                <Input
+                  aria-label="Selected feature name"
+                  value={featureNameDraft}
+                  maxLength={80}
+                  onChange={(event) => setFeatureNameDraft(event.target.value)}
+                  width="190px"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onRenameFeature(selectedFeature, normalizedFeatureName)}
+                  isDisabled={
+                    busy
+                    || normalizedFeatureName.length === 0
+                    || normalizedFeatureName === selectedFeature.name
+                  }
+                >
+                  Rename feature
+                </Button>
+              </HStack>
+            </>
+          ) : null}
+        </Box>
+      ) : null}
+
       <Box className="sketchmath-inline-editor" mt={3}>
         <Text fontSize="sm" fontWeight="600">New extrusion</Text>
         <Text fontSize="sm" opacity={0.75} mt={1}>
-          {activeProfile ? `Source profile: ${activeProfile.label || activeProfile.id}` : "Select a closed profile to add a feature."}
+          {activeProfile ? `Source profile: ${activeProfile.label || "Selected closed profile"}` : "Select a closed profile to add a feature."}
         </Text>
         <HStack spacing={2} flexWrap="wrap" mt={2}>
           <Input
@@ -220,8 +375,8 @@ const FeatureHistoryPanel = ({
               width="190px"
               placeholder="No construction axis"
             >
-              {revolveAxes.map((axis) => (
-                <option key={axis.id} value={axis.id}>{axis.label || axis.id}</option>
+              {revolveAxes.map((axis, index) => (
+                <option key={axis.id} value={axis.id}>{axis.label || `Construction axis ${index + 1}`}</option>
               ))}
             </Select>
             <Button
@@ -303,13 +458,18 @@ const FeatureHistoryPanel = ({
             && (holeDraft.termination === "through" || (Number.isFinite(holeDepth) && holeDepth > 0)),
           );
           return (
-            <Box key={feature.feature_id} className="sketchmath-history-row" data-testid={`sketchmath-feature-${feature.feature_id}`}>
+            <Box
+              key={feature.feature_id}
+              className="sketchmath-history-row"
+              data-testid={`sketchmath-feature-${feature.feature_id}`}
+              style={selectedFeature?.feature_id === feature.feature_id ? { borderColor: "#33f6ff" } : undefined}
+            >
               <Text fontWeight="600">{feature.name}</Text>
               <Text fontSize="sm" opacity={0.75}>
                 {feature.feature_type} · {feature.parameters.operation} · {record?.status || "not rebuilt"}
-                {feature.feature_type === "extrude" ? ` · profile ${feature.profile_id}` : ""}
+                {feature.feature_type === "extrude" ? " · source profile" : ""}
                 {feature.feature_type === "hole" ? ` · ${feature.parameters.style} ${feature.parameters.termination}` : ""}
-                {feature.feature_type === "revolve" ? ` · ${feature.parameters.angle_deg}° about ${feature.parameters.axis_entity_id}` : ""}
+                {feature.feature_type === "revolve" ? ` · ${feature.parameters.angle_deg}° about construction axis` : ""}
                 {feature.feature_type === "fillet" ? ` · radius ${feature.parameters.radius_mm} mm` : ""}
                 {feature.feature_type === "chamfer" ? ` · distance ${feature.parameters.distance_mm} mm` : ""}
                 {record ? ` · ${record.generated_topology.length} semantic refs` : ""}

@@ -1198,6 +1198,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
+      onRenameFeature: jest.fn(),
       onAddSimpleHole: jest.fn(),
       onBuildArtifact: jest.fn(),
       onRetryArtifact: jest.fn(),
@@ -1294,6 +1295,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
+      onRenameFeature: jest.fn(),
       onAddSimpleHole: jest.fn(),
       onBuildArtifact,
       onRetryArtifact: jest.fn(),
@@ -1348,6 +1350,153 @@ describe("SketchMath workspace", () => {
     await userEvent.click(screen.getByRole("button", { name: "Build STEP" }));
     expect(onBuildArtifact).toHaveBeenCalledWith(filletFeature, "step");
     expect(screen.getByText("Measurements require a validated kernel artifact.")).toBeInTheDocument();
+  });
+
+  it("renders a semantic model tree, selects typed features, and renames without exposing raw ids", async () => {
+    const features = [
+      {
+        feature_id: "feature_internal_extrude",
+        feature_type: "extrude" as const,
+        name: "Base pad",
+        body_id: "body_internal_1",
+        sketch_id: "sketch_internal_1",
+        profile_id: "profile_internal_1",
+        source_region_id: null,
+        dependencies: [],
+        topology_references: [],
+        parameters: { depth_mm: 8, extent: "one_sided" as const, direction: "positive" as const, operation: "new_body" as const },
+        suppressed: false,
+      },
+      {
+        feature_id: "feature_internal_revolve",
+        feature_type: "revolve" as const,
+        name: "Turned boss",
+        body_id: "body_internal_1",
+        sketch_id: "sketch_internal_1",
+        profile_id: "profile_internal_2",
+        source_region_id: null,
+        dependencies: [],
+        topology_references: [],
+        parameters: { axis_entity_id: "axis_internal_42", angle_deg: 360, operation: "add" as const },
+        suppressed: false,
+      },
+      {
+        feature_id: "feature_internal_hole",
+        feature_type: "hole" as const,
+        name: "Mount hole",
+        body_id: "body_internal_1",
+        sketch_id: "sketch_internal_1",
+        profile_id: null,
+        source_region_id: null,
+        dependencies: ["feature_internal_extrude"],
+        topology_references: [],
+        parameters: { style: "simple" as const, termination: "through" as const, position_mm: [5, 5] as [number, number], diameter_mm: 4, depth_mm: null, operation: "cut" as const },
+        suppressed: false,
+      },
+      {
+        feature_id: "feature_internal_fillet",
+        feature_type: "fillet" as const,
+        name: "Edge fillet",
+        body_id: "body_internal_1",
+        sketch_id: "sketch_internal_1",
+        profile_id: null,
+        source_region_id: null,
+        dependencies: ["feature_internal_extrude"],
+        topology_references: [],
+        parameters: { radius_mm: 2, operation: "modify" as const },
+        suppressed: false,
+      },
+      {
+        feature_id: "feature_internal_chamfer",
+        feature_type: "chamfer" as const,
+        name: "Edge chamfer",
+        body_id: "body_internal_1",
+        sketch_id: "sketch_internal_1",
+        profile_id: null,
+        source_region_id: null,
+        dependencies: ["feature_internal_extrude"],
+        topology_references: [],
+        parameters: { distance_mm: 1.5, operation: "modify" as const },
+        suppressed: false,
+      },
+    ];
+    const document = {
+      schema_version: "1.0",
+      document_id: "document_internal_1",
+      name: "Bracket study",
+      units: "mm",
+      revision: 5,
+      bodies: [{
+        body_id: "body_internal_1",
+        name: "Bracket body",
+        sketch_ids: ["sketch_internal_1"],
+        feature_ids: features.map((feature) => feature.feature_id),
+        visible: true,
+      }],
+      sketches: [{
+        sketch_id: "sketch_internal_1",
+        name: "Layout sketch",
+        plane: "xy",
+        state: { entities: [], constraints: [] },
+        visible: true,
+      }],
+      features,
+      artifacts: [],
+      provenance: {},
+      last_rebuild: null,
+    } as any;
+    const onRenameFeature = jest.fn();
+
+    render(<FeatureHistoryPanel
+      document={document}
+      activeProfile={null}
+      newDepthValue="10"
+      busy={false}
+      canUndo={false}
+      canRedo={false}
+      holeFeaturesEnabled={false}
+      revolveFeaturesEnabled={false}
+      filletFeaturesEnabled={false}
+      chamferFeaturesEnabled={false}
+      artifactJobsEnabled={false}
+      revolveAxes={[]}
+      artifactJobs={{}}
+      onNewDepthValueChange={jest.fn()}
+      onAddExtrusion={jest.fn()}
+      onAddFullRevolve={jest.fn()}
+      onAddOuterFillet={jest.fn()}
+      onAddOuterChamfer={jest.fn()}
+      onUpdateDepth={jest.fn()}
+      onUpdateFilletRadius={jest.fn()}
+      onUpdateChamferDistance={jest.fn()}
+      onRenameFeature={onRenameFeature}
+      onAddSimpleHole={jest.fn()}
+      onBuildArtifact={jest.fn()}
+      onRetryArtifact={jest.fn()}
+      artifactDownloadUrl={jest.fn()}
+      onUndo={jest.fn()}
+      onRedo={jest.fn()}
+    />);
+
+    const tree = screen.getByTestId("sketchmath-model-tree");
+    expect(tree).toHaveTextContent("Body · Bracket body");
+    expect(tree).toHaveTextContent("Sketch · Layout sketch");
+    expect(tree).toHaveTextContent("Extrude · Base pad");
+    expect(tree).toHaveTextContent("Revolve · Turned boss");
+    expect(tree).toHaveTextContent("Hole · Mount hole");
+    expect(tree).toHaveTextContent("Fillet · Edge fillet");
+    expect(tree).toHaveTextContent("Chamfer · Edge chamfer");
+    expect(screen.queryByText("axis_internal_42")).toBeNull();
+    expect(screen.getByTestId("sketchmath-model-properties")).toHaveTextContent("Distance 1.5 mm");
+
+    const nameInput = screen.getByRole("textbox", { name: "Selected feature name" });
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, "  Edge break  ");
+    await userEvent.click(screen.getByRole("button", { name: "Rename feature" }));
+    expect(onRenameFeature).toHaveBeenCalledWith(features[4], "Edge break");
+
+    await userEvent.click(screen.getByRole("button", { name: "Sketch · Layout sketch" }));
+    expect(screen.getByTestId("sketchmath-model-properties")).toHaveTextContent("Sketch · XY plane · Visible");
   });
 
   it("loads canvas-first and keeps advanced JSON hidden by default", async () => {

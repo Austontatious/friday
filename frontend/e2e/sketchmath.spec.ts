@@ -462,6 +462,50 @@ test.describe("SketchMath workspace", () => {
     expect((await graphDownloadPromise).suggestedFilename()).toMatch(/\.stl$/);
   });
 
+  test("selects semantic model-tree nodes and persists a feature rename", async ({ page }) => {
+    await openSketchMath(page);
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+
+    await page.getByRole("button", { name: "Rectangle" }).first().click();
+    await clickSvgViewBoxPoint(page, 140, 120);
+    await clickSvgViewBoxPoint(page, 360, 200);
+    const panel = page.getByTestId("sketchmath-feature-history-panel");
+    await page.getByLabel("Feature extrusion depth").fill("12");
+    await panel.getByRole("button", { name: "Add extrusion feature" }).click();
+    await expect(panel).toContainText("Revision 2");
+
+    const snapshot = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as {
+      document: { features: Array<{ feature_id: string; name: string }> };
+    };
+    const featureId = snapshot.document.features[0].feature_id;
+    const tree = page.getByTestId("sketchmath-model-tree");
+    await expect(tree).toContainText("Body · Main body");
+    await expect(tree).toContainText("Sketch · Main sketch");
+    await expect(tree).toContainText("Extrude · Extrude 1");
+    await expect(tree).not.toContainText(featureId);
+
+    await tree.getByRole("button", { name: "Extrude · Extrude 1" }).click();
+    await expect(page.getByTestId("sketchmath-model-properties")).toContainText("Depth 12 mm");
+    await page.getByLabel("Selected feature name").fill("Primary pad");
+    await page.getByRole("button", { name: "Rename feature" }).click();
+    await expect(panel).toContainText("Revision 3");
+    await expect(tree).toContainText("Extrude · Primary pad");
+
+    const renamed = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as {
+      document: { features: Array<{ feature_id: string; name: string; parameters: { depth_mm: number } }> };
+    };
+    expect(renamed.document.features[0]).toMatchObject({
+      feature_id: featureId,
+      name: "Primary pad",
+      parameters: { depth_mm: 12 },
+    });
+
+    await page.reload();
+    await expect(page.getByTestId("sketchmath-model-tree")).toContainText("Extrude · Primary pad");
+    await expect(page.getByLabel("Selected feature name")).toHaveValue("Primary pad");
+  });
+
   test("creates an outer-edge fillet and downloads its revisioned kernel STEP", async ({ page }) => {
     await openSketchMath(page);
     const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));

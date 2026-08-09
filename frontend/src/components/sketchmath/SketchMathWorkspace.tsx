@@ -1769,6 +1769,26 @@ const SketchMathWorkspace = () => {
     });
   };
 
+  const handleRenameFeature = async (feature: SketchMathFeature, name: string) => {
+    if (!sketchDocument) return;
+    const normalizedName = name.trim();
+    if (!normalizedName || normalizedName === feature.name) return;
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `rename_${feature.feature_id}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "replace_feature",
+      target_id: feature.feature_id,
+      parameters: {
+        feature: {
+          ...feature,
+          name: normalizedName,
+        },
+      },
+    });
+  };
+
   const handleAddFullRevolve = async (
     profile: Extract<SketchMathEntity, { type: "profile_2d" }>,
     axis: Extract<SketchMathEntity, { type: "line_2d" | "construction_line_2d" }>,
@@ -4255,6 +4275,7 @@ const SketchMathWorkspace = () => {
                   onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
                   onUpdateFilletRadius={(feature, radius) => void handleUpdateFilletRadius(feature, radius)}
                   onUpdateChamferDistance={(feature, distance) => void handleUpdateChamferDistance(feature, distance)}
+                  onRenameFeature={(feature, name) => void handleRenameFeature(feature, name)}
                   onAddSimpleHole={(feature, topReference, position, diameter, termination, depth) => (
                     void handleAddSimpleHole(feature, topReference, position, diameter, termination, depth)
                   )}
