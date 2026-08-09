@@ -68,7 +68,7 @@ The pure rebuild layer:
 
 The modeled extrusion parameters cover new-body, add, and cut semantics; positive/negative direction; symmetric extent; and one-/two-sided depth. Add/cut extrusions require exactly one same-body dependency plus one semantic top/bottom face attachment. Their bounds are placed relative to that face, and a one-sided operation aimed away from the target fails structurally.
 
-Typed hole parameters cover simple, counterbore, and countersink style plus through/blind termination. A hole requires one extrusion target and one semantic top-face selector. Rebuild validates finite conditional parameters, target-material containment, edge breakout, depth versus cumulative target-body thickness, counterbore/countersink geometry, analytic removed volume, and generated rim/wall/bottom/style topology. The guarded browser currently creates simple through/blind holes; counterbore/countersink are canonical API/model operations only.
+Typed hole parameters cover simple, counterbore, and countersink style plus through/blind termination. A hole requires one extrusion target and one semantic top-face selector. Rebuild validates finite conditional parameters, target-material containment, edge breakout, depth versus cumulative target-body thickness, counterbore/countersink geometry, analytic removed volume, and generated rim/wall/bottom/style topology. The guarded browser creates simple holes and can replace an existing hole with simple/counterbore/countersink parameters. New advanced-hole creation and their STL/STEP materialization remain outside the bounded artifact envelope.
 
 Typed revolve parameters name a stable sketch axis entity, a finite angle, and new-body/add/cut operation. The current rebuild accepts exactly 360 degrees, rejects profiles that cross the axis, computes analytic Pappus volume and exact full-revolution bounds, and generates source-derived semantic revolved-face references. An axis may be an `axis_2d`, regular line, or construction line. Add/cut requires exactly one dependency and semantic target face, but remains an analytic signed-volume contract rather than a kernel-validated spatial boolean.
 
@@ -88,7 +88,7 @@ When the frontend flag is enabled, the workspace shows Feature history with:
 - selected-profile extrusion creation;
 - stable feature IDs, build status, measurements, and shortened output signatures;
 - in-place extrusion-depth replacement;
-- numeric simple-hole placement and existing simple-hole diameter/through/blind/depth replacement against the current semantic top face;
+- numeric simple-hole placement and existing simple/counterbore/countersink style, diameter, termination/depth, and conditional style-parameter replacement against the current semantic top face;
 - default-off new-body full-revolve creation from a selected closed profile and chosen construction-line axis, plus existing-feature axis replacement inside the supported 360-degree envelope;
 - default-off outer-vertical-edge fillet creation, radius replacement, kernel STEP build, and download for the supported bounded vertical feature graph;
 - default-off outer-vertical-edge chamfer creation, distance replacement, kernel STEP build, and download for its supported bounded vertical feature graph;
@@ -107,6 +107,7 @@ A revision conflict refreshes the backend-authoritative session before the user 
 - The golden browser workflow commits 80→100 mm width and Ø5→Ø6 four-hole design parameters, preserves offsets/centering and stable IDs, performs undo/redo/reload, then builds and downloads a revision-12 native STEP with exact supported topology and no browser errors.
 - Existing simple-hole property editing is a complete `replace_feature` operation with rebuild, undo/redo, reload, and terminal STL evidence. A feature property owned by a design-parameter binding refuses direct replacement with `feature_parameter_bound`; rename remains allowed because it does not mutate the bound parameters.
 - Existing full-revolve axis editing uses the same typed `replace_feature` boundary. Live Playwright creates two construction axes, changes the axis of a 360-degree revolve, observes a new rebuild signature with the same feature ID, and proves undo/redo/reload with no browser errors. The angle control remains fixed at 360 degrees because partial sweeps are structurally unsupported.
+- Advanced hole property Playwright creates a simple hole, replaces it with a counterbore and then a countersink, verifies typed conditional parameters, and proves stable-ID undo/redo/reload with no browser errors. Artifact controls remain truthful: the layered STL and bounded STEP workers still support simple-hole graphs only.
 
 ## Open Boundaries
 

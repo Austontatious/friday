@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-08-09 - SketchMath Counterbore and Countersink Property Editing
+
+### What Changed
+- Generalized the existing semantic-hole property editor from simple holes to simple, counterbore, and countersink styles.
+- Added conditional counterbore diameter/depth and countersink diameter/angle validation, while retaining through/blind/depth behavior and design-parameter binding protection.
+- Routed every style change through the canonical typed `replace_feature` operation and added live undo/redo/reload acceptance.
+
+### Why
+- The canonical backend already modeled and rebuilt all three hole styles, but advanced styles had no browser property path.
+- Manual and AI-authored features must remain editable through one history/rebuild boundary rather than requiring raw API mutation.
+
+### New Env Flags
+- None. The existing default-off document-v1, feature-history, and hole-feature flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py -k "hole or counterbore or countersink"`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm test -- --runInBand --watchAll=false src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run test:e2e -- --grep "edits counterbore and countersink"`
+
+### Evidence
+- Code checkpoint: `9f0621c`.
+- Targeted Playwright passed in 8.4 seconds with stable feature identity, counterbore→countersink replacement, undo/redo, reload, and no browser errors.
+
+### Boundary
+- Advanced hole rebuild/volume/topology semantics pass, but layered STL and bounded STEP jobs still accept simple holes only. No advanced-hole artifact support is claimed.
+
+---
+
 ## 2026-08-09 - SketchMath Resumed Release Regression
 
 ### What Changed

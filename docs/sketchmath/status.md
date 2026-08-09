@@ -121,6 +121,15 @@ The property-edit checkpoint `1e8db05` with browser proof `7976010` closes the s
 - Live Playwright creates two construction axes, creates a full revolve, changes its axis, observes a changed deterministic rebuild signature, and proves feature undo/redo plus disk reload in 10.8 seconds with no console/page errors.
 - The angle field remains explicitly fixed at 360 degrees; partial sweeps, spatial revolve booleans, and revolve artifacts remain open rather than implied.
 
+## Current Advanced-Hole Property Validation
+
+On 2026-08-09 for guarded UI checkpoint `9f0621c`:
+
+- The existing-hole property editor covers simple, counterbore, and countersink styles with through/blind depth plus conditional counterbore diameter/depth and countersink diameter/angle.
+- All edits remain revision-checked typed `replace_feature` commits and retain backend style geometry, containment, depth, volume, and generated-topology validation.
+- Five focused backend hole tests, TypeScript, all 44 workspace tests, and live counterbore→countersink undo/redo/reload Playwright pass. The browser workflow completed in 8.4 seconds with no console/page errors.
+- New-hole creation remains simple-only. Advanced hole STL/STEP is not claimed; the current artifact workers still refuse unsupported advanced-hole graphs structurally.
+
 ## Current Kernel-Fillet Validation
 
 On 2026-08-09 for semantic model `1f1b034`, FreeCAD boundary `30af86a`, API gate `e6b272f`, and guarded UI `53a39ed`:
@@ -187,7 +196,7 @@ On 2026-08-09 for guarded UI checkpoint `bc650ca`:
 - Pure rebuild topologically orders dependencies, detects missing references/cycles, propagates blocked status, validates source profiles/holes/region identity, and emits deterministic hashes, signatures, bounds, net area, signed volume, and structured errors.
 - Typed extrusion parameters cover new-body/add/cut, positive/negative direction, symmetric, and one-/two-sided measurement semantics. Broad kernel-backed feature reconstruction is not claimed.
 - Add/cut extrusions attach through semantic top/bottom references and are placed at the resolved face Z; missing attachments and one-sided directions away from the target fail structurally.
-- Typed holes cover simple/counterbore/countersink and through/blind analytic semantics. The guarded React panel exposes simple through/blind placement, extrusion depth editing, rebuild/reference evidence, and dedicated feature undo/redo.
+- Typed holes cover simple/counterbore/countersink and through/blind analytic semantics. The guarded React panel exposes simple placement plus existing advanced-style conditional property editing, extrusion depth editing, rebuild/reference evidence, and dedicated feature undo/redo.
 - Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, guarded new-body creation, and existing-axis replacement with feature undo/redo/reload.
 - Typed fillet covers convex extrusion vertical edges, semantic adjacency/signature/endpoints, exact/recovered selection, finite radius editing, kernel-required measurement state, and a resumable validated FreeCAD STEP path with guarded browser creation/download.
 - Typed chamfer reuses the stable edge contract with finite distance editing, deterministic `chamfer_surface` identity, native FreeCAD STEP validation, and guarded browser creation/download.
