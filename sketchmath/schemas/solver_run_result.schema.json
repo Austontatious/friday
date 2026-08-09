@@ -209,6 +209,19 @@
       "title": "Changed Entity Ids",
       "type": "array"
     },
+    "characteristic_length_mm": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Characteristic Length Mm"
+    },
     "diagnostics": {
       "items": {
         "type": "string"
@@ -228,6 +241,70 @@
       "default": null,
       "title": "Feasible"
     },
+    "function_evaluations": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Function Evaluations"
+    },
+    "jacobian_evaluations": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Jacobian Evaluations"
+    },
+    "jacobian_rank": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Jacobian Rank"
+    },
+    "jacobian_strategy": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Jacobian Strategy"
+    },
+    "max_abs_residual": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Abs Residual"
+    },
     "mode": {
       "enum": [
         "analyze",
@@ -235,6 +312,18 @@
       ],
       "title": "Mode",
       "type": "string"
+    },
+    "optimizer_terminated_successfully": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Optimizer Terminated Successfully"
     },
     "outcome": {
       "enum": [
@@ -262,6 +351,19 @@
       "title": "Requested Constraint Ids",
       "type": "array"
     },
+    "residual_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Residual Count"
+    },
     "residual_norm": {
       "anyOf": [
         {
@@ -276,14 +378,34 @@
       "title": "Residual Norm"
     },
     "schema_version": {
-      "const": "1.0",
-      "default": "1.0",
+      "const": "1.1",
+      "default": "1.1",
       "title": "Schema Version",
       "type": "string"
+    },
+    "seed_count": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Seed Count"
     },
     "termination_reason": {
       "title": "Termination Reason",
       "type": "string"
+    },
+    "variable_order": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Variable Order",
+      "type": "array"
     }
   },
   "required": [

@@ -64,16 +64,16 @@ def test_midpoint_constraint_moves_point_and_enters_exact_linear_analysis() -> N
     assert analysis["remaining_dof"] == 0
 
 
-def test_collinear_and_symmetric_constraints_apply_closed_form_and_remain_partial() -> None:
+def test_collinear_and_symmetric_constraints_apply_closed_form_and_analyze_exactly() -> None:
     collinear = _session([_point("a", 0, 0), _point("b", 8, 0), _point("moving", 3, 4)])
     result = collinear.execute(_command("make_collinear", "collinear", ["a", "b", "moving"]))
     assert result.after.get_entity("moving").coords == pytest.approx((3.0, 0.0))
-    assert _analysis(collinear)["coverage"] == "partial"
+    assert _analysis(collinear)["coverage"] == "exact"
 
     symmetric = _session([_point("reference", 2, 1), _point("target", 5, 5), _point("axis_a", 0, 0), _point("axis_b", 0, 6)])
     result = symmetric.execute(_command("make_symmetric", "symmetric", ["reference", "target", "axis_a", "axis_b"]))
     assert result.after.get_entity("target").coords == pytest.approx((-2.0, 1.0))
-    assert _analysis(symmetric)["coverage"] == "partial"
+    assert _analysis(symmetric)["coverage"] == "exact"
 
 
 def test_concentric_circles_update_linked_center_and_are_exact() -> None:

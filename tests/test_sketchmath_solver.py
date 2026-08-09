@@ -157,7 +157,7 @@ def test_make_equal_angle_adjusts_target_angle() -> None:
 def test_solve_constraints_can_place_missing_quadrilateral_corner() -> None:
     session = _session(
         [
-            {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": False},
+            {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": True},
             {"id": "point_B", "type": "point_2d", "coords": [4, 0], "locked": True},
             {"id": "point_C", "type": "point_2d", "coords": [4, 3], "locked": True},
             {"id": "point_D", "type": "point_2d", "coords": [1, 1], "locked": False},
@@ -189,7 +189,7 @@ def test_under_constrained_solve_returns_structured_error() -> None:
 
     assert exc_info.value.to_dict()["code"] == "clarification_required"
     assert exc_info.value.detail["solver_run"]["outcome"] == "under_constrained"
-    assert exc_info.value.detail["solver_run"]["feasible"] is None
+    assert exc_info.value.detail["solver_run"]["feasible"] is True
 
 
 def test_over_constrained_solve_returns_structured_error() -> None:
@@ -258,7 +258,16 @@ def test_unified_solve_run_returns_analysis_and_deterministic_patch() -> None:
                 "unit": "mm",
                 "direction": 1,
                 "anchor": "point_a",
-            }
+            },
+            {
+                "id": "vertical_distance",
+                "type": "vertical_distance_constraint",
+                "points": ["point_A", "point_B"],
+                "distance": 3,
+                "unit": "mm",
+                "direction": 1,
+                "anchor": "point_a",
+            },
         ],
     )
 
@@ -266,11 +275,11 @@ def test_unified_solve_run_returns_analysis_and_deterministic_patch() -> None:
     run = result.metadata["solver_run"]
 
     assert result.after.get_entity("point_B").coords == pytest.approx((8, 3))
-    assert run["backend"] == "closed_form_v1"
+    assert run["backend"] == "scipy_least_squares_v1"
     assert run["mode"] == "solve"
     assert run["outcome"] == "solved"
     assert run["feasible"] is True
-    assert run["residual_norm"] is None
+    assert run["residual_norm"] <= 1e-7
     assert run["analysis_before"]["coverage"] == "exact"
     assert run["analysis_after"]["coverage"] == "exact"
     assert [patch["entity_id"] for patch in run["proposed_patch"]] == ["point_B"]

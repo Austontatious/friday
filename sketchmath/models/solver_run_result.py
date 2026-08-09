@@ -19,7 +19,7 @@ class SolverCoordinatePatch(BaseModel):
 class SolverRunResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.1"] = "1.1"
     backend: str
     mode: Literal["analyze", "solve"]
     outcome: Literal["analyzed", "solved", "under_constrained", "inconsistent", "redundant", "failed"]
@@ -29,6 +29,16 @@ class SolverRunResult(BaseModel):
     proposed_patch: list[SolverCoordinatePatch] = Field(default_factory=list)
     feasible: bool | None = None
     residual_norm: float | None = Field(default=None, ge=0)
+    max_abs_residual: float | None = Field(default=None, ge=0)
+    residual_count: int | None = Field(default=None, ge=0)
+    variable_order: list[str] = Field(default_factory=list)
+    jacobian_strategy: str | None = None
+    jacobian_rank: int | None = Field(default=None, ge=0)
+    function_evaluations: int | None = Field(default=None, ge=0)
+    jacobian_evaluations: int | None = Field(default=None, ge=0)
+    seed_count: int | None = Field(default=None, ge=1)
+    characteristic_length_mm: float | None = Field(default=None, gt=0)
+    optimizer_terminated_successfully: bool | None = None
     analysis_before: SolverAnalysis
     analysis_after: SolverAnalysis
     diagnostics: list[str] = Field(default_factory=list)

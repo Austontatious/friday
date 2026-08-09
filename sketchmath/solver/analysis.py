@@ -227,7 +227,7 @@ def _unmodeled_entities(state: SelectionContext) -> list[str]:
     return sorted(unmodeled)
 
 
-def analyze_constraint_system(
+def _analyze_linear_constraint_system(
     state: SelectionContext,
     *,
     policy: NumericalTolerancePolicy = DEFAULT_TOLERANCE_POLICY,
@@ -318,3 +318,22 @@ def analyze_constraint_system(
         diagnostics=diagnostics,
         tolerance_policy=policy.to_dict(),
     )
+
+
+def analyze_constraint_system(
+    state: SelectionContext,
+    *,
+    policy: NumericalTolerancePolicy = DEFAULT_TOLERANCE_POLICY,
+) -> SolverAnalysis:
+    """Analyze through the solver-neutral nonlinear boundary, with a linear fallback.
+
+    The fallback keeps lightweight environments usable when the declared SciPy
+    dependency has not yet been installed. It never promotes nonlinear coverage.
+    """
+
+    from sketchmath.solver.nonlinear import evaluate_nonlinear_system
+
+    evaluation = evaluate_nonlinear_system(state, policy=policy)
+    if evaluation is not None:
+        return evaluation.analysis
+    return _analyze_linear_constraint_system(state, policy=policy)

@@ -215,6 +215,17 @@ def test_v04_driving_axis_and_circle_dimensions_round_trip_through_api(monkeypat
     assert axis.json()["result"]["after"]["items"][1]["coords"] == [8.0, 3.0]
     assert axis.json()["result"]["after"]["constraints"][0]["type"] == "horizontal_distance_constraint"
 
+    vertical_command = _command(
+        "set_vertical_distance",
+        "axis_vertical_distance",
+        mode="commit",
+        selection=["point_A", "point_B"],
+        parameters={"distance": 3, "unit": "mm", "anchor": "point_a"},
+    )
+    vertical_command["version"] = "0.4"
+    vertical = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": vertical_command})
+    assert vertical.status_code == 200
+
     diameter_command = _command(
         "set_diameter",
         "circle_diameter",
@@ -227,14 +238,14 @@ def test_v04_driving_axis_and_circle_dimensions_round_trip_through_api(monkeypat
     assert diameter.status_code == 200
     circle = next(item for item in diameter.json()["result"]["after"]["items"] if item["id"] == "circle")
     assert circle["radius"] == 15.0
-    assert diameter.json()["result"]["after"]["constraints"][1]["type"] == "diameter_constraint"
+    assert diameter.json()["result"]["after"]["constraints"][2]["type"] == "diameter_constraint"
 
     analyze_command = _command("analyze_constraints", "unified_analysis")
     analyze_command["version"] = "0.3"
     analysis = client.post(f"/api/sketchmath/sessions/{session_id}/commands/preview", json={"command": analyze_command})
     assert analysis.status_code == 200
     assert analysis.json()["result"]["metadata"]["solver_run"]["outcome"] == "analyzed"
-    assert analysis.json()["result"]["metadata"]["solver_run"]["backend"] == "closed_form_v1"
+    assert analysis.json()["result"]["metadata"]["solver_run"]["backend"] == "scipy_least_squares_v1"
 
     solve = client.post(
         f"/api/sketchmath/sessions/{session_id}/commands/preview",
@@ -246,7 +257,7 @@ def test_v04_driving_axis_and_circle_dimensions_round_trip_through_api(monkeypat
 
     snapshot = client.get(f"/api/sketchmath/sessions/{session_id}")
     assert snapshot.status_code == 200
-    assert snapshot.json()["history_length"] == 2
+    assert snapshot.json()["history_length"] == 3
     client.close()
 
 

@@ -167,7 +167,7 @@ const solverRunFromMetadata = (value: unknown): SketchMathSolverRun | null => {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<SketchMathSolverRun>;
   if (
-    candidate.schema_version !== "1.0" ||
+    !["1.0", "1.1"].includes(String(candidate.schema_version)) ||
     typeof candidate.backend !== "string" ||
     !["analyze", "solve"].includes(String(candidate.mode)) ||
     !["analyzed", "solved", "under_constrained", "inconsistent", "redundant", "failed"].includes(String(candidate.outcome)) ||
@@ -907,6 +907,13 @@ const SketchMathWorkspace = () => {
       `Termination: ${solverRun?.termination_reason || "unknown"}`,
       `Feasible: ${solverRun?.feasible ?? "unknown"}`,
       `Residual norm: ${solverRun?.residual_norm ?? "unavailable"}`,
+      `Max residual: ${solverRun?.max_abs_residual ?? "unavailable"}`,
+      `Residual rows: ${solverRun?.residual_count ?? "unavailable"}`,
+      `Jacobian: ${solverRun?.jacobian_strategy ?? "unavailable"}`,
+      `Jacobian rank: ${solverRun?.jacobian_rank ?? "unavailable"}`,
+      `Function evaluations: ${solverRun?.function_evaluations ?? "unavailable"}`,
+      `Deterministic seeds: ${solverRun?.seed_count ?? "unavailable"}`,
+      `Characteristic length (mm): ${solverRun?.characteristic_length_mm ?? "unavailable"}`,
       `Coverage: ${solverAnalysis.coverage}`,
       `Freedom: ${solverAnalysis.freedom_state}`,
       `Consistency: ${solverAnalysis.consistency_state}`,

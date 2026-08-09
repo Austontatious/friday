@@ -123,7 +123,7 @@ export type SketchMathSolverAnalysis = {
 };
 
 export type SketchMathSolverRun = {
-  schema_version: "1.0";
+  schema_version: "1.0" | "1.1";
   backend: string;
   mode: "analyze" | "solve";
   outcome: "analyzed" | "solved" | "under_constrained" | "inconsistent" | "redundant" | "failed";
@@ -138,6 +138,16 @@ export type SketchMathSolverRun = {
   }>;
   feasible: boolean | null;
   residual_norm: number | null;
+  max_abs_residual?: number | null;
+  residual_count?: number | null;
+  variable_order?: string[];
+  jacobian_strategy?: string | null;
+  jacobian_rank?: number | null;
+  function_evaluations?: number | null;
+  jacobian_evaluations?: number | null;
+  seed_count?: number | null;
+  characteristic_length_mm?: number | null;
+  optimizer_terminated_successfully?: boolean | null;
   analysis_before: SketchMathSolverAnalysis;
   analysis_after: SketchMathSolverAnalysis;
   diagnostics: string[];

@@ -61,6 +61,7 @@ from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
 from sketchmath.models.solver_run_result import SolverCoordinatePatch, SolverRunResult
 from sketchmath.solver.analysis import analyze_constraint_system
+from sketchmath.solver.nonlinear import evaluate_nonlinear_system
 
 from .errors import (
     CadExportError,
@@ -1200,7 +1201,7 @@ def _solver_coordinate_patch(before: SelectionContext, after: SelectionContext, 
     return patches
 
 
-def _run_constraint_path(
+def _run_closed_form_constraint_path(
     state: SelectionContext,
     constraints: list[ConstraintEntity],
     *,
@@ -1321,6 +1322,126 @@ def _run_constraint_path(
         analysis_after=analysis_after,
         feasible=feasible,
         diagnostics=[*analysis_after.diagnostics, "Generalized residual norm is unavailable for the closed-form backend."],
+    )
+
+
+def _run_constraint_path(
+    state: SelectionContext,
+    constraints: list[ConstraintEntity],
+    *,
+    solve: bool,
+) -> SolverRunResult:
+    """Run the generalized backend without leaking its implementation into callers."""
+
+    all_constraint_ids = [constraint.id for constraint in state.constraints]
+    requested_ids = [constraint.id for constraint in constraints]
+    if requested_ids != all_constraint_ids:
+        # Selected-subset solving retains the compatibility path until the
+        # generalized backend has an explicit inactive-constraint contract.
+        return _run_closed_form_constraint_path(state, constraints, solve=solve)
+    evaluation = evaluate_nonlinear_system(state)
+    if evaluation is None:
+        return _run_closed_form_constraint_path(state, constraints, solve=solve)
+    analysis = evaluation.analysis
+    if not solve:
+        return SolverRunResult(
+            backend=evaluation.backend,
+            mode="analyze",
+            outcome="analyzed",
+            termination_reason=evaluation.termination_reason,
+            requested_constraint_ids=all_constraint_ids,
+            analysis_before=analysis,
+            analysis_after=analysis,
+            feasible=evaluation.feasible,
+            residual_norm=evaluation.residual_norm,
+            max_abs_residual=evaluation.max_abs_residual,
+            residual_count=evaluation.residual_count,
+            variable_order=evaluation.variable_order,
+            jacobian_strategy="scipy_3_point_with_central_rank_check",
+            jacobian_rank=evaluation.jacobian_rank,
+            function_evaluations=evaluation.function_evaluations,
+            jacobian_evaluations=evaluation.jacobian_evaluations,
+            seed_count=evaluation.seed_count,
+            characteristic_length_mm=evaluation.characteristic_length_mm,
+            optimizer_terminated_successfully=evaluation.optimizer_success,
+            diagnostics=evaluation.diagnostics,
+        )
+    base = {
+        "backend": evaluation.backend,
+        "mode": "solve",
+        "requested_constraint_ids": requested_ids,
+        "analysis_before": analysis,
+        "analysis_after": analysis,
+        "residual_norm": evaluation.residual_norm,
+        "max_abs_residual": evaluation.max_abs_residual,
+        "residual_count": evaluation.residual_count,
+        "variable_order": evaluation.variable_order,
+        "jacobian_strategy": "scipy_3_point_with_central_rank_check",
+        "jacobian_rank": evaluation.jacobian_rank,
+        "function_evaluations": evaluation.function_evaluations,
+        "jacobian_evaluations": evaluation.jacobian_evaluations,
+        "seed_count": evaluation.seed_count,
+        "characteristic_length_mm": evaluation.characteristic_length_mm,
+        "optimizer_terminated_successfully": evaluation.optimizer_success,
+        "diagnostics": evaluation.diagnostics,
+    }
+    if analysis.consistency_state == "inconsistent":
+        return SolverRunResult(
+            **base,
+            outcome="inconsistent",
+            termination_reason="nonlinear_residual_infeasible",
+            feasible=False,
+        )
+    if analysis.coverage != "exact":
+        if (
+            not evaluation.changed_entity_ids
+            and evaluation.max_abs_residual is not None
+            and evaluation.max_abs_residual <= DEFAULT_TOLERANCE_POLICY.nonlinear_feasibility_abs
+            and evaluation.optimizer_success is True
+        ):
+            return SolverRunResult(
+                **base,
+                outcome="solved",
+                termination_reason="nonlinear_supported_subset_already_feasible",
+                feasible=None,
+            )
+        return SolverRunResult(
+            **base,
+            outcome="failed",
+            termination_reason="nonlinear_coverage_partial",
+            feasible=None,
+        )
+    if analysis.redundancy_state == "redundant":
+        return SolverRunResult(
+            **base,
+            outcome="redundant",
+            termination_reason="nonlinear_redundant_system",
+            feasible=True,
+        )
+    if evaluation.feasible is not True or evaluation.optimizer_success is not True:
+        return SolverRunResult(
+            **base,
+            outcome="failed",
+            termination_reason="nonlinear_convergence_failed",
+            feasible=evaluation.feasible,
+        )
+    patch = _solver_coordinate_patch(state, evaluation.proposed_state, evaluation.changed_entity_ids)
+    if analysis.freedom_state == "under_constrained":
+        return SolverRunResult(
+            **base,
+            outcome="under_constrained",
+            termination_reason="nonlinear_feasible_under_constrained",
+            changed_entity_ids=evaluation.changed_entity_ids,
+            proposed_patch=patch,
+            feasible=True,
+        )
+    return SolverRunResult(
+        **base,
+        outcome="solved",
+        termination_reason="nonlinear_residual_feasible",
+        changed_entity_ids=evaluation.changed_entity_ids,
+        proposed_patch=patch,
+        feasible=True,
     )
 
 
@@ -1882,7 +2003,7 @@ def _apply_distance_constraint(constraint: DistanceConstraint, state: SelectionC
     target = float(constraint.distance)
     unit = constraint.unit
     try:
-        target_mm = float(denormalize_length(target, unit))
+        target_mm = float(normalize_length(target, unit))
     except ValueError as exc:
         raise InvalidUnitsError(str(exc), detail={"constraint_id": constraint.id, "unit": unit}) from exc
     current = distance(a.coords, b.coords)

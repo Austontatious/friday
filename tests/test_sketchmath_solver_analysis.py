@@ -92,7 +92,7 @@ def test_coincident_constraint_can_be_proven_redundant() -> None:
     assert analysis.remaining_dof == 0
 
 
-def test_nonlinear_constraint_reports_partial_not_fabricated_dof() -> None:
+def test_nonlinear_distance_constraint_reports_exact_dof() -> None:
     state = _state(
         items=[_point("a", 0, 0), _point("b", 5, 0)],
         constraints=[
@@ -107,12 +107,13 @@ def test_nonlinear_constraint_reports_partial_not_fabricated_dof() -> None:
 
     analysis = analyze_constraint_system(state)
 
-    assert analysis.coverage == "partial"
-    assert analysis.freedom_state == "unknown"
-    assert analysis.consistency_state == "unknown"
-    assert analysis.unsupported_constraint_ids == ["distance"]
-    assert analysis.remaining_dof is None
-    assert analysis.remaining_tracked_dof_upper_bound == 4
+    assert analysis.coverage == "exact"
+    assert analysis.freedom_state == "under_constrained"
+    assert analysis.consistency_state == "consistent"
+    assert analysis.supported_constraint_ids == ["distance"]
+    assert analysis.unsupported_constraint_ids == []
+    assert analysis.remaining_dof == 3
+    assert analysis.remaining_tracked_dof_upper_bound == 3
 
 
 def test_axis_distances_are_exact_linear_constraints() -> None:
