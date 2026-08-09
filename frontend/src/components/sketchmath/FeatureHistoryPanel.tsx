@@ -148,7 +148,7 @@ const FeatureHistoryPanel = ({
       <VStack align="stretch" spacing={3} mt={3}>
         {document.features.length === 0 ? (
           <Text fontSize="sm" opacity={0.72}>No committed features yet.</Text>
-        ) : document.features.map((feature) => {
+        ) : document.features.map((feature, featureIndex) => {
           const record = buildRecords[feature.feature_id];
           const depthDraft = feature.feature_type === "extrude"
             ? depthDrafts[feature.feature_id] ?? String(feature.parameters.depth_mm)
@@ -161,12 +161,18 @@ const FeatureHistoryPanel = ({
               && artifact.revision === document.revision
               && artifact.format === "stl"
             ));
-          const canBuildArtifact = feature.feature_type === "extrude"
-            && record?.status === "succeeded"
-            && feature.parameters.operation === "new_body"
-            && feature.parameters.extent === "one_sided"
-            && feature.parameters.direction === "positive"
-            && feature.dependencies.length === 0;
+          const laterBodyFeatures = document.features.slice(featureIndex + 1).filter(
+            (candidate) => candidate.body_id === feature.body_id && !candidate.suppressed,
+          );
+          const graphSupportsStl = document.features.slice(0, featureIndex + 1).every(
+            (candidate) => candidate.body_id !== feature.body_id
+              || candidate.suppressed
+              || candidate.feature_type === "extrude"
+              || candidate.parameters.style === "simple",
+          );
+          const canBuildArtifact = record?.status === "succeeded"
+            && laterBodyFeatures.length === 0
+            && graphSupportsStl;
           const artifactBusy = artifactJob?.state === "READY" || artifactJob?.state === "RUNNING";
           const topReference = record?.generated_topology.find((reference) => reference.topology_type === "face" && reference.role === "top");
           const holeDraft = holeDrafts[feature.feature_id];
@@ -335,7 +341,7 @@ const FeatureHistoryPanel = ({
                       {artifactJob.error ? ` · ${artifactJob.error.code}: ${artifactJob.error.message}` : ""}
                     </Text>
                   ) : !canBuildArtifact ? (
-                    <Text fontSize="xs" opacity={0.65} mt={1}>STL build requires one independent positive new-body extrusion.</Text>
+                    <Text fontSize="xs" opacity={0.65} mt={1}>STL build is available on the terminal supported body feature.</Text>
                   ) : null}
                 </Box>
               ) : null}

@@ -7,7 +7,6 @@ from typing import Any
 
 from sketchmath.cad.adapter import CadAdapter
 from sketchmath.cad.feature_mesh import build_feature_body_mesh
-from sketchmath.cad.preview_mesh import build_preview_mesh
 from sketchmath.cad.solid_validation import validate_solid_measurements
 from sketchmath.cad.stl_export import write_ascii_stl
 from sketchmath.executor.errors import CadExportError, FeatureRebuildError, MissingEntityError, UnsupportedCadFormatError

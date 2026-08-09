@@ -435,8 +435,10 @@ test.describe("SketchMath workspace", () => {
     const holeResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
     const withHole = await holeResponse.json() as FeatureSnapshot;
     const holeFeature = withHole.document.features.find((feature) => feature.feature_type === "hole");
+    expect(holeFeature).toBeTruthy();
+    const holeFeatureId = holeFeature!.feature_id;
     expect(holeFeature?.parameters.diameter_mm).toBe(20);
-    expect(withHole.document.last_rebuild.records[1]).toMatchObject({ feature_id: holeFeature?.feature_id });
+    expect(withHole.document.last_rebuild.records[1]).toMatchObject({ feature_id: holeFeatureId });
 
     await page.getByLabel(`Feature depth ${featureId}`).fill("30");
     await page.getByTestId(`sketchmath-feature-${featureId}`).getByRole("button", { name: "Apply depth" }).click();
@@ -450,7 +452,14 @@ test.describe("SketchMath workspace", () => {
     expect(recovered.document.last_rebuild.records[1].resolved_references?.[0].recovery_state).toBe("recovered");
 
     await page.reload();
-    await expect(page.getByTestId(`sketchmath-feature-${holeFeature?.feature_id}`)).toContainText("hole · cut · succeeded");
+    const holeRow = page.getByTestId(`sketchmath-feature-${holeFeatureId}`);
+    await expect(holeRow).toContainText("hole · cut · succeeded");
+    await holeRow.getByRole("button", { name: "Build STL" }).click();
+    await expect(page.getByTestId(`sketchmath-artifact-status-${holeFeatureId}`)).toContainText("DONE · complete · revision 7", { timeout: 15000 });
+    const graphDownload = page.getByTestId(`sketchmath-artifact-download-${holeFeatureId}`);
+    const graphDownloadPromise = page.waitForEvent("download");
+    await graphDownload.click();
+    expect((await graphDownloadPromise).suggestedFilename()).toMatch(/\.stl$/);
   });
 
   test("creates a center-defined rectangle through the canonical rectangle bundle", async ({ page }) => {
