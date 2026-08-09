@@ -1686,7 +1686,19 @@ const SketchMathWorkspace = () => {
       featureId = `${stem}_${suffix}`;
       suffix += 1;
     }
-    const dependency = sketchDocument.features[sketchDocument.features.length - 1];
+    const dependency = [...sketchDocument.features].reverse().find(
+      (candidate): candidate is Extract<SketchMathFeature, { feature_type: "extrude" }> => candidate.feature_type === "extrude",
+    );
+    const dependencyRecord = dependency
+      ? sketchDocument.last_rebuild?.records.find((record) => record.feature_id === dependency.feature_id)
+      : null;
+    const dependencyTop = dependencyRecord?.generated_topology.find(
+      (reference) => reference.topology_type === "face" && reference.role === "top",
+    );
+    if (dependency && !dependencyTop) {
+      setUserError("The prior feature does not expose a semantic top face for attachment.");
+      return;
+    }
     const feature: SketchMathFeature = {
       feature_id: featureId,
       feature_type: "extrude",
@@ -1696,7 +1708,16 @@ const SketchMathWorkspace = () => {
       profile_id: profile.id,
       source_region_id: profile.source_region_id || null,
       dependencies: dependency ? [dependency.feature_id] : [],
-      topology_references: [],
+      topology_references: dependency && dependencyTop ? [
+        {
+          reference_id: dependencyTop.reference_id,
+          owner_feature_id: dependency.feature_id,
+          topology_type: "face",
+          role: "top",
+          source_entity_id: dependencyTop.source_entity_id || null,
+          expected_signature: dependencyTop.geometric_signature,
+        },
+      ] : [],
       parameters: {
         depth_mm: depth,
         extent: "one_sided",

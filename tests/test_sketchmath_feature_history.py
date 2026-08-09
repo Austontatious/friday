@@ -61,6 +61,7 @@ def _feature(
     depth: float = 10,
     extent: str = "one_sided",
     second_depth: float | None = None,
+    direction: str = "positive",
     topology_references: list[dict] | None = None,
 ) -> FeatureRecord:
     return FeatureRecord.model_validate(
@@ -77,7 +78,7 @@ def _feature(
                 "depth_mm": depth,
                 "extent": extent,
                 "second_depth_mm": second_depth,
-                "direction": "positive",
+                "direction": direction,
                 "operation": operation,
             },
         }
@@ -187,8 +188,51 @@ def test_extrude_rebuild_is_pure_deterministic_and_hole_aware() -> None:
 
 def test_dependency_order_drives_add_and_cut_rebuild() -> None:
     base = _feature("feature_base")
-    add = _feature("feature_add", profile_id="profile_boss", operation="add", dependencies=["feature_base"], depth=4)
-    cut = _feature("feature_cut", profile_id="profile_boss", operation="cut", dependencies=["feature_add"], depth=2)
+    base_top = next(
+        item
+        for item in rebuild_document(_document().model_copy(update={"features": [base]})).records[0].generated_topology
+        if item.role == "top"
+    )
+    add = _feature(
+        "feature_add",
+        profile_id="profile_boss",
+        operation="add",
+        dependencies=["feature_base"],
+        depth=4,
+        topology_references=[
+            {
+                "reference_id": base_top.reference_id,
+                "owner_feature_id": "feature_base",
+                "topology_type": "face",
+                "role": "top",
+                "source_entity_id": "profile_plate",
+                "expected_signature": base_top.geometric_signature,
+            }
+        ],
+    )
+    add_top = next(
+        item
+        for item in rebuild_document(_document().model_copy(update={"features": [base, add]})).records[1].generated_topology
+        if item.role == "top"
+    )
+    cut = _feature(
+        "feature_cut",
+        profile_id="profile_boss",
+        operation="cut",
+        dependencies=["feature_add"],
+        depth=2,
+        direction="negative",
+        topology_references=[
+            {
+                "reference_id": add_top.reference_id,
+                "owner_feature_id": "feature_add",
+                "topology_type": "face",
+                "role": "top",
+                "source_entity_id": "profile_boss",
+                "expected_signature": add_top.geometric_signature,
+            }
+        ],
+    )
     document = _document().model_copy(update={"features": [cut, add, base]})
 
     report = rebuild_document(document)
@@ -196,6 +240,45 @@ def test_dependency_order_drives_add_and_cut_rebuild() -> None:
     assert report.ok is True
     assert report.rebuild_order == ["feature_base", "feature_add", "feature_cut"]
     assert [record.measurements.volume_delta_mm3 for record in report.records if record.measurements] == pytest.approx([840, 144, -72])
+    assert report.records[1].measurements.bounds_mm[-2:] == pytest.approx((10, 14))
+    assert report.records[2].measurements.bounds_mm[-2:] == pytest.approx((12, 14))
+
+
+def test_boolean_extrusion_requires_semantic_attachment_and_direction_into_target() -> None:
+    base = _feature("feature_base")
+    missing_attachment = _feature(
+        "feature_add",
+        profile_id="profile_boss",
+        operation="add",
+        dependencies=["feature_base"],
+    )
+    missing_report = rebuild_document(_document().model_copy(update={"features": [base, missing_attachment]}))
+    assert missing_report.records[1].error.code == "feature_attachment_reference_required"
+
+    top = next(
+        item
+        for item in rebuild_document(_document().model_copy(update={"features": [base]})).records[0].generated_topology
+        if item.role == "top"
+    )
+    wrong_direction = _feature(
+        "feature_cut",
+        profile_id="profile_boss",
+        operation="cut",
+        dependencies=["feature_base"],
+        direction="positive",
+        topology_references=[
+            {
+                "reference_id": top.reference_id,
+                "owner_feature_id": "feature_base",
+                "topology_type": "face",
+                "role": "top",
+                "source_entity_id": "profile_plate",
+                "expected_signature": top.geometric_signature,
+            }
+        ],
+    )
+    direction_report = rebuild_document(_document().model_copy(update={"features": [base, wrong_direction]}))
+    assert direction_report.records[1].error.code == "feature_direction_away_from_target"
 
 
 def test_symmetric_and_two_sided_extents_have_deterministic_bounds() -> None:

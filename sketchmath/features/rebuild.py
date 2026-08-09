@@ -135,7 +135,13 @@ def _profile_for_feature(document: SketchMathDocument, feature: FeatureRecord) -
     return profile, holes, None
 
 
-def _extrude_measurements(feature: FeatureRecord, profile: Profile2DEntity, holes: list[Profile2DEntity]) -> FeatureMeasurements:
+def _extrude_measurements(
+    feature: FeatureRecord,
+    profile: Profile2DEntity,
+    holes: list[Profile2DEntity],
+    *,
+    attachment_z: float = 0.0,
+) -> FeatureMeasurements:
     parameters = feature.parameters
     net_area = profile.area - sum(hole.area for hole in holes)
     if net_area <= 0:
@@ -149,6 +155,8 @@ def _extrude_measurements(feature: FeatureRecord, profile: Profile2DEntity, hole
         z_min, z_max = -parameters.depth_mm, 0.0
     else:
         z_min, z_max = 0.0, parameters.depth_mm
+    z_min += attachment_z
+    z_max += attachment_z
     total_depth = z_max - z_min
     xs = [vertex[0] for vertex in profile.vertices]
     ys = [vertex[1] for vertex in profile.vertices]
@@ -284,12 +292,13 @@ def _hole_measurements(
     target: FeatureBuildRecord,
     target_profile: Profile2DEntity,
     target_holes: list[Profile2DEntity],
+    target_body_bounds: tuple[float, float, float, float, float, float],
 ) -> FeatureMeasurements:
     parameters = feature.parameters
     if not isinstance(parameters, HoleParameters) or target.measurements is None:
         raise ValueError("hole feature requires a built target")
     bounds = target.measurements.bounds_mm
-    target_depth = bounds[5] - bounds[4]
+    target_depth = bounds[5] - target_body_bounds[4]
     shaft_depth = target_depth if parameters.termination == "through" else float(parameters.depth_mm or 0.0)
     if shaft_depth > target_depth:
         raise ValueError("hole depth cannot exceed target thickness")
@@ -334,6 +343,37 @@ def _hole_measurements(
         volume_delta_mm3=-volume,
         bounds_mm=(x - outer_radius, x + outer_radius, y - outer_radius, y + outer_radius, z_max - shaft_depth, z_max),
         hole_count=1,
+    )
+
+
+def _dependency_body_bounds(
+    feature_id: str,
+    records_by_id: dict[str, FeatureBuildRecord],
+    feature_map: dict[str, FeatureRecord],
+) -> tuple[float, float, float, float, float, float] | None:
+    pending = [feature_id]
+    visited: set[str] = set()
+    bounds: list[tuple[float, float, float, float, float, float]] = []
+    while pending:
+        current_id = pending.pop()
+        if current_id in visited:
+            continue
+        visited.add(current_id)
+        record = records_by_id.get(current_id)
+        current = feature_map.get(current_id)
+        if record is not None and record.measurements is not None and current is not None and current.parameters.operation != "cut":
+            bounds.append(record.measurements.bounds_mm)
+        if current is not None:
+            pending.extend(current.dependencies)
+    if not bounds:
+        return None
+    return (
+        min(item[0] for item in bounds),
+        max(item[1] for item in bounds),
+        min(item[2] for item in bounds),
+        max(item[3] for item in bounds),
+        min(item[4] for item in bounds),
+        max(item[5] for item in bounds),
     )
 
 
@@ -568,9 +608,77 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
         resolved_references: list[ResolvedTopologyReference] = []
         if error is None:
             resolved_references, error = _resolve_topology_references(feature, records_by_id)
+        attachment_z = 0.0
+        if error is None and feature.feature_type == "extrude" and feature.parameters.operation != "new_body":
+            if len(feature.dependencies) != 1:
+                error = FeatureBuildError(
+                    code="boolean_target_dependency_required",
+                    message="An add or cut extrusion requires exactly one target feature dependency.",
+                    detail={"dependency_ids": feature.dependencies},
+                )
+            else:
+                dependency_id = feature.dependencies[0]
+                face_selectors = [
+                    selector
+                    for selector in feature.topology_references
+                    if selector.owner_feature_id == dependency_id
+                    and selector.topology_type == "face"
+                    and selector.role in {"top", "bottom"}
+                ]
+                if len(face_selectors) != 1:
+                    error = FeatureBuildError(
+                        code="feature_attachment_reference_required",
+                        message="An add or cut extrusion requires exactly one semantic top- or bottom-face attachment.",
+                        detail={
+                            "dependency_id": dependency_id,
+                            "attachment_reference_ids": [selector.reference_id for selector in face_selectors],
+                        },
+                    )
+                else:
+                    selector = face_selectors[0]
+                    resolved = next(
+                        (item for item in resolved_references if item.requested_reference_id == selector.reference_id),
+                        None,
+                    )
+                    owner_record = records_by_id.get(dependency_id)
+                    attachment = next(
+                        (
+                            item
+                            for item in owner_record.generated_topology
+                            if resolved is not None and item.reference_id == resolved.resolved_reference_id
+                        ),
+                        None,
+                    ) if owner_record is not None else None
+                    z_value = attachment.measurements.get("z_mm") if attachment is not None else None
+                    if not isinstance(z_value, (int, float)):
+                        error = FeatureBuildError(
+                            code="invalid_feature_attachment",
+                            message="Feature attachment does not provide a usable face position.",
+                            detail={"reference_id": selector.reference_id},
+                        )
+                    else:
+                        attachment_z = float(z_value)
+                        if feature.parameters.extent == "one_sided":
+                            expected_direction = (
+                                "positive"
+                                if (selector.role == "top") == (feature.parameters.operation == "add")
+                                else "negative"
+                            )
+                            if feature.parameters.direction != expected_direction:
+                                error = FeatureBuildError(
+                                    code="feature_direction_away_from_target",
+                                    message="One-sided add/cut direction must enter or extend from the attached target face.",
+                                    detail={
+                                        "operation": feature.parameters.operation,
+                                        "face_role": selector.role,
+                                        "direction": feature.parameters.direction,
+                                        "expected_direction": expected_direction,
+                                    },
+                                )
         target_profile: Profile2DEntity | None = None
         target_holes: list[Profile2DEntity] = []
         target_record: FeatureBuildRecord | None = None
+        target_body_bounds: tuple[float, float, float, float, float, float] | None = None
         if error is None and feature.feature_type == "hole":
             if len(feature.dependencies) != 1:
                 error = FeatureBuildError(
@@ -606,6 +714,7 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                         )
                     else:
                         target_record = records_by_id.get(dependency_id)
+                        target_body_bounds = _dependency_body_bounds(dependency_id, records_by_id, feature_map)
                         target_profile, target_holes, target_error = _profile_for_feature(document, target_feature)
                         if target_error is not None:
                             error = target_error
@@ -620,8 +729,8 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
         else:
             try:
                 if feature.feature_type == "hole":
-                    assert target_record is not None and target_profile is not None
-                    measurements = _hole_measurements(feature, target_record, target_profile, target_holes)
+                    assert target_record is not None and target_profile is not None and target_body_bounds is not None
+                    measurements = _hole_measurements(feature, target_record, target_profile, target_holes, target_body_bounds)
                     generated_topology = _hole_topology(feature, measurements)
                     source_geometry: object = {
                         "target_feature_id": feature.dependencies[0],
@@ -629,7 +738,7 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                     }
                 else:
                     assert profile is not None
-                    measurements = _extrude_measurements(feature, profile, holes)
+                    measurements = _extrude_measurements(feature, profile, holes, attachment_z=attachment_z)
                     generated_topology = _extrude_topology(feature, profile, holes, measurements)
                     source_geometry = {
                         "profile": profile.model_dump(mode="json"),
