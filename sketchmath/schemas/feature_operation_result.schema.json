@@ -1258,8 +1258,11 @@
           "type": "string"
         },
         "feature_type": {
-          "const": "extrude",
           "default": "extrude",
+          "enum": [
+            "extrude",
+            "hole"
+          ],
           "title": "Feature Type",
           "type": "string"
         },
@@ -1268,11 +1271,27 @@
           "type": "string"
         },
         "parameters": {
-          "$ref": "#/$defs/ExtrudeParameters"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExtrudeParameters"
+            },
+            {
+              "$ref": "#/$defs/HoleParameters"
+            }
+          ],
+          "title": "Parameters"
         },
         "profile_id": {
-          "title": "Profile Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Id"
         },
         "sketch_id": {
           "title": "Sketch Id",
@@ -1308,7 +1327,6 @@
         "name",
         "body_id",
         "sketch_id",
-        "profile_id",
         "parameters"
       ],
       "title": "FeatureRecord",
@@ -1369,6 +1387,127 @@
         "coords"
       ],
       "title": "FixedPointConstraint",
+      "type": "object"
+    },
+    "HoleParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "counterbore_depth_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Counterbore Depth Mm"
+        },
+        "counterbore_diameter_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Counterbore Diameter Mm"
+        },
+        "countersink_angle_deg": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 180,
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Countersink Angle Deg"
+        },
+        "countersink_diameter_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Countersink Diameter Mm"
+        },
+        "depth_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Depth Mm"
+        },
+        "diameter_mm": {
+          "exclusiveMinimum": 0,
+          "title": "Diameter Mm",
+          "type": "number"
+        },
+        "operation": {
+          "const": "cut",
+          "default": "cut",
+          "title": "Operation",
+          "type": "string"
+        },
+        "position_mm": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position Mm",
+          "type": "array"
+        },
+        "style": {
+          "default": "simple",
+          "enum": [
+            "simple",
+            "counterbore",
+            "countersink"
+          ],
+          "title": "Style",
+          "type": "string"
+        },
+        "termination": {
+          "default": "through",
+          "enum": [
+            "through",
+            "blind"
+          ],
+          "title": "Termination",
+          "type": "string"
+        }
+      },
+      "required": [
+        "position_mm",
+        "diameter_mm"
+      ],
+      "title": "HoleParameters",
       "type": "object"
     },
     "HorizontalConstraint": {

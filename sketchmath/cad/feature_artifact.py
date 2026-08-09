@@ -49,6 +49,11 @@ def _validated_feature(document: SketchMathDocument, feature_id: str) -> tuple[F
         )
     if feature.suppressed:
         raise CadExportError("Suppressed feature cannot produce an artifact", detail={"feature_id": feature_id})
+    if feature.feature_type != "extrude":
+        raise CadExportError(
+            "Canonical artifact materialization currently supports extrusion features",
+            detail={"feature_id": feature_id, "feature_type": feature.feature_type, "error_code": "unsupported_artifact_feature_type"},
+        )
     if feature.parameters.operation != "new_body" or feature.dependencies:
         raise CadExportError(
             "Canonical artifact materialization currently requires one independent new-body extrusion",

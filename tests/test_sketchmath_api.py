@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Lock
+import math
 import time
 
 from fastapi.testclient import TestClient
+import pytest
 
 from backend.main import create_app
 
@@ -774,6 +776,40 @@ def test_sketchmath_artifact_jobs_default_off_and_gate_build_route(monkeypatch, 
     client.close()
 
 
+def test_sketchmath_hole_features_default_off_and_gate_feature_route(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.delenv("FRIDAY_SKETCHMATH_HOLE_FEATURES_ENABLED", raising=False)
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={})
+    hole = {
+        "feature_id": "feature_gated_hole",
+        "feature_type": "hole",
+        "name": "Gated hole",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "dependencies": ["feature_missing"],
+        "topology_references": [],
+        "parameters": {
+            "style": "simple",
+            "termination": "through",
+            "position_mm": [0, 0],
+            "diameter_mm": 4,
+            "operation": "cut",
+        },
+    }
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{created.json()['session_id']}/features/preview",
+        json={"command": _feature_command("add_feature", "gated_hole", 0, feature=hole)},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "sketchmath_hole_features_disabled"
+    client.close()
+
+
 def test_sketchmath_artifact_job_build_poll_register_download_and_replay(monkeypatch, tmp_path):
     monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
     monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
@@ -943,6 +979,88 @@ def test_sketchmath_feature_history_preview_commit_reload_conflict_and_undo_redo
     assert after_refusal["document"]["revision"] == 7
     assert after_refusal["history_length"] == 1
     assert any(item["id"] == "profile_box" for item in after_refusal["selection_context"]["items"])
+    client.close()
+
+
+def test_sketchmath_typed_hole_feature_recovers_top_face_after_base_edit_and_reload(monkeypatch, tmp_path):
+    from backend.sketchmath.service import SESSION_STORE
+
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_HOLE_FEATURES_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": _profile_selection_context()})
+    session_id = created.json()["session_id"]
+    base = _extrude_feature(10)
+    base_response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={"command": _feature_command("add_feature", "add_hole_base", 0, feature=base, mode="commit")},
+    )
+    assert base_response.status_code == 200
+    top = next(
+        item
+        for item in base_response.json()["document"]["last_rebuild"]["records"][0]["generated_topology"]
+        if item["role"] == "top"
+    )
+    hole = {
+        "feature_id": "feature_mount_hole",
+        "feature_type": "hole",
+        "name": "Mount hole",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "dependencies": ["feature_plate"],
+        "topology_references": [
+            {
+                "reference_id": top["reference_id"],
+                "owner_feature_id": "feature_plate",
+                "topology_type": "face",
+                "role": "top",
+                "source_entity_id": "profile_box",
+                "expected_signature": top["geometric_signature"],
+            }
+        ],
+        "parameters": {
+            "style": "simple",
+            "termination": "through",
+            "position_mm": [10, 5],
+            "diameter_mm": 4,
+            "operation": "cut",
+        },
+    }
+    hole_response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={"command": _feature_command("add_feature", "add_mount_hole", 1, feature=hole, mode="commit")},
+    )
+    assert hole_response.status_code == 200, hole_response.text
+    hole_record = hole_response.json()["document"]["last_rebuild"]["records"][1]
+    assert hole_record["measurements"]["volume_delta_mm3"] == pytest.approx(-40 * math.pi)
+    assert hole_record["resolved_references"][0]["recovery_state"] == "exact"
+
+    edited_base = _extrude_feature(20)
+    edited_response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={
+            "command": _feature_command(
+                "replace_feature",
+                "edit_hole_base_depth",
+                2,
+                feature=edited_base,
+                target_id="feature_plate",
+                mode="commit",
+            )
+        },
+    )
+    assert edited_response.status_code == 200, edited_response.text
+    edited_hole_record = edited_response.json()["document"]["last_rebuild"]["records"][1]
+    assert edited_hole_record["measurements"]["volume_delta_mm3"] == pytest.approx(-80 * math.pi)
+    assert edited_hole_record["resolved_references"][0]["recovery_state"] == "recovered"
+
+    SESSION_STORE._sessions.pop(session_id, None)
+    reloaded = client.get(f"/api/sketchmath/sessions/{session_id}")
+    assert reloaded.status_code == 200
+    assert [feature["feature_type"] for feature in reloaded.json()["document"]["features"]] == ["extrude", "hole"]
+    assert reloaded.json()["document"]["revision"] == 3
     client.close()
 
 

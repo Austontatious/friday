@@ -82,6 +82,21 @@ def _require_artifact_jobs() -> None:
         )
 
 
+def _require_enabled_feature_family(command: Dict[str, Any]) -> None:
+    parameters = command.get("parameters") if isinstance(command, dict) else None
+    feature = parameters.get("feature") if isinstance(parameters, dict) else None
+    if isinstance(feature, dict) and feature.get("feature_type") == "hole" and not SketchMathConfig.from_env().hole_features_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=_error_payload(
+                "sketchmath_hole_features_disabled",
+                "SketchMath hole features are disabled",
+                "Set FRIDAY_SKETCHMATH_HOLE_FEATURES_ENABLED=1",
+                False,
+            ),
+        )
+
+
 def _cad_export_root() -> Path:
     root = Path(SketchMathConfig.from_env().cad_export_dir)
     if not root.is_absolute():
@@ -215,6 +230,7 @@ def preview_feature(session_id: str, payload: Dict[str, Any]):
     command = payload.get("command") if isinstance(payload, dict) else None
     if not isinstance(command, dict):
         raise HTTPException(status_code=400, detail=_error_payload("bad_request", "Missing feature command", "Provide a 'command' object", False))
+    _require_enabled_feature_family(command)
     try:
         return _store().run_feature_command(session_id, command, mode="preview")
     except SketchMathError as exc:
@@ -228,6 +244,7 @@ def commit_feature(session_id: str, payload: Dict[str, Any]):
     command = payload.get("command") if isinstance(payload, dict) else None
     if not isinstance(command, dict):
         raise HTTPException(status_code=400, detail=_error_payload("bad_request", "Missing feature command", "Provide a 'command' object", False))
+    _require_enabled_feature_family(command)
     try:
         return _store().run_feature_command(session_id, command, mode="commit")
     except SketchMathError as exc:

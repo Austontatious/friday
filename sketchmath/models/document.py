@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -45,6 +46,56 @@ class ExtrudeParameters(BaseModel):
         return self
 
 
+class HoleParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    style: Literal["simple", "counterbore", "countersink"] = "simple"
+    termination: Literal["through", "blind"] = "through"
+    position_mm: tuple[float, float]
+    diameter_mm: float = Field(gt=0)
+    depth_mm: float | None = Field(default=None, gt=0)
+    counterbore_diameter_mm: float | None = Field(default=None, gt=0)
+    counterbore_depth_mm: float | None = Field(default=None, gt=0)
+    countersink_diameter_mm: float | None = Field(default=None, gt=0)
+    countersink_angle_deg: float | None = Field(default=None, gt=0, lt=180)
+    operation: Literal["cut"] = "cut"
+
+    @model_validator(mode="after")
+    def validate_hole_semantics(self) -> "HoleParameters":
+        numeric_values = [
+            *self.position_mm,
+            self.diameter_mm,
+            self.depth_mm,
+            self.counterbore_diameter_mm,
+            self.counterbore_depth_mm,
+            self.countersink_diameter_mm,
+            self.countersink_angle_deg,
+        ]
+        if not all(value is None or math.isfinite(value) for value in numeric_values):
+            raise ValueError("hole parameters must be finite")
+        if self.termination == "blind" and self.depth_mm is None:
+            raise ValueError("blind hole requires depth_mm")
+        if self.termination == "through" and self.depth_mm is not None:
+            raise ValueError("through hole cannot declare depth_mm")
+        if self.style == "counterbore":
+            if self.counterbore_diameter_mm is None or self.counterbore_depth_mm is None:
+                raise ValueError("counterbore requires counterbore diameter and depth")
+            if self.counterbore_diameter_mm <= self.diameter_mm:
+                raise ValueError("counterbore diameter must exceed hole diameter")
+            if self.termination == "blind" and self.counterbore_depth_mm > float(self.depth_mm or 0):
+                raise ValueError("counterbore depth cannot exceed blind hole depth")
+        elif self.counterbore_diameter_mm is not None or self.counterbore_depth_mm is not None:
+            raise ValueError("counterbore parameters require counterbore style")
+        if self.style == "countersink":
+            if self.countersink_diameter_mm is None or self.countersink_angle_deg is None:
+                raise ValueError("countersink requires countersink diameter and angle")
+            if self.countersink_diameter_mm <= self.diameter_mm:
+                raise ValueError("countersink diameter must exceed hole diameter")
+        elif self.countersink_diameter_mm is not None or self.countersink_angle_deg is not None:
+            raise ValueError("countersink parameters require countersink style")
+        return self
+
+
 class TopologyReferenceSelector(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -87,16 +138,29 @@ class FeatureRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     feature_id: str
-    feature_type: Literal["extrude"] = "extrude"
+    feature_type: Literal["extrude", "hole"] = "extrude"
     name: str
     body_id: str
     sketch_id: str
-    profile_id: str
+    profile_id: str | None = None
     source_region_id: str | None = None
     dependencies: list[str] = Field(default_factory=list)
     topology_references: list[TopologyReferenceSelector] = Field(default_factory=list)
-    parameters: ExtrudeParameters
+    parameters: ExtrudeParameters | HoleParameters
     suppressed: bool = False
+
+    @model_validator(mode="after")
+    def validate_feature_parameters(self) -> "FeatureRecord":
+        if self.feature_type == "extrude":
+            if not isinstance(self.parameters, ExtrudeParameters):
+                raise ValueError("extrude feature requires extrusion parameters")
+            if not self.profile_id:
+                raise ValueError("extrude feature requires profile_id")
+        elif not isinstance(self.parameters, HoleParameters):
+            raise ValueError("hole feature requires hole parameters")
+        elif self.profile_id is not None:
+            raise ValueError("hole feature does not use profile_id")
+        return self
 
 
 class FeatureBuildError(BaseModel):

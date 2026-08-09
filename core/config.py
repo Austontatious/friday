@@ -185,6 +185,7 @@ class CompanionConfig:
 class SketchMathConfig:
     enabled: bool
     document_v1_enabled: bool
+    hole_features_enabled: bool
     artifact_jobs_enabled: bool
     session_dir: str
     cad_export_dir: str
@@ -209,6 +210,7 @@ class SketchMathConfig:
         return cls(
             enabled=_env_bool("FRIDAY_SKETCHMATH_ENABLED", default=False),
             document_v1_enabled=_env_bool("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", default=False),
+            hole_features_enabled=_env_bool("FRIDAY_SKETCHMATH_HOLE_FEATURES_ENABLED", default=False),
             artifact_jobs_enabled=_env_bool("FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED", default=False),
             session_dir=session_dir,
             cad_export_dir=cad_export_dir,

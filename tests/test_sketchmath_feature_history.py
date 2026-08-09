@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from sketchmath.executor.errors import FeatureRebuildError, RevisionConflictError, SelectionResolutionError
@@ -102,6 +104,56 @@ def _command(
             "operation_type": operation_type,
             "target_id": target_id,
             "parameters": payload,
+        }
+    )
+
+
+def _hole_feature(
+    feature_id: str,
+    base: FeatureRecord,
+    *,
+    position: tuple[float, float] = (5, 5),
+    diameter: float = 2,
+    style: str = "simple",
+    termination: str = "through",
+    depth: float | None = None,
+    counterbore_diameter: float | None = None,
+    counterbore_depth: float | None = None,
+    countersink_diameter: float | None = None,
+    countersink_angle: float | None = None,
+) -> FeatureRecord:
+    base_report = rebuild_document(_document().model_copy(update={"features": [base]}))
+    top = next(item for item in base_report.records[0].generated_topology if item.role == "top")
+    return FeatureRecord.model_validate(
+        {
+            "feature_id": feature_id,
+            "feature_type": "hole",
+            "name": feature_id.replace("_", " ").title(),
+            "body_id": base.body_id,
+            "sketch_id": base.sketch_id,
+            "dependencies": [base.feature_id],
+            "topology_references": [
+                {
+                    "reference_id": top.reference_id,
+                    "owner_feature_id": base.feature_id,
+                    "topology_type": "face",
+                    "role": "top",
+                    "source_entity_id": base.profile_id,
+                    "expected_signature": top.geometric_signature,
+                }
+            ],
+            "parameters": {
+                "style": style,
+                "termination": termination,
+                "position_mm": position,
+                "diameter_mm": diameter,
+                "depth_mm": depth,
+                "counterbore_diameter_mm": counterbore_diameter,
+                "counterbore_depth_mm": counterbore_depth,
+                "countersink_diameter_mm": countersink_diameter,
+                "countersink_angle_deg": countersink_angle,
+                "operation": "cut",
+            },
         }
     )
 
@@ -281,6 +333,89 @@ def test_downstream_topology_reference_recovers_after_upstream_depth_edit() -> N
     assert resolved.recovery_state == "recovered"
     assert resolved.resolved_reference_id == top.reference_id
     assert resolved.current_signature != resolved.expected_signature
+
+
+def test_simple_through_hole_uses_semantic_top_face_and_emits_stable_topology() -> None:
+    base = _feature("feature_base", profile_id="profile_boss", depth=10)
+    hole = _hole_feature("feature_hole", base)
+
+    report = rebuild_document(_document().model_copy(update={"features": [base, hole]}))
+
+    assert report.ok is True
+    record = report.records[1]
+    assert record.resolved_references[0].recovery_state == "exact"
+    assert record.measurements.volume_delta_mm3 == pytest.approx(-10 * math.pi)
+    assert record.measurements.bounds_mm == pytest.approx((4, 6, 4, 6, 0, 10))
+    assert {item.role for item in record.generated_topology} == {"hole_wall", "hole_rim"}
+
+
+def test_blind_counterbore_and_through_countersink_have_typed_volume_semantics() -> None:
+    base = _feature("feature_base", profile_id="profile_boss", depth=10)
+    counterbore = _hole_feature(
+        "feature_counterbore",
+        base,
+        style="counterbore",
+        termination="blind",
+        depth=6,
+        counterbore_diameter=4,
+        counterbore_depth=2,
+    )
+    counterbore_report = rebuild_document(_document().model_copy(update={"features": [base, counterbore]}))
+    counterbore_record = counterbore_report.records[1]
+    assert counterbore_report.ok is True
+    assert counterbore_record.measurements.volume_delta_mm3 == pytest.approx(-12 * math.pi)
+    assert counterbore_record.measurements.bounds_mm == pytest.approx((3, 7, 3, 7, 4, 10))
+    assert {item.role for item in counterbore_record.generated_topology} >= {
+        "hole_wall",
+        "hole_rim",
+        "hole_bottom",
+        "counterbore_wall",
+        "counterbore_step_edge",
+    }
+
+    countersink = _hole_feature(
+        "feature_countersink",
+        base,
+        style="countersink",
+        countersink_diameter=4,
+        countersink_angle=90,
+    )
+    countersink_report = rebuild_document(_document().model_copy(update={"features": [base, countersink]}))
+    countersink_record = countersink_report.records[1]
+    assert countersink_report.ok is True
+    assert countersink_record.measurements.volume_delta_mm3 == pytest.approx(-(10 + 4 / 3) * math.pi)
+    assert "countersink_face" in {item.role for item in countersink_record.generated_topology}
+
+
+def test_hole_reference_recovers_after_depth_edit_and_updates_through_depth() -> None:
+    base = _feature("feature_base", profile_id="profile_boss", depth=10)
+    hole = _hole_feature("feature_hole", base)
+
+    edited_base = _feature("feature_base", profile_id="profile_boss", depth=20)
+    report = rebuild_document(_document().model_copy(update={"features": [edited_base, hole]}))
+
+    assert report.ok is True
+    record = report.records[1]
+    assert record.resolved_references[0].recovery_state == "recovered"
+    assert record.measurements.volume_delta_mm3 == pytest.approx(-20 * math.pi)
+    assert record.measurements.bounds_mm[-2:] == pytest.approx((0, 20))
+
+
+def test_hole_rejects_missing_top_face_edge_breakout_and_excess_blind_depth() -> None:
+    base = _feature("feature_base", profile_id="profile_boss", depth=10)
+    missing_reference = _hole_feature("feature_missing_reference", base).model_copy(update={"topology_references": []})
+    missing_report = rebuild_document(_document().model_copy(update={"features": [base, missing_reference]}))
+    assert missing_report.records[1].error.code == "hole_top_face_reference_required"
+
+    breakout = _hole_feature("feature_breakout", base, position=(2.5, 5), diameter=2)
+    breakout_report = rebuild_document(_document().model_copy(update={"features": [base, breakout]}))
+    assert breakout_report.records[1].error.code == "invalid_feature_geometry"
+    assert "inside target material" in breakout_report.records[1].error.message
+
+    too_deep = _hole_feature("feature_too_deep", base, termination="blind", depth=11)
+    too_deep_report = rebuild_document(_document().model_copy(update={"features": [base, too_deep]}))
+    assert too_deep_report.records[1].error.code == "invalid_feature_geometry"
+    assert "target thickness" in too_deep_report.records[1].error.message
 
 
 @pytest.mark.parametrize(
