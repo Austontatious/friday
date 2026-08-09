@@ -45,6 +45,44 @@ class ExtrudeParameters(BaseModel):
         return self
 
 
+class TopologyReferenceSelector(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reference_id: str
+    owner_feature_id: str
+    topology_type: Literal["face", "edge"]
+    role: str
+    source_entity_id: str | None = None
+    expected_signature: str
+
+
+class SemanticTopologyReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reference_id: str
+    owner_feature_id: str
+    topology_type: Literal["face", "edge"]
+    role: str
+    source_entity_id: str | None = None
+    ordinal: int = Field(ge=0)
+    geometric_signature: str
+    measurements: dict[str, float | int | str] = Field(default_factory=dict)
+
+
+class ResolvedTopologyReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requested_reference_id: str
+    resolved_reference_id: str
+    owner_feature_id: str
+    topology_type: Literal["face", "edge"]
+    role: str
+    source_entity_id: str | None = None
+    recovery_state: Literal["exact", "recovered"]
+    expected_signature: str
+    current_signature: str
+
+
 class FeatureRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -56,6 +94,7 @@ class FeatureRecord(BaseModel):
     profile_id: str
     source_region_id: str | None = None
     dependencies: list[str] = Field(default_factory=list)
+    topology_references: list[TopologyReferenceSelector] = Field(default_factory=list)
     parameters: ExtrudeParameters
     suppressed: bool = False
 
@@ -86,6 +125,8 @@ class FeatureBuildRecord(BaseModel):
     input_hash: str
     output_signature: str | None = None
     measurements: FeatureMeasurements | None = None
+    generated_topology: list[SemanticTopologyReference] = Field(default_factory=list)
+    resolved_references: list[ResolvedTopologyReference] = Field(default_factory=list)
     error: FeatureBuildError | None = None
 
 

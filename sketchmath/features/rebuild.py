@@ -9,6 +9,8 @@ from sketchmath.models.document import (
     FeatureMeasurements,
     FeatureRebuildReport,
     FeatureRecord,
+    ResolvedTopologyReference,
+    SemanticTopologyReference,
     SketchMathDocument,
 )
 from sketchmath.models.entities import Profile2DEntity
@@ -155,6 +157,190 @@ def _extrude_measurements(feature: FeatureRecord, profile: Profile2DEntity, hole
     )
 
 
+def _semantic_reference(
+    feature: FeatureRecord,
+    *,
+    topology_type: str,
+    role: str,
+    source_entity_id: str | None,
+    ordinal: int,
+    geometry: object,
+    measurements: dict[str, float | int | str] | None = None,
+) -> SemanticTopologyReference:
+    identity = {
+        "owner_feature_id": feature.feature_id,
+        "topology_type": topology_type,
+        "role": role,
+        "source_entity_id": source_entity_id,
+        "ordinal": ordinal,
+    }
+    return SemanticTopologyReference(
+        reference_id=f"topo_{_hash_payload(identity)[:20]}",
+        owner_feature_id=feature.feature_id,
+        topology_type=topology_type,
+        role=role,
+        source_entity_id=source_entity_id,
+        ordinal=ordinal,
+        geometric_signature=_hash_payload({"identity": identity, "geometry": geometry}),
+        measurements=measurements or {},
+    )
+
+
+def _extrude_topology(
+    feature: FeatureRecord,
+    profile: Profile2DEntity,
+    holes: list[Profile2DEntity],
+    measurements: FeatureMeasurements,
+) -> list[SemanticTopologyReference]:
+    z_min, z_max = measurements.bounds_mm[-2:]
+    topology: list[SemanticTopologyReference] = []
+    face_geometry = {
+        "outer": profile.vertices,
+        "holes": [{"id": hole.id, "vertices": hole.vertices} for hole in holes],
+    }
+    for ordinal, (role, z_value) in enumerate((("bottom", z_min), ("top", z_max))):
+        topology.append(
+            _semantic_reference(
+                feature,
+                topology_type="face",
+                role=role,
+                source_entity_id=profile.id,
+                ordinal=ordinal,
+                geometry={**face_geometry, "z": z_value},
+                measurements={"area_mm2": measurements.net_profile_area_mm2, "z_mm": z_value},
+            )
+        )
+
+    segment_count = max(1, len(profile.vertices) - 1)
+    source_ids = list(profile.source_curve_ids or profile.source_line_ids)
+    if profile.source_circle_id:
+        source_ids = [profile.source_circle_id]
+    if not source_ids:
+        source_ids = [profile.id] * segment_count
+    for ordinal, source_id in enumerate(source_ids):
+        segment = (
+            [profile.vertices[ordinal], profile.vertices[ordinal + 1]]
+            if len(source_ids) == segment_count and ordinal + 1 < len(profile.vertices)
+            else profile.vertices
+        )
+        side_geometry = {"segment": segment, "z_min": z_min, "z_max": z_max}
+        topology.append(
+            _semantic_reference(
+                feature,
+                topology_type="face",
+                role="outer_wall",
+                source_entity_id=source_id,
+                ordinal=ordinal,
+                geometry=side_geometry,
+                measurements={"height_mm": z_max - z_min},
+            )
+        )
+        for edge_role, z_value in (("bottom_outer_edge", z_min), ("top_outer_edge", z_max)):
+            topology.append(
+                _semantic_reference(
+                    feature,
+                    topology_type="edge",
+                    role=edge_role,
+                    source_entity_id=source_id,
+                    ordinal=ordinal,
+                    geometry={"segment": segment, "z": z_value},
+                    measurements={"z_mm": z_value},
+                )
+            )
+
+    for ordinal, hole in enumerate(holes):
+        topology.append(
+            _semantic_reference(
+                feature,
+                topology_type="face",
+                role="hole_wall",
+                source_entity_id=hole.id,
+                ordinal=ordinal,
+                geometry={"vertices": hole.vertices, "z_min": z_min, "z_max": z_max},
+                measurements={"height_mm": z_max - z_min, "area_mm2": hole.area},
+            )
+        )
+        for edge_role, z_value in (("bottom_hole_edge", z_min), ("top_hole_edge", z_max)):
+            topology.append(
+                _semantic_reference(
+                    feature,
+                    topology_type="edge",
+                    role=edge_role,
+                    source_entity_id=hole.id,
+                    ordinal=ordinal,
+                    geometry={"vertices": hole.vertices, "z": z_value},
+                    measurements={"z_mm": z_value},
+                )
+            )
+    return topology
+
+
+def _resolve_topology_references(
+    feature: FeatureRecord,
+    records_by_id: dict[str, FeatureBuildRecord],
+) -> tuple[list[ResolvedTopologyReference], FeatureBuildError | None]:
+    resolved: list[ResolvedTopologyReference] = []
+    for selector in feature.topology_references:
+        if selector.owner_feature_id not in feature.dependencies:
+            return [], FeatureBuildError(
+                code="topology_reference_dependency_required",
+                message="A topology reference owner must be an explicit feature dependency.",
+                detail={
+                    "reference_id": selector.reference_id,
+                    "owner_feature_id": selector.owner_feature_id,
+                    "dependency_ids": feature.dependencies,
+                },
+            )
+        owner_record = records_by_id.get(selector.owner_feature_id)
+        candidates = owner_record.generated_topology if owner_record is not None else []
+        match = next((item for item in candidates if item.reference_id == selector.reference_id), None)
+        if match is None:
+            semantic_matches = [
+                item
+                for item in candidates
+                if item.topology_type == selector.topology_type
+                and item.role == selector.role
+                and item.source_entity_id == selector.source_entity_id
+            ]
+            if len(semantic_matches) > 1:
+                return [], FeatureBuildError(
+                    code="ambiguous_topology_reference",
+                    message="Topology reference recovery matched more than one candidate.",
+                    detail={
+                        "reference_id": selector.reference_id,
+                        "candidate_reference_ids": [item.reference_id for item in semantic_matches],
+                    },
+                )
+            match = semantic_matches[0] if semantic_matches else None
+        if match is None:
+            return [], FeatureBuildError(
+                code="missing_topology_reference",
+                message="Topology reference could not be resolved.",
+                detail={
+                    "reference_id": selector.reference_id,
+                    "owner_feature_id": selector.owner_feature_id,
+                    "topology_type": selector.topology_type,
+                    "role": selector.role,
+                    "source_entity_id": selector.source_entity_id,
+                },
+            )
+        exact = match.reference_id == selector.reference_id and match.geometric_signature == selector.expected_signature
+        resolved.append(
+            ResolvedTopologyReference(
+                requested_reference_id=selector.reference_id,
+                resolved_reference_id=match.reference_id,
+                owner_feature_id=selector.owner_feature_id,
+                topology_type=match.topology_type,
+                role=match.role,
+                source_entity_id=match.source_entity_id,
+                recovery_state="exact" if exact else "recovered",
+                expected_signature=selector.expected_signature,
+                current_signature=match.geometric_signature,
+            )
+        )
+    return resolved, None
+
+
 def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
     ordered, _, graph_errors = _ordered_features(document)
     records: list[FeatureBuildRecord] = []
@@ -254,23 +440,38 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                     error=FeatureBuildError(code="invalid_feature_geometry", message=str(exc), detail={"profile_id": profile.id}),
                 )
             else:
-                output_signature = _hash_payload(
-                    {
-                        "input": base_payload,
-                        "profile": profile.model_dump(mode="json"),
-                        "holes": [hole.model_dump(mode="json") for hole in holes],
-                        "measurements": measurements.model_dump(mode="json"),
-                    }
-                )
-                record = FeatureBuildRecord(
-                    feature_id=feature.feature_id,
-                    order=order,
-                    status="succeeded",
-                    input_hash=input_hash,
-                    output_signature=output_signature,
-                    measurements=measurements,
-                )
-                body_has_base.add(feature.body_id)
+                generated_topology = _extrude_topology(feature, profile, holes, measurements)
+                resolved_references, reference_error = _resolve_topology_references(feature, records_by_id)
+                if reference_error is not None:
+                    record = FeatureBuildRecord(
+                        feature_id=feature.feature_id,
+                        order=order,
+                        status="failed",
+                        input_hash=input_hash,
+                        error=reference_error,
+                    )
+                else:
+                    output_signature = _hash_payload(
+                        {
+                            "input": base_payload,
+                            "profile": profile.model_dump(mode="json"),
+                            "holes": [hole.model_dump(mode="json") for hole in holes],
+                            "measurements": measurements.model_dump(mode="json"),
+                            "generated_topology": [item.model_dump(mode="json") for item in generated_topology],
+                            "resolved_references": [item.model_dump(mode="json") for item in resolved_references],
+                        }
+                    )
+                    record = FeatureBuildRecord(
+                        feature_id=feature.feature_id,
+                        order=order,
+                        status="succeeded",
+                        input_hash=input_hash,
+                        output_signature=output_signature,
+                        measurements=measurements,
+                        generated_topology=generated_topology,
+                        resolved_references=resolved_references,
+                    )
+                    body_has_base.add(feature.body_id)
         records.append(record)
         records_by_id[feature.feature_id] = record
 

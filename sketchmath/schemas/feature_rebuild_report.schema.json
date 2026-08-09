@@ -42,6 +42,13 @@
           "title": "Feature Id",
           "type": "string"
         },
+        "generated_topology": {
+          "items": {
+            "$ref": "#/$defs/SemanticTopologyReference"
+          },
+          "title": "Generated Topology",
+          "type": "array"
+        },
         "input_hash": {
           "title": "Input Hash",
           "type": "string"
@@ -72,6 +79,13 @@
           ],
           "default": null,
           "title": "Output Signature"
+        },
+        "resolved_references": {
+          "items": {
+            "$ref": "#/$defs/ResolvedTopologyReference"
+          },
+          "title": "Resolved References",
+          "type": "array"
         },
         "status": {
           "enum": [
@@ -142,6 +156,148 @@
         "hole_count"
       ],
       "title": "FeatureMeasurements",
+      "type": "object"
+    },
+    "ResolvedTopologyReference": {
+      "additionalProperties": false,
+      "properties": {
+        "current_signature": {
+          "title": "Current Signature",
+          "type": "string"
+        },
+        "expected_signature": {
+          "title": "Expected Signature",
+          "type": "string"
+        },
+        "owner_feature_id": {
+          "title": "Owner Feature Id",
+          "type": "string"
+        },
+        "recovery_state": {
+          "enum": [
+            "exact",
+            "recovered"
+          ],
+          "title": "Recovery State",
+          "type": "string"
+        },
+        "requested_reference_id": {
+          "title": "Requested Reference Id",
+          "type": "string"
+        },
+        "resolved_reference_id": {
+          "title": "Resolved Reference Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "source_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Entity Id"
+        },
+        "topology_type": {
+          "enum": [
+            "face",
+            "edge"
+          ],
+          "title": "Topology Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requested_reference_id",
+        "resolved_reference_id",
+        "owner_feature_id",
+        "topology_type",
+        "role",
+        "recovery_state",
+        "expected_signature",
+        "current_signature"
+      ],
+      "title": "ResolvedTopologyReference",
+      "type": "object"
+    },
+    "SemanticTopologyReference": {
+      "additionalProperties": false,
+      "properties": {
+        "geometric_signature": {
+          "title": "Geometric Signature",
+          "type": "string"
+        },
+        "measurements": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Measurements",
+          "type": "object"
+        },
+        "ordinal": {
+          "minimum": 0,
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "owner_feature_id": {
+          "title": "Owner Feature Id",
+          "type": "string"
+        },
+        "reference_id": {
+          "title": "Reference Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "source_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Entity Id"
+        },
+        "topology_type": {
+          "enum": [
+            "face",
+            "edge"
+          ],
+          "title": "Topology Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference_id",
+        "owner_feature_id",
+        "topology_type",
+        "role",
+        "ordinal",
+        "geometric_signature"
+      ],
+      "title": "SemanticTopologyReference",
       "type": "object"
     }
   },

@@ -289,6 +289,26 @@ export type SketchMathExtrudeParameters = {
   operation: "new_body" | "add" | "cut";
 };
 
+export type SketchMathTopologyReferenceSelector = {
+  reference_id: string;
+  owner_feature_id: string;
+  topology_type: "face" | "edge";
+  role: string;
+  source_entity_id?: string | null;
+  expected_signature: string;
+};
+
+export type SketchMathSemanticTopologyReference = {
+  reference_id: string;
+  owner_feature_id: string;
+  topology_type: "face" | "edge";
+  role: string;
+  source_entity_id?: string | null;
+  ordinal: number;
+  geometric_signature: string;
+  measurements: Record<string, number | string>;
+};
+
 export type SketchMathFeature = {
   feature_id: string;
   feature_type: "extrude";
@@ -298,6 +318,7 @@ export type SketchMathFeature = {
   profile_id: string;
   source_region_id?: string | null;
   dependencies: string[];
+  topology_references: SketchMathTopologyReferenceSelector[];
   parameters: SketchMathExtrudeParameters;
   suppressed: boolean;
 };
@@ -314,6 +335,18 @@ export type SketchMathFeatureBuildRecord = {
     bounds_mm: [number, number, number, number, number, number];
     hole_count: number;
   } | null;
+  generated_topology: SketchMathSemanticTopologyReference[];
+  resolved_references: Array<{
+    requested_reference_id: string;
+    resolved_reference_id: string;
+    owner_feature_id: string;
+    topology_type: "face" | "edge";
+    role: string;
+    source_entity_id?: string | null;
+    recovery_state: "exact" | "recovered";
+    expected_signature: string;
+    current_signature: string;
+  }>;
   error?: {
     code: string;
     message: string;

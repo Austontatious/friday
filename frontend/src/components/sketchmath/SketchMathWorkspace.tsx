@@ -1647,6 +1647,7 @@ const SketchMathWorkspace = () => {
       profile_id: profile.id,
       source_region_id: profile.source_region_id || null,
       dependencies: dependency ? [dependency.feature_id] : [],
+      topology_references: [],
       parameters: {
         depth_mm: depth,
         extent: "one_sided",

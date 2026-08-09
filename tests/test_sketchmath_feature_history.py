@@ -59,6 +59,7 @@ def _feature(
     depth: float = 10,
     extent: str = "one_sided",
     second_depth: float | None = None,
+    topology_references: list[dict] | None = None,
 ) -> FeatureRecord:
     return FeatureRecord.model_validate(
         {
@@ -69,6 +70,7 @@ def _feature(
             "profile_id": profile_id,
             "source_region_id": "region_plate" if profile_id == "profile_plate" else "region_boss",
             "dependencies": dependencies or [],
+            "topology_references": topology_references or [],
             "parameters": {
                 "depth_mm": depth,
                 "extent": extent,
@@ -221,3 +223,97 @@ def test_delete_refuses_downstream_reference_and_suppression_is_rebuildable() ->
     )
     assert suppressed.after.features[1].suppressed is True
     assert suppressed.rebuild.records[1].status == "suppressed"
+
+
+def test_extrude_emits_stable_semantic_topology_with_geometry_signatures() -> None:
+    first = rebuild_document(_document().model_copy(update={"features": [_feature("feature_base", depth=10)]}))
+    second = rebuild_document(_document().model_copy(update={"features": [_feature("feature_base", depth=25)]}))
+
+    first_topology = {item.reference_id: item for item in first.records[0].generated_topology}
+    second_topology = {item.reference_id: item for item in second.records[0].generated_topology}
+    assert first_topology.keys() == second_topology.keys()
+    assert {item.role for item in first_topology.values()} >= {
+        "top",
+        "bottom",
+        "outer_wall",
+        "top_outer_edge",
+        "bottom_outer_edge",
+        "hole_wall",
+        "top_hole_edge",
+        "bottom_hole_edge",
+    }
+    first_top = next(item for item in first_topology.values() if item.role == "top")
+    second_top = second_topology[first_top.reference_id]
+    assert second_top.geometric_signature != first_top.geometric_signature
+    assert second_top.source_entity_id == "profile_plate"
+
+
+def test_downstream_topology_reference_recovers_after_upstream_depth_edit() -> None:
+    base = _feature("feature_base", depth=10)
+    base_report = rebuild_document(_document().model_copy(update={"features": [base]}))
+    top = next(item for item in base_report.records[0].generated_topology if item.role == "top")
+    selector = {
+        "reference_id": top.reference_id,
+        "owner_feature_id": "feature_base",
+        "topology_type": "face",
+        "role": "top",
+        "source_entity_id": "profile_plate",
+        "expected_signature": top.geometric_signature,
+    }
+    downstream = _feature(
+        "feature_add",
+        profile_id="profile_boss",
+        operation="add",
+        dependencies=["feature_base"],
+        depth=4,
+        topology_references=[selector],
+    )
+
+    exact = rebuild_document(_document().model_copy(update={"features": [base, downstream]}))
+    assert exact.ok is True
+    assert exact.records[1].resolved_references[0].recovery_state == "exact"
+
+    edited = rebuild_document(
+        _document().model_copy(update={"features": [_feature("feature_base", depth=25), downstream]})
+    )
+    resolved = edited.records[1].resolved_references[0]
+    assert edited.ok is True
+    assert resolved.recovery_state == "recovered"
+    assert resolved.resolved_reference_id == top.reference_id
+    assert resolved.current_signature != resolved.expected_signature
+
+
+@pytest.mark.parametrize(
+    ("role", "source_entity_id", "expected_code"),
+    [
+        ("missing_role", "profile_plate", "missing_topology_reference"),
+        ("top_outer_edge", "profile_plate", "ambiguous_topology_reference"),
+    ],
+)
+def test_unrecoverable_topology_reference_fails_structurally(
+    role: str,
+    source_entity_id: str,
+    expected_code: str,
+) -> None:
+    base = _feature("feature_base")
+    downstream = _feature(
+        "feature_add",
+        profile_id="profile_boss",
+        operation="add",
+        dependencies=["feature_base"],
+        topology_references=[
+            {
+                "reference_id": "topo_stale_reference",
+                "owner_feature_id": "feature_base",
+                "topology_type": "edge" if "edge" in role else "face",
+                "role": role,
+                "source_entity_id": source_entity_id,
+                "expected_signature": "stale_signature",
+            }
+        ],
+    )
+
+    report = rebuild_document(_document().model_copy(update={"features": [base, downstream]}))
+
+    assert report.ok is False
+    assert report.records[1].error.code == expected_code

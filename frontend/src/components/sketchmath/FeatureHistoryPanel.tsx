@@ -105,6 +105,7 @@ const FeatureHistoryPanel = ({
               <Text fontWeight="600">{feature.name}</Text>
               <Text fontSize="sm" opacity={0.75}>
                 {feature.parameters.operation} · {record?.status || "not rebuilt"} · profile {feature.profile_id}
+                {record ? ` · ${record.generated_topology.length} semantic refs` : ""}
               </Text>
               {record?.measurements ? (
                 <Text fontSize="sm" opacity={0.75} data-testid={`sketchmath-feature-measurements-${feature.feature_id}`}>
