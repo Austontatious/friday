@@ -1338,12 +1338,12 @@ const SketchMathWorkspace = () => {
     return { ...base, kind: "mixed", summary: `Selected: ${selectedEntityIds.length} entities` };
   }, [rectangleDimensions, rectangleSelectionDetail, selectedEntities, selectedEntityIds.length, selectedHoleSummary, selectedLineEntities, selectedPointEntities]);
 
-  const reconcileSelection = (items: SketchMathEntity[]) => {
+  const reconcileSelection = useCallback((items: SketchMathEntity[]) => {
     const validIds = new Set(items.map((entity) => entity.id));
     setSelectedEntityIds((current) => current.filter((entityId) => validIds.has(entityId)));
-  };
+  }, []);
 
-  const syncSnapshot = (snapshot: SketchMathSessionSnapshot) => {
+  const syncSnapshot = useCallback((snapshot: SketchMathSessionSnapshot) => {
     setCommittedContext(snapshot.selection_context);
     reconcileSelection(snapshot.selection_context.items);
     setHistory(snapshot.history);
@@ -1353,7 +1353,7 @@ const SketchMathWorkspace = () => {
     setCanFeatureUndo(Boolean(snapshot.can_feature_undo));
     setCanFeatureRedo(Boolean(snapshot.can_feature_redo));
     window.localStorage.setItem(SESSION_STORAGE_KEY, snapshot.session_id);
-  };
+  }, [reconcileSelection]);
 
   const syncCommandResponse = (response: SketchMathCommandResponse) => {
     setCommittedContext(response.selection_context || response.result.after);
@@ -1422,7 +1422,7 @@ const SketchMathWorkspace = () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [appendEvents, artifactJobs, artifactJobsEnabled, sessionId]);
+  }, [appendEvents, artifactJobs, artifactJobsEnabled, sessionId, syncSnapshot]);
 
   const refreshTopology = useCallback(async (activeSessionId: string) => {
     const requestId = topologyRequestRef.current + 1;
