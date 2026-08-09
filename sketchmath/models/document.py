@@ -112,6 +112,19 @@ class RevolveParameters(BaseModel):
         return self
 
 
+class FilletParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    radius_mm: float = Field(gt=0)
+    operation: Literal["modify"] = "modify"
+
+    @model_validator(mode="after")
+    def validate_fillet_parameters(self) -> "FilletParameters":
+        if not math.isfinite(self.radius_mm):
+            raise ValueError("fillet radius must be finite")
+        return self
+
+
 class TopologyReferenceSelector(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -154,7 +167,7 @@ class FeatureRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     feature_id: str
-    feature_type: Literal["extrude", "hole", "revolve"] = "extrude"
+    feature_type: Literal["extrude", "hole", "revolve", "fillet"] = "extrude"
     name: str
     body_id: str
     sketch_id: str
@@ -162,7 +175,7 @@ class FeatureRecord(BaseModel):
     source_region_id: str | None = None
     dependencies: list[str] = Field(default_factory=list)
     topology_references: list[TopologyReferenceSelector] = Field(default_factory=list)
-    parameters: ExtrudeParameters | HoleParameters | RevolveParameters
+    parameters: ExtrudeParameters | HoleParameters | RevolveParameters | FilletParameters
     suppressed: bool = False
 
     @model_validator(mode="after")
@@ -177,11 +190,16 @@ class FeatureRecord(BaseModel):
                 raise ValueError("hole feature requires hole parameters")
             if self.profile_id is not None:
                 raise ValueError("hole feature does not use profile_id")
-        else:
+        elif self.feature_type == "revolve":
             if not isinstance(self.parameters, RevolveParameters):
                 raise ValueError("revolve feature requires revolve parameters")
             if not self.profile_id:
                 raise ValueError("revolve feature requires profile_id")
+        else:
+            if not isinstance(self.parameters, FilletParameters):
+                raise ValueError("fillet feature requires fillet parameters")
+            if self.profile_id is not None:
+                raise ValueError("fillet feature does not use profile_id")
         return self
 
 
@@ -213,6 +231,7 @@ class FeatureBuildRecord(BaseModel):
     measurements: FeatureMeasurements | None = None
     generated_topology: list[SemanticTopologyReference] = Field(default_factory=list)
     resolved_references: list[ResolvedTopologyReference] = Field(default_factory=list)
+    measurement_coverage: Literal["exact", "kernel_required"] = "exact"
     error: FeatureBuildError | None = None
 
 

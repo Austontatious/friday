@@ -12,6 +12,7 @@ from sketchmath.models.document import (
     FeatureMeasurements,
     FeatureRebuildReport,
     FeatureRecord,
+    FilletParameters,
     HoleParameters,
     RevolveParameters,
     ResolvedTopologyReference,
@@ -258,6 +259,53 @@ def _extrude_topology(
                     ordinal=ordinal,
                     geometry={"segment": segment, "z": z_value},
                     measurements={"z_mm": z_value},
+                )
+            )
+
+    if not profile.source_circle_id and len(source_ids) == segment_count:
+        ring = profile.vertices[:-1] if profile.vertices[0] == profile.vertices[-1] else profile.vertices
+        signed_area = sum(
+            ring[index][0] * ring[(index + 1) % len(ring)][1]
+            - ring[(index + 1) % len(ring)][0] * ring[index][1]
+            for index in range(len(ring))
+        ) / 2.0
+        for ordinal, vertex in enumerate(ring):
+            previous_vertex = ring[(ordinal - 1) % len(ring)]
+            next_vertex = ring[(ordinal + 1) % len(ring)]
+            incoming = (vertex[0] - previous_vertex[0], vertex[1] - previous_vertex[1])
+            outgoing = (next_vertex[0] - vertex[0], next_vertex[1] - vertex[1])
+            turn = incoming[0] * outgoing[1] - incoming[1] * outgoing[0]
+            corner_class = "convex" if turn * signed_area > 0 else "concave"
+            before_source = source_ids[(ordinal - 1) % len(source_ids)]
+            after_source = source_ids[ordinal % len(source_ids)]
+            source_id = (
+                f"{before_source}|{after_source}"
+                if before_source != profile.id or after_source != profile.id
+                else f"{profile.id}:vertex:{ordinal}"
+            )
+            before_length = math.hypot(*incoming)
+            after_length = math.hypot(*outgoing)
+            topology.append(
+                _semantic_reference(
+                    feature,
+                    topology_type="edge",
+                    role="vertical_outer_edge",
+                    source_entity_id=source_id,
+                    ordinal=ordinal,
+                    geometry={
+                        "endpoints": [[vertex[0], vertex[1], z_min], [vertex[0], vertex[1], z_max]],
+                        "adjacent_source_ids": [before_source, after_source],
+                        "corner_class": corner_class,
+                    },
+                    measurements={
+                        "x_mm": vertex[0],
+                        "y_mm": vertex[1],
+                        "z_min_mm": z_min,
+                        "z_max_mm": z_max,
+                        "length_mm": z_max - z_min,
+                        "max_radius_mm": min(before_length, after_length) / 2.0,
+                        "corner_class": corner_class,
+                    },
                 )
             )
 
@@ -654,6 +702,94 @@ def _resolve_topology_references(
     return resolved, None
 
 
+def _fillet_contract(
+    feature: FeatureRecord,
+    records_by_id: dict[str, FeatureBuildRecord],
+    feature_map: dict[str, FeatureRecord],
+    resolved_references: list[ResolvedTopologyReference],
+) -> tuple[list[SemanticTopologyReference], FeatureBuildError | None]:
+    parameters = feature.parameters
+    if not isinstance(parameters, FilletParameters):
+        return [], FeatureBuildError(code="invalid_fillet_parameters", message="Fillet feature requires fillet parameters.")
+    if len(feature.dependencies) != 1:
+        return [], FeatureBuildError(
+            code="fillet_target_dependency_required",
+            message="A fillet requires exactly one target feature dependency.",
+            detail={"dependency_ids": feature.dependencies},
+        )
+    target_id = feature.dependencies[0]
+    target_feature = feature_map.get(target_id)
+    target_record = records_by_id.get(target_id)
+    if target_feature is None or target_record is None or target_feature.feature_type != "extrude":
+        return [], FeatureBuildError(
+            code="unsupported_fillet_target",
+            message="Canonical fillet currently targets an extrusion feature.",
+            detail={"dependency_id": target_id, "feature_type": target_feature.feature_type if target_feature else None},
+        )
+    selectors = [
+        selector
+        for selector in feature.topology_references
+        if selector.owner_feature_id == target_id and selector.topology_type == "edge"
+    ]
+    if not selectors:
+        return [], FeatureBuildError(
+            code="fillet_edge_reference_required",
+            message="A fillet requires at least one semantic target-edge reference.",
+            detail={"dependency_id": target_id},
+        )
+    if len({selector.reference_id for selector in selectors}) != len(selectors):
+        return [], FeatureBuildError(
+            code="duplicate_fillet_edge_reference",
+            message="A fillet edge may only be selected once.",
+            detail={"reference_ids": [selector.reference_id for selector in selectors]},
+        )
+    generated: list[SemanticTopologyReference] = []
+    for ordinal, selector in enumerate(selectors):
+        resolved = next(
+            (item for item in resolved_references if item.requested_reference_id == selector.reference_id),
+            None,
+        )
+        target_edge = next(
+            (
+                item
+                for item in target_record.generated_topology
+                if resolved is not None and item.reference_id == resolved.resolved_reference_id
+            ),
+            None,
+        )
+        if target_edge is None or target_edge.role != "vertical_outer_edge":
+            return [], FeatureBuildError(
+                code="unsupported_fillet_edge",
+                message="Canonical fillet currently supports convex outer vertical extrusion edges.",
+                detail={"reference_id": selector.reference_id, "role": target_edge.role if target_edge else selector.role},
+            )
+        if target_edge.measurements.get("corner_class") != "convex":
+            return [], FeatureBuildError(
+                code="unsupported_concave_fillet",
+                message="Canonical fillet currently supports convex outer corners only.",
+                detail={"reference_id": selector.reference_id},
+            )
+        max_radius = target_edge.measurements.get("max_radius_mm")
+        if not isinstance(max_radius, (int, float)) or parameters.radius_mm >= float(max_radius) - 1e-9:
+            return [], FeatureBuildError(
+                code="fillet_radius_exceeds_adjacent_edges",
+                message="Fillet radius must be smaller than half both adjacent edge lengths.",
+                detail={"reference_id": selector.reference_id, "radius_mm": parameters.radius_mm, "max_radius_mm": max_radius},
+            )
+        generated.append(
+            _semantic_reference(
+                feature,
+                topology_type="face",
+                role="fillet_surface",
+                source_entity_id=target_edge.source_entity_id,
+                ordinal=ordinal,
+                geometry={"target_signature": target_edge.geometric_signature, "radius_mm": parameters.radius_mm},
+                measurements={"radius_mm": parameters.radius_mm, "target_edge_reference_id": target_edge.reference_id},
+            )
+        )
+    return generated, None
+
+
 def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
     ordered, _, graph_errors = _ordered_features(document)
     records: list[FeatureBuildRecord] = []
@@ -735,6 +871,9 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
         resolved_references: list[ResolvedTopologyReference] = []
         if error is None:
             resolved_references, error = _resolve_topology_references(feature, records_by_id)
+        fillet_topology: list[SemanticTopologyReference] = []
+        if error is None and feature.feature_type == "fillet":
+            fillet_topology, error = _fillet_contract(feature, records_by_id, feature_map, resolved_references)
         if error is None and feature.feature_type == "revolve":
             assert isinstance(feature.parameters, RevolveParameters)
             if not math.isclose(feature.parameters.angle_deg, 360.0, abs_tol=1e-9):
@@ -903,6 +1042,15 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                         "holes": [hole.model_dump(mode="json") for hole in holes],
                         "axis": axis_geometry,
                     }
+                elif feature.feature_type == "fillet":
+                    assert isinstance(feature.parameters, FilletParameters)
+                    measurements = None
+                    generated_topology = fillet_topology
+                    source_geometry = {
+                        "target_feature_id": feature.dependencies[0],
+                        "target_signature": records_by_id[feature.dependencies[0]].output_signature,
+                        "radius_mm": feature.parameters.radius_mm,
+                    }
                 else:
                     assert profile is not None
                     measurements = _extrude_measurements(feature, profile, holes, attachment_z=attachment_z)
@@ -928,7 +1076,7 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                     {
                         "input": base_payload,
                         "source_geometry": source_geometry,
-                        "measurements": measurements.model_dump(mode="json"),
+                        "measurements": measurements.model_dump(mode="json") if measurements is not None else None,
                         "generated_topology": [item.model_dump(mode="json") for item in generated_topology],
                         "resolved_references": [item.model_dump(mode="json") for item in resolved_references],
                     }
@@ -942,6 +1090,7 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                     measurements=measurements,
                     generated_topology=generated_topology,
                     resolved_references=resolved_references,
+                    measurement_coverage="kernel_required" if feature.feature_type == "fillet" else "exact",
                 )
                 body_has_base.add(feature.body_id)
         records.append(record)

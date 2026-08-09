@@ -1021,6 +1021,15 @@
           "title": "Input Hash",
           "type": "string"
         },
+        "measurement_coverage": {
+          "default": "exact",
+          "enum": [
+            "exact",
+            "kernel_required"
+          ],
+          "title": "Measurement Coverage",
+          "type": "string"
+        },
         "measurements": {
           "anyOf": [
             {
@@ -1198,7 +1207,8 @@
           "enum": [
             "extrude",
             "hole",
-            "revolve"
+            "revolve",
+            "fillet"
           ],
           "title": "Feature Type",
           "type": "string"
@@ -1217,6 +1227,9 @@
             },
             {
               "$ref": "#/$defs/RevolveParameters"
+            },
+            {
+              "$ref": "#/$defs/FilletParameters"
             }
           ],
           "title": "Parameters"
@@ -1270,6 +1283,27 @@
         "parameters"
       ],
       "title": "FeatureRecord",
+      "type": "object"
+    },
+    "FilletParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "modify",
+          "default": "modify",
+          "title": "Operation",
+          "type": "string"
+        },
+        "radius_mm": {
+          "exclusiveMinimum": 0,
+          "title": "Radius Mm",
+          "type": "number"
+        }
+      },
+      "required": [
+        "radius_mm"
+      ],
+      "title": "FilletParameters",
       "type": "object"
     },
     "FixedPointConstraint": {

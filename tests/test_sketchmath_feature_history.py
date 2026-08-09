@@ -215,6 +215,38 @@ def _revolve_feature(
     )
 
 
+def _fillet_feature(
+    feature_id: str,
+    target: FeatureRecord,
+    edge_references: list,
+    *,
+    radius: float = 2,
+) -> FeatureRecord:
+    return FeatureRecord.model_validate(
+        {
+            "feature_id": feature_id,
+            "feature_type": "fillet",
+            "name": feature_id.replace("_", " ").title(),
+            "body_id": target.body_id,
+            "sketch_id": target.sketch_id,
+            "profile_id": None,
+            "dependencies": [target.feature_id],
+            "topology_references": [
+                {
+                    "reference_id": edge.reference_id,
+                    "owner_feature_id": target.feature_id,
+                    "topology_type": "edge",
+                    "role": edge.role,
+                    "source_entity_id": edge.source_entity_id,
+                    "expected_signature": edge.geometric_signature,
+                }
+                for edge in edge_references
+            ],
+            "parameters": {"radius_mm": radius, "operation": "modify"},
+        }
+    )
+
+
 def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch() -> None:
     document = _document()
 
@@ -369,6 +401,69 @@ def test_full_revolve_uses_explicit_axis_and_pappus_volume() -> None:
     assert record.measurements.volume_delta_mm3 == pytest.approx(360 * math.pi)
     assert record.measurements.bounds_mm == pytest.approx((-8, 8, 2, 8, -8, 8))
     assert {item.role for item in record.generated_topology} == {"revolved_outer_face"}
+
+
+def test_fillet_uses_semantic_vertical_edges_and_defers_measurements_to_kernel() -> None:
+    base = _feature("feature_base")
+    base_report = rebuild_document(_document().model_copy(update={"features": [base]}))
+    vertical_edges = [item for item in base_report.records[0].generated_topology if item.role == "vertical_outer_edge"]
+    fillet = _fillet_feature("feature_fillet", base, vertical_edges, radius=2)
+
+    report = rebuild_document(_document().model_copy(update={"features": [base, fillet]}))
+
+    assert len(vertical_edges) == 4
+    assert all(edge.measurements["corner_class"] == "convex" for edge in vertical_edges)
+    assert report.ok is True
+    record = report.records[1]
+    assert record.measurement_coverage == "kernel_required"
+    assert record.measurements is None
+    assert len(record.resolved_references) == 4
+    assert {item.role for item in record.generated_topology} == {"fillet_surface"}
+
+
+def test_fillet_reference_recovers_after_upstream_profile_edit() -> None:
+    base = _feature("feature_base")
+    base_report = rebuild_document(_document().model_copy(update={"features": [base]}))
+    selected_edge = next(
+        item
+        for item in base_report.records[0].generated_topology
+        if item.role == "vertical_outer_edge" and item.measurements["x_mm"] == 10 and item.measurements["y_mm"] == 0
+    )
+    fillet = _fillet_feature("feature_fillet", base, [selected_edge], radius=2)
+    document = _document()
+    profile = document.sketches[0].state.get_entity("profile_plate")
+    edited_profile = profile.model_copy(
+        update={"vertices": [(0, 0), (12, 0), (12, 10), (0, 10), (0, 0)], "area": 120}
+    )
+    edited_state = document.sketches[0].state.model_copy(
+        update={"items": [edited_profile if item.id == profile.id else item for item in document.sketches[0].state.items]}
+    )
+    edited_document = document.model_copy(
+        update={"sketches": [document.sketches[0].model_copy(update={"state": edited_state})], "features": [base, fillet]}
+    )
+
+    report = rebuild_document(edited_document)
+
+    assert report.ok is True
+    assert report.records[1].resolved_references[0].recovery_state == "recovered"
+    assert report.records[1].resolved_references[0].current_signature != selected_edge.geometric_signature
+
+
+def test_fillet_rejects_non_vertical_edge_and_excess_radius() -> None:
+    base = _feature("feature_base")
+    base_report = rebuild_document(_document().model_copy(update={"features": [base]}))
+    top_edge = next(item for item in base_report.records[0].generated_topology if item.role == "top_outer_edge")
+    vertical_edge = next(item for item in base_report.records[0].generated_topology if item.role == "vertical_outer_edge")
+
+    wrong_edge = rebuild_document(
+        _document().model_copy(update={"features": [base, _fillet_feature("feature_wrong_edge", base, [top_edge])]})
+    )
+    excess_radius = rebuild_document(
+        _document().model_copy(update={"features": [base, _fillet_feature("feature_large", base, [vertical_edge], radius=5)]})
+    )
+
+    assert wrong_edge.records[1].error.code == "unsupported_fillet_edge"
+    assert excess_radius.records[1].error.code == "fillet_radius_exceeds_adjacent_edges"
 
 
 def test_revolve_add_and_cut_require_semantic_target_faces() -> None:

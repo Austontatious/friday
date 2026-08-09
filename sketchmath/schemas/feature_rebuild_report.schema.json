@@ -53,6 +53,15 @@
           "title": "Input Hash",
           "type": "string"
         },
+        "measurement_coverage": {
+          "default": "exact",
+          "enum": [
+            "exact",
+            "kernel_required"
+          ],
+          "title": "Measurement Coverage",
+          "type": "string"
+        },
         "measurements": {
           "anyOf": [
             {
