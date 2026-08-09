@@ -87,7 +87,7 @@ When the frontend flag is enabled, the workspace shows Feature history with:
 - a minimum model tree for canonical body, sketch, and typed feature nodes, with selection, bounded properties, and immutable-ID feature rename;
 - selected-profile extrusion creation;
 - stable feature IDs, build status, measurements, and shortened output signatures;
-- in-place extrusion-depth replacement;
+- in-place extrusion depth, one-/two-sided/symmetric extent, second-depth, and direction replacement while preserving operation/dependencies;
 - numeric simple-hole placement and existing simple/counterbore/countersink style, diameter, termination/depth, and conditional style-parameter replacement against the current semantic top face;
 - default-off new-body full-revolve creation from a selected closed profile and chosen construction-line axis, plus existing-feature axis replacement inside the supported 360-degree envelope;
 - default-off outer-vertical-edge fillet creation, radius replacement, kernel STEP build, and download for the supported bounded vertical feature graph;
@@ -108,6 +108,7 @@ A revision conflict refreshes the backend-authoritative session before the user 
 - Existing simple-hole property editing is a complete `replace_feature` operation with rebuild, undo/redo, reload, and terminal STL evidence. A feature property owned by a design-parameter binding refuses direct replacement with `feature_parameter_bound`; rename remains allowed because it does not mutate the bound parameters.
 - Existing full-revolve axis editing uses the same typed `replace_feature` boundary. Live Playwright creates two construction axes, changes the axis of a 360-degree revolve, observes a new rebuild signature with the same feature ID, and proves undo/redo/reload with no browser errors. The angle control remains fixed at 360 degrees because partial sweeps are structurally unsupported.
 - Advanced hole property Playwright creates a simple hole, replaces it with a counterbore and then a countersink, verifies typed conditional parameters, and proves stable-ID undo/redo/reload with no browser errors. Artifact controls remain truthful: the layered STL and bounded STEP workers still support simple-hole graphs only.
+- Extrusion property Playwright replaces a new-body feature with symmetric/negative and then two-sided/positive parameters, verifies exact analytic Z bounds and a changed signature with stable identity, and proves undo/redo/reload with no browser errors.
 
 ## Open Boundaries
 

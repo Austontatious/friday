@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-09 - SketchMath Extrusion Direction and Extent Editing
+
+### What Changed
+- Expanded existing extrusion properties from depth-only editing to one-sided, symmetric, and two-sided extents, optional second depth, and positive/negative direction.
+- Routed the complete typed extrusion parameter object through canonical `replace_feature` history while preserving operation, dependencies, references, and feature identity.
+- Added exact-bounds, signature-change, undo/redo, and reload browser acceptance.
+
+### Why
+- The backend already modeled deterministic extent/direction semantics, but the property editor exposed only depth.
+- A typed property workflow is required before claiming editable feature history for supported extrusion modes.
+
+### New Env Flags
+- None; the existing document-v1 and feature-history flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py -k "extrusion or extent or replace_feature"`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm test -- --runInBand --watchAll=false src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run test:e2e -- --grep "edits extrusion direction and extent"`
+
+### Evidence and Boundary
+- Code checkpoint: `54bce47`; targeted Playwright passed in 7.4 seconds.
+- The browser proves symmetric `[-5,5]` and two-sided `[-4,10]` Z bounds, stable ID, changed signature, undo/redo, and reload.
+- Add/cut attachment authoring and general kernel execution remain open; this slice does not infer target/dependency intent.
+
+---
+
 ## 2026-08-09 - SketchMath Clean Production Build
 
 ### What Changed

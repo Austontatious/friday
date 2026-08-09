@@ -19,6 +19,7 @@ When canonical design parameters exist, the same panel renders their user-facing
 - Existing body and sketch visibility values are displayed but not mutated. A control is intentionally absent until the renderer honors persisted visibility end to end.
 - The hierarchy follows the current canonical single-body/single-sketch document. Multi-body, multi-sketch attachments, reordering, drag/drop, and body/sketch rename remain open.
 - Typed feature editors remain in the feature-history rows. Cross-feature design intent uses the one canonical document parameter list rather than duplicating values in tree properties.
+- Existing extrusions expose depth, one-sided/symmetric/two-sided extent, conditional second depth, and direction. Replacement preserves the feature's operation/dependency/reference intent.
 - Existing holes expose simple/counterbore/countersink style, diameter, through/blind/depth, and style-specific diameter/depth/angle editing in their history row. Parameter-bound holes show the design-parameter owner state and disable direct property mutation.
 - Existing full revolves expose their user-facing construction-axis choice and the supported 360-degree sweep in the history row. Applying a different axis preserves the immutable feature ID and participates in canonical rebuild, undo/redo, and persistence.
 
@@ -30,5 +31,6 @@ When canonical design parameters exist, the same panel renders their user-facing
 - Golden Playwright proves two named design-parameter edits, undo/redo/reload, rebuilt tree state, and revision-bound STEP download without exposing raw model IDs or emitting browser errors.
 - Full-revolve Playwright proves two construction axes, stable-ID axis replacement, changed rebuild signature, undo/redo, and reload without exposing the axis IDs as Normal-mode labels or emitting browser errors.
 - Advanced-hole Playwright proves counterbore and countersink conditional properties, stable-ID replacement, undo/redo, and reload without emitting browser errors.
+- Extrusion Playwright proves symmetric and two-sided bounds, direction/second-depth properties, stable identity/signature history, undo/redo, and reload.
 
-Checkpoints: `bc650ca`, `1e8db05`, `7976010`, `9f0621c`.
+Checkpoints: `bc650ca`, `1e8db05`, `7976010`, `9f0621c`, `54bce47`.

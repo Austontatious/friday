@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `7b62e3e` (golden/feature property acceptance, complete resumed regression evidence, advanced-hole editing, and clean production build; see `golden_mounting_plate_v1.md` and `status.md`)
+Last validated SketchMath code milestone: `54bce47` (golden/feature property acceptance, resumed regression, advanced-hole and extrusion extent editing, and clean production build; see `golden_mounting_plate_v1.md` and `status.md`)
 
 ## Mission
 

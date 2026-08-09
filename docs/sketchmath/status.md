@@ -130,6 +130,15 @@ On 2026-08-09 for guarded UI checkpoint `9f0621c`:
 - Five focused backend hole tests, TypeScript, all 44 workspace tests, and live counterbore→countersink undo/redo/reload Playwright pass. The browser workflow completed in 8.4 seconds with no console/page errors.
 - New-hole creation remains simple-only. Advanced hole STL/STEP is not claimed; the current artifact workers still refuse unsupported advanced-hole graphs structurally.
 
+## Current Extrusion Property Validation
+
+On 2026-08-09 for guarded UI checkpoint `54bce47`:
+
+- Existing extrusion properties cover positive/negative direction and one-sided, symmetric, or two-sided extent with conditional second depth, in addition to primary depth.
+- Typed replacement preserves operation, dependencies, semantic references, and immutable feature ID.
+- Three focused backend tests, TypeScript, all 44 workspace tests, and live browser acceptance pass. The browser verifies exact symmetric `[-5,5]` and two-sided `[-4,10]` Z bounds, signature change, undo/redo, and reload in 7.4 seconds without console/page errors.
+- Add/cut attachment authoring and general kernel execution remain open; the editor does not invent target topology or boolean intent.
+
 ## Current Kernel-Fillet Validation
 
 On 2026-08-09 for semantic model `1f1b034`, FreeCAD boundary `30af86a`, API gate `e6b272f`, and guarded UI `53a39ed`:
@@ -194,7 +203,7 @@ On 2026-08-09 for guarded UI checkpoint `bc650ca`:
 - The default-off compatibility adapter preserves legacy sketch entity IDs while wrapping one `SelectionContext` as `body_main` / `sketch_main`.
 - Revision-checked add/replace/delete/suppress operations persist independently from sketch-command history; feature undo/redo assigns new monotonic revisions.
 - Pure rebuild topologically orders dependencies, detects missing references/cycles, propagates blocked status, validates source profiles/holes/region identity, and emits deterministic hashes, signatures, bounds, net area, signed volume, and structured errors.
-- Typed extrusion parameters cover new-body/add/cut, positive/negative direction, symmetric, and one-/two-sided measurement semantics. Broad kernel-backed feature reconstruction is not claimed.
+- Typed extrusion parameters cover new-body/add/cut, positive/negative direction, symmetric, and one-/two-sided measurement semantics. Existing features expose the supported depth/direction/extent property envelope; broad kernel-backed feature reconstruction is not claimed.
 - Add/cut extrusions attach through semantic top/bottom references and are placed at the resolved face Z; missing attachments and one-sided directions away from the target fail structurally.
 - Typed holes cover simple/counterbore/countersink and through/blind analytic semantics. The guarded React panel exposes simple placement plus existing advanced-style conditional property editing, extrusion depth editing, rebuild/reference evidence, and dedicated feature undo/redo.
 - Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, guarded new-body creation, and existing-axis replacement with feature undo/redo/reload.
