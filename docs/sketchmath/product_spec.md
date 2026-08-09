@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `0979dfe` (terminal feature-graph STL; evidence: `artifact_job_contract.md` and `golden_mounting_plate_v1.md`)
+Last validated SketchMath code milestone: `07e9880` (guarded full-revolve slice; evidence: `feature_history_contract.md` and `status.md`)
 
 ## Mission
 

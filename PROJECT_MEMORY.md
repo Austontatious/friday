@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-09 - SketchMath Explicit-Axis Full Revolve
+
+### What Changed
+- Added a typed revolve feature with stable sketch-axis identity, new-body/add/cut operation, deterministic full-angle Pappus volume, exact bounds, generated semantic revolved faces, persistence, and reference recovery after axis edits.
+- Added structured refusal for missing/degenerate axes, profiles crossing the axis, and partial sweeps. Revolve STL is explicitly unsupported instead of falling through the vertical-feature materializer.
+- Added default-off backend creation gating and a default-off browser editor for new-body 360-degree revolves using construction-line axes. API/model add/cut requires a semantic target face but is not claimed as a spatial solid boolean.
+
+### Why
+- Revolve is the next canonical feature family and must preserve parametric identity and deterministic rebuild behavior before adding kernel execution or broader UI controls.
+- Explicit refusal prevents analytic feature support from being mistaken for artifact or arbitrary-angle support.
+
+### New Env Flags
+- `FRIDAY_SKETCHMATH_REVOLVE_FEATURES_ENABLED=0` gates backend revolve creation.
+- `REACT_APP_SKETCHMATH_REVOLVE_FEATURES_ENABLED=0` exposes the guarded full-revolve editor.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py tests/test_sketchmath_api.py tests/test_sketchmath_feature_artifact.py tests/test_sketchmath_artifact_jobs.py tests/test_sketchmath_stl_export.py tests/test_sketchmath_golden_mounting_plate.py` — 59 focused tests.
+- `python3 -m sketchmath.schemas.generate --check` — generated schemas match.
+- `cd frontend && npx tsc --noEmit && npm test -- --runInBand --watchAll=false` — TypeScript and all 67 frontend tests pass.
+- `docker compose -f docker-compose.app.yml config --quiet` — default-off deployment plumbing validates.
+
+### Checkpoints and Remaining Work
+- Code checkpoints: `a851d99`, `3481f16`, `07e9880`.
+- Partial revolve, spatial add/cut boolean proof, revolve STL/STEP, fillet/chamfer/shell/pattern families, multi-sketch/model tree, and final release hardening remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Semantic Holes, Resumable Artifacts, and Golden STL
 
 ### What Changed

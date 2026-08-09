@@ -2,14 +2,14 @@
 
 Updated: 2026-08-09
 
-Current phase: Phase 3/4/6 bounded vertical-feature slice — feature history, semantic references, and revisioned artifacts
+Current phase: Phase 3/4/6 bounded solid-feature slice — feature history, semantic references, full revolve, and revisioned vertical artifacts
 
-Gate: `SM-FEAT-001` and the generated extrusion/hole reference subset pass; `SM-FEAT-002/004`, `SM-ART-001`, and golden-part evidence pass only for the documented envelope
+Gate: `SM-FEAT-001` and the generated extrusion/hole/revolve reference subset pass; `SM-FEAT-002/003/004`, `SM-ART-001`, and golden-part evidence pass only for the documented envelope
 
 ## Baseline
 
 - Audited checkout: `21b8153`
-- Latest SketchMath product code commit: `0979dfe`
+- Latest SketchMath product code commit: `07e9880`
 - Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
@@ -91,6 +91,14 @@ On 2026-08-09 for semantic holes `f0c2f49`/`cc08509`, semantic attachments `99e2
 - The seven-feature golden mounting plate matches bounds `(0,100,0,60,0,13)`, analytic volume `51000−613π mm³`, five through holes, stable serialization, upstream-width recovery, deterministic STL content, and zero non-manifold edges.
 - Compose validates with every new capability default off outside the dedicated acceptance harness.
 
+## Current Full-Revolve Validation
+
+On 2026-08-09 for canonical model `a851d99`, API gate `3481f16`, and guarded UI `07e9880`:
+
+- 59 focused feature/API/artifact/golden Python tests pass, including deterministic Pappus volume, arbitrary stable axis lookup, exact full-revolution bounds, generated semantic faces, reference recovery after axis edits, persistence, and structured partial-sweep/cross-axis/missing-axis refusal.
+- TypeScript, generated schemas, Compose, and all 67 frontend tests pass. The UI test proves the editor remains absent by default and selects a construction-line axis when enabled.
+- Browser creation is deliberately limited to a new-body 360-degree revolve. API/model add/cut requires a semantic target face but does not claim spatial boolean or kernel artifact validation.
+
 ## Active Phase 1 Slice
 
 - ADRs 004-006 define the canonical document migration, solver/licensing, and async execution boundaries.
@@ -131,6 +139,7 @@ On 2026-08-09 for semantic holes `f0c2f49`/`cc08509`, semantic attachments `99e2
 - Typed extrusion parameters cover new-body/add/cut, positive/negative direction, symmetric, and one-/two-sided measurement semantics. Broad kernel-backed feature reconstruction is not claimed.
 - Add/cut extrusions attach through semantic top/bottom references and are placed at the resolved face Z; missing attachments and one-sided directions away from the target fail structurally.
 - Typed holes cover simple/counterbore/countersink and through/blind analytic semantics. The guarded React panel exposes simple through/blind placement, extrusion depth editing, rebuild/reference evidence, and dedicated feature undo/redo.
+- Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, and a guarded new-body browser editor.
 - Revision-bound artifact jobs persist READY/RUNNING/DONE/FAILED manifests and resumable step markers. Supported terminal vertical extrusion/simple-hole graphs produce validated layered STL; stale results never register.
 - Legacy FreeCAD `extrude_profile` preview/export remains separate; canonical feature commits never replay external CAD work. See `feature_history_contract.md`, `artifact_job_contract.md`, and `golden_mounting_plate_v1.md`.
 
@@ -156,7 +165,7 @@ Completed and published:
 - Canonical document v1 remains a single-sketch, single-worker compatibility path; multi-sketch and a full model tree are not implemented.
 - Generated extrusion/hole semantic face/edge references are stable and recoverable, but browser face/edge picking and raw kernel-topology reconciliation are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
-- Layered STL supports vertical extrusion/simple-hole graphs. Counterbore/countersink STL, revolve/fillet/chamfer/shell/pattern features, and full-graph STEP remain open.
+- Layered STL supports vertical extrusion/simple-hole graphs. Counterbore/countersink and revolve STL, partial revolve, spatial revolve booleans, fillet/chamfer/shell/pattern features, and full-graph STEP remain open.
 - Artifact cancellation, automatic TTL/quota cleanup, and worker-process isolation are not implemented.
 - 3D camera mechanics pass automation, but CAD-like pan/tilt feel requires explicit manual acceptance.
 - AI translation covers a small command subset and does not yet plan over a canonical feature model.
@@ -173,7 +182,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Implement revolve next, then fillet/chamfer or a deliberately bounded alternative; expand browser property/model-tree behavior and full-graph STEP without weakening the current semantic-reference and artifact gates.
+Implement fillet/chamfer or a deliberately bounded edge-feature alternative next; expand browser property/model-tree behavior and full-graph STEP without weakening the current semantic-reference and artifact gates.
 
 ## Release Status
 
