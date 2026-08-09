@@ -75,12 +75,8 @@ def _append_wall(
         bottom_b = bottom_loop[next_index]
         top_a = top_loop[index]
         top_b = top_loop[next_index]
-        if surface == "hole_wall":
-            _append_triangle(triangles, (bottom_a, top_b, bottom_b), surface=surface, ring_id=ring_id)
-            _append_triangle(triangles, (bottom_a, top_a, top_b), surface=surface, ring_id=ring_id)
-        else:
-            _append_triangle(triangles, (bottom_a, bottom_b, top_b), surface=surface, ring_id=ring_id)
-            _append_triangle(triangles, (bottom_a, top_b, top_a), surface=surface, ring_id=ring_id)
+        _append_triangle(triangles, (bottom_a, bottom_b, top_b), surface=surface, ring_id=ring_id)
+        _append_triangle(triangles, (bottom_a, top_b, top_a), surface=surface, ring_id=ring_id)
     return top_loop
 
 
