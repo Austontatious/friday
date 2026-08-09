@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-08-09 - SketchMath Existing Simple-Hole Property Editing
+
+### What Changed
+- Added existing semantic-hole diameter and through/blind/depth editors through canonical `replace_feature` commits.
+- Added undo/redo/reload and terminal STL browser acceptance for the edited hole.
+- Protected design-parameter-bound feature properties from direct replacement while still permitting non-parameter edits such as rename.
+
+### Why
+- The release sheet requires existing hole properties to remain editable after creation without bypassing rebuild/history.
+- Directly changing a parameter-owned golden hole would otherwise silently desynchronize named design intent.
+
+### New Env Flags
+- None; the existing document-v1, feature-history, and hole-feature flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_golden_mounting_plate.py`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm test -- --runInBand --watchAll=false src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npx playwright test e2e/sketchmath.spec.ts --grep "commits revisioned extrusion history"`
+
+### Evidence
+- Code checkpoint: `cad4063`.
+
+---
+
 ## 2026-08-09 - SketchMath Golden Parametric Edit Acceptance
 
 ### What Changed

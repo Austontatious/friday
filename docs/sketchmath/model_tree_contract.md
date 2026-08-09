@@ -19,6 +19,7 @@ When canonical design parameters exist, the same panel renders their user-facing
 - Existing body and sketch visibility values are displayed but not mutated. A control is intentionally absent until the renderer honors persisted visibility end to end.
 - The hierarchy follows the current canonical single-body/single-sketch document. Multi-body, multi-sketch attachments, reordering, drag/drop, and body/sketch rename remain open.
 - Typed feature editors remain in the feature-history rows. Cross-feature design intent uses the one canonical document parameter list rather than duplicating values in tree properties.
+- Existing simple holes expose diameter plus through/blind/depth editing in their history row. Parameter-bound holes show the design-parameter owner state and disable direct property mutation.
 
 ## Evidence
 

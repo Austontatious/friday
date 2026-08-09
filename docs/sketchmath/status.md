@@ -212,7 +212,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Close the remaining feature-property editing envelope next: edit existing hole diameter/depth/type and full-revolve angle/axis through typed replacement operations, then prove the supported changes through undo/redo/reload. Follow with the remaining bounded revolve/kernel and release-regression gaps.
+Close the remaining full-revolve property envelope next: edit the supported angle/axis through typed replacement operations and prove undo/redo/reload. Existing simple-hole diameter/through/blind/depth editing now passes; follow revolve editing with the remaining bounded kernel and release-regression gaps.
 
 ## Release Status
 

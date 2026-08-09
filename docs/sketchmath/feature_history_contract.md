@@ -88,7 +88,7 @@ When the frontend flag is enabled, the workspace shows Feature history with:
 - selected-profile extrusion creation;
 - stable feature IDs, build status, measurements, and shortened output signatures;
 - in-place extrusion-depth replacement;
-- numeric simple-hole placement with through/blind termination against the current semantic top face;
+- numeric simple-hole placement and existing simple-hole diameter/through/blind/depth replacement against the current semantic top face;
 - default-off new-body full-revolve creation from a selected closed profile and chosen construction-line axis;
 - default-off outer-vertical-edge fillet creation, radius replacement, kernel STEP build, and download for the supported bounded vertical feature graph;
 - default-off outer-vertical-edge chamfer creation, distance replacement, kernel STEP build, and download for its supported bounded vertical feature graph;
@@ -105,6 +105,7 @@ A revision conflict refreshes the backend-authoritative session before the user 
 - Frontend type-check and the 44 focused workspace tests pass. Targeted Playwright proves model-tree selection/rename/reload plus fillet and chamfer create/edit, kernel STEP polling/download, artifact metadata, and reload.
 - A live Playwright workflow creates a rectangle feature, edits depth, observes a changed signature with a stable ID, performs feature undo/redo, reloads, creates a typed through hole, recovers its reference after another base edit, builds/downloads a terminal graph STL, and accepts no console/page errors.
 - The golden browser workflow commits 80→100 mm width and Ø5→Ø6 four-hole design parameters, preserves offsets/centering and stable IDs, performs undo/redo/reload, then builds and downloads a revision-12 native STEP with exact supported topology and no browser errors.
+- Existing simple-hole property editing is a complete `replace_feature` operation with rebuild, undo/redo, reload, and terminal STL evidence. A feature property owned by a design-parameter binding refuses direct replacement with `feature_parameter_bound`; rename remains allowed because it does not mutate the bound parameters.
 
 ## Open Boundaries
 
