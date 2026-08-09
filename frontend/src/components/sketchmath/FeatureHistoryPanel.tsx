@@ -49,6 +49,7 @@ type FeatureHistoryPanelProps = {
   onUpdateDepth: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, depth: number) => void;
   onUpdateFilletRadius: (feature: Extract<SketchMathFeature, { feature_type: "fillet" }>, radius: number) => void;
   onUpdateChamferDistance: (feature: Extract<SketchMathFeature, { feature_type: "chamfer" }>, distance: number) => void;
+  onSetDesignParameter: (parameterId: string, value: number) => void;
   onRenameFeature: (feature: SketchMathFeature, name: string) => void;
   onAddSimpleHole: (
     feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
@@ -121,6 +122,7 @@ const FeatureHistoryPanel = ({
   onUpdateDepth,
   onUpdateFilletRadius,
   onUpdateChamferDistance,
+  onSetDesignParameter,
   onRenameFeature,
   onAddSimpleHole,
   onBuildArtifact,
@@ -133,6 +135,7 @@ const FeatureHistoryPanel = ({
   const [holeDrafts, setHoleDrafts] = useState<Record<string, HoleDraft>>({});
   const [filletDrafts, setFilletDrafts] = useState<Record<string, string>>({});
   const [chamferDrafts, setChamferDrafts] = useState<Record<string, string>>({});
+  const [parameterDrafts, setParameterDrafts] = useState<Record<string, string>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
   const defaultSelection = useMemo<ModelTreeSelection | null>(() => {
     const feature = document.features[document.features.length - 1];
@@ -144,6 +147,7 @@ const FeatureHistoryPanel = ({
   }, [document.bodies, document.features, document.sketches]);
   const [treeSelection, setTreeSelection] = useState<ModelTreeSelection | null>(defaultSelection);
   const [featureNameDraft, setFeatureNameDraft] = useState("");
+  const designParameters = useMemo(() => document.design_parameters || [], [document.design_parameters]);
   const buildRecords = useMemo(
     () => recordByFeature(document.last_rebuild?.records || []),
     [document.last_rebuild?.records],
@@ -197,6 +201,12 @@ const FeatureHistoryPanel = ({
     ));
   }, [document.features]);
 
+  useEffect(() => {
+    setParameterDrafts(Object.fromEntries(
+      designParameters.map((parameter) => [parameter.parameter_id, String(parameter.value)]),
+    ));
+  }, [designParameters]);
+
   const newDepth = validDepth(newDepthValue);
   const revolveAxis = revolveAxes.find((axis) => axis.id === revolveAxisId) || revolveAxes[0] || null;
   const selectedBody = treeSelection?.kind === "body"
@@ -240,6 +250,53 @@ const FeatureHistoryPanel = ({
       <Text fontSize="sm" opacity={0.78} data-testid="sketchmath-rebuild-status">
         Rebuild {document.last_rebuild?.ok === false ? "failed" : "passed"} · {document.features.length} feature{document.features.length === 1 ? "" : "s"}
       </Text>
+
+      {designParameters.length > 0 ? (
+        <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-design-parameters">
+          <Text fontSize="sm" fontWeight="600">Design parameters</Text>
+          <VStack align="stretch" spacing={2} mt={2}>
+            {designParameters.map((parameter) => {
+              const draft = parameterDrafts[parameter.parameter_id] ?? String(parameter.value);
+              const value = Number(draft);
+              const valid = Number.isFinite(value)
+                && (parameter.minimum == null || value >= parameter.minimum)
+                && (parameter.maximum == null || value <= parameter.maximum);
+              return (
+                <HStack
+                  key={parameter.parameter_id}
+                  spacing={2}
+                  flexWrap="wrap"
+                  data-testid={`sketchmath-design-parameter-${parameter.parameter_id}`}
+                >
+                  <Text fontSize="sm" style={{ minWidth: "145px" }}>{parameter.name}</Text>
+                  <Input
+                    type="number"
+                    min={parameter.minimum ?? undefined}
+                    max={parameter.maximum ?? undefined}
+                    step="0.01"
+                    aria-label={parameter.name}
+                    value={draft}
+                    onChange={(event) => setParameterDrafts((current) => ({
+                      ...current,
+                      [parameter.parameter_id]: event.target.value,
+                    }))}
+                    width="110px"
+                  />
+                  <Text fontSize="sm">{parameter.unit}</Text>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => valid && onSetDesignParameter(parameter.parameter_id, value)}
+                    isDisabled={!valid || value === parameter.value || busy}
+                  >
+                    Apply
+                  </Button>
+                </HStack>
+              );
+            })}
+          </VStack>
+        </Box>
+      ) : null}
 
       <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-model-tree">
         <Text fontSize="sm" fontWeight="600">Model tree</Text>
@@ -429,11 +486,14 @@ const FeatureHistoryPanel = ({
           const bodyGraph = document.features.slice(0, featureIndex + 1).filter(
             (candidate) => candidate.body_id === feature.body_id && !candidate.suppressed,
           );
+          const preFinishGraph = bodyGraph.slice(0, -1);
           const graphSupportsEdgeFinishStep = (feature.feature_type === "fillet" || feature.feature_type === "chamfer")
-            && bodyGraph.length === 2
-            && bodyGraph[0].feature_type === "extrude"
-            && bodyGraph[0].parameters.operation === "new_body"
-            && bodyGraph[1].feature_type === feature.feature_type;
+            && preFinishGraph.length > 0
+            && preFinishGraph.every((candidate, index) => (
+              candidate.feature_type === "extrude"
+                ? candidate.parameters.operation === (index === 0 ? "new_body" : "add")
+                : candidate.feature_type === "hole" && candidate.parameters.style === "simple"
+            ));
           const canBuildArtifact = record?.status === "succeeded"
             && laterBodyFeatures.length === 0
             && (artifactFormat === "stl" ? graphSupportsStl : graphSupportsEdgeFinishStep);

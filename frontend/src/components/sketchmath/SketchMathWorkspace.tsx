@@ -1769,6 +1769,19 @@ const SketchMathWorkspace = () => {
     });
   };
 
+  const handleSetDesignParameter = async (parameterId: string, value: number) => {
+    if (!sketchDocument) return;
+    await commitFeatureOperation({
+      version: "1.1",
+      operation_id: `set_${parameterId}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "set_design_parameter",
+      target_id: parameterId,
+      parameters: { value },
+    });
+  };
+
   const handleRenameFeature = async (feature: SketchMathFeature, name: string) => {
     if (!sketchDocument) return;
     const normalizedName = name.trim();
@@ -4275,6 +4288,7 @@ const SketchMathWorkspace = () => {
                   onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
                   onUpdateFilletRadius={(feature, radius) => void handleUpdateFilletRadius(feature, radius)}
                   onUpdateChamferDistance={(feature, distance) => void handleUpdateChamferDistance(feature, distance)}
+                  onSetDesignParameter={(parameterId, value) => void handleSetDesignParameter(parameterId, value)}
                   onRenameFeature={(feature, name) => void handleRenameFeature(feature, name)}
                   onAddSimpleHole={(feature, topReference, position, diameter, termination, depth) => (
                     void handleAddSimpleHole(feature, topReference, position, diameter, termination, depth)

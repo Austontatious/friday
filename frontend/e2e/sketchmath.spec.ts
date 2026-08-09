@@ -1,8 +1,19 @@
 import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
+import { execFileSync } from "node:child_process";
+import path from "node:path";
 import { openSketchMath } from "./helpers/sketchmath";
 
 const screenshotPath = (name: string) => `../tmp/sketchmath_sol/${name}`;
+
+const goldenMountingPlateDocument = (): Record<string, unknown> => JSON.parse(execFileSync(
+  "python3",
+  [
+    "-c",
+    "from sketchmath.features.golden_mounting_plate import build_golden_mounting_plate; print(build_golden_mounting_plate().model_dump_json())",
+  ],
+  { cwd: path.resolve(__dirname, "../.."), encoding: "utf8" },
+));
 
 const clickWorkbenchButton = async (page: Page, label: string) => {
   await page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: label, exact: true }).click();
@@ -504,6 +515,93 @@ test.describe("SketchMath workspace", () => {
     await page.reload();
     await expect(page.getByTestId("sketchmath-model-tree")).toContainText("Extrude · Primary pad");
     await expect(page.getByLabel("Selected feature name")).toHaveValue("Primary pad");
+  });
+
+  test("edits the golden mounting plate parametrically and exports the rebuilt STEP", async ({ page }) => {
+    const createdResponse = await page.request.post("/api/sketchmath/sessions", {
+      data: { document: goldenMountingPlateDocument() },
+    });
+    expect(createdResponse.ok()).toBeTruthy();
+    const created = await createdResponse.json() as { session_id: string };
+    await page.addInitScript((sessionId) => {
+      window.localStorage.setItem("friday_sketchmath_session_id", sessionId);
+    }, created.session_id);
+    await openSketchMath(page);
+
+    const panel = page.getByTestId("sketchmath-feature-history-panel");
+    await expect(panel).toContainText("Revision 8");
+    await expect(page.getByTestId("sketchmath-model-tree")).toContainText("Fillet · Outer edge fillets");
+    await expect(page.getByTestId("sketchmath-model-tree")).not.toContainText("feature_outer_fillet");
+
+    const widthEditor = page.getByTestId("sketchmath-design-parameter-plate_width_mm");
+    await widthEditor.getByLabel("Plate width").fill("100");
+    await widthEditor.getByRole("button", { name: "Apply" }).click();
+    await expect(panel).toContainText("Revision 9");
+
+    const diameterEditor = page.getByTestId("sketchmath-design-parameter-corner_hole_diameter_mm");
+    await diameterEditor.getByLabel("Corner-hole diameter").fill("6");
+    await diameterEditor.getByRole("button", { name: "Apply" }).click();
+    await expect(panel).toContainText("Revision 10");
+
+    type GoldenSnapshot = {
+      selection_context: {
+        items: Array<{ id: string; area?: number; center?: [number, number] }>;
+      };
+      document: {
+        revision: number;
+        design_parameters: Array<{ parameter_id: string; value: number }>;
+        features: Array<{
+          feature_id: string;
+          feature_type: string;
+          parameters: { position_mm?: [number, number]; diameter_mm?: number };
+        }>;
+        artifacts: Array<{ revision: number; format: string; metadata: Record<string, any> }>;
+      };
+    };
+    const edited = await (await page.request.get(`/api/sketchmath/sessions/${created.session_id}`)).json() as GoldenSnapshot;
+    const features = Object.fromEntries(edited.document.features.map((feature) => [feature.feature_id, feature]));
+    const sketchEntities = Object.fromEntries(edited.selection_context.items.map((entity) => [entity.id, entity]));
+    expect(edited.document.design_parameters.map((parameter) => parameter.value)).toEqual([100, 6]);
+    expect(sketchEntities.profile_plate.area).toBe(5000);
+    expect(sketchEntities.circle_boss.center).toEqual([50, 25]);
+    expect(features.feature_mount_hole_2.parameters.position_mm).toEqual([93, 7]);
+    expect(features.feature_mount_hole_3.parameters.position_mm).toEqual([93, 43]);
+    expect(features.feature_boss_hole.parameters.position_mm).toEqual([50, 25]);
+    const cornerHoles = edited.document.features.filter((feature) => feature.feature_id.startsWith("feature_mount_hole_"));
+    expect(cornerHoles).toHaveLength(4);
+    expect(cornerHoles.every((feature) => feature.parameters.diameter_mm === 6)).toBe(true);
+
+    await panel.getByRole("button", { name: "Undo feature" }).click();
+    await expect(diameterEditor.getByLabel("Corner-hole diameter")).toHaveValue("5");
+    await panel.getByRole("button", { name: "Redo feature" }).click();
+    await expect(diameterEditor.getByLabel("Corner-hole diameter")).toHaveValue("6");
+
+    await page.reload();
+    await expect(page.getByLabel("Plate width")).toHaveValue("100");
+    await expect(page.getByLabel("Corner-hole diameter")).toHaveValue("6");
+    const filletRow = page.getByTestId("sketchmath-feature-feature_outer_fillet");
+    await filletRow.getByRole("button", { name: "Build STEP" }).click();
+    await expect(page.getByTestId("sketchmath-artifact-status-feature_outer_fillet")).toContainText(
+      "STEP artifact · DONE · complete · revision 12",
+      { timeout: 30000 },
+    );
+
+    const artifactSnapshot = await (await page.request.get(`/api/sketchmath/sessions/${created.session_id}`)).json() as GoldenSnapshot;
+    const artifact = artifactSnapshot.document.artifacts[0];
+    expect(artifact).toMatchObject({ revision: 12, format: "step" });
+    const bbox = artifact.metadata.measurements.bbox;
+    expect(bbox.xmin).toBeCloseTo(0, 8);
+    expect(bbox.xmax).toBeCloseTo(100, 8);
+    expect(bbox.ymin).toBeCloseTo(0, 8);
+    expect(bbox.ymax).toBeCloseTo(50, 8);
+    expect(bbox.zmin).toBeCloseTo(0, 8);
+    expect(bbox.zmax).toBeCloseTo(13, 8);
+    expect(artifact.metadata.measurements.canonical_hole_count).toBe(5);
+    expect(artifact.metadata.measurements.volume_mm3).toBeCloseTo(24_920 + 1_315 * Math.PI, 4);
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("sketchmath-artifact-download-feature_outer_fillet").click();
+    expect((await downloadPromise).suggestedFilename()).toMatch(/\.step$/);
   });
 
   test("creates an outer-edge fillet and downloads its revisioned kernel STEP", async ({ page }) => {

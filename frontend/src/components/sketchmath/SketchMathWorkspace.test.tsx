@@ -1198,6 +1198,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
+      onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
       onAddSimpleHole: jest.fn(),
       onBuildArtifact: jest.fn(),
@@ -1295,6 +1296,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
+      onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
       onAddSimpleHole: jest.fn(),
       onBuildArtifact,
@@ -1441,11 +1443,26 @@ describe("SketchMath workspace", () => {
         visible: true,
       }],
       features,
+      design_parameters: [{
+        parameter_id: "plate_width_mm",
+        name: "Plate width",
+        value: 80,
+        unit: "mm",
+        minimum: 31,
+        maximum: null,
+        bindings: [{
+          binding_type: "rectangle_profile_width",
+          target_id: "profile_internal_1",
+          scale: 1,
+          offset: 0,
+        }],
+      }],
       artifacts: [],
       provenance: {},
       last_rebuild: null,
     } as any;
     const onRenameFeature = jest.fn();
+    const onSetDesignParameter = jest.fn();
 
     render(<FeatureHistoryPanel
       document={document}
@@ -1469,6 +1486,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth={jest.fn()}
       onUpdateFilletRadius={jest.fn()}
       onUpdateChamferDistance={jest.fn()}
+      onSetDesignParameter={onSetDesignParameter}
       onRenameFeature={onRenameFeature}
       onAddSimpleHole={jest.fn()}
       onBuildArtifact={jest.fn()}
@@ -1488,6 +1506,12 @@ describe("SketchMath workspace", () => {
     expect(tree).toHaveTextContent("Chamfer · Edge chamfer");
     expect(screen.queryByText("axis_internal_42")).toBeNull();
     expect(screen.getByTestId("sketchmath-model-properties")).toHaveTextContent("Distance 1.5 mm");
+
+    const widthInput = screen.getByRole("spinbutton", { name: "Plate width" });
+    await userEvent.clear(widthInput);
+    await userEvent.type(widthInput, "100");
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onSetDesignParameter).toHaveBeenCalledWith("plate_width_mm", 100);
 
     const nameInput = screen.getByRole("textbox", { name: "Selected feature name" });
     await userEvent.clear(nameInput);

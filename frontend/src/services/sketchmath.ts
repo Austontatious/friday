@@ -464,7 +464,7 @@ export type SketchMathArtifactJobManifest = {
 };
 
 export type SketchMathDocument = {
-  schema_version: "1.0";
+  schema_version: "1.0" | "1.1";
   document_id: string;
   name: string;
   units: string;
@@ -484,17 +484,31 @@ export type SketchMathDocument = {
     visible: boolean;
   }>;
   features: SketchMathFeature[];
+  design_parameters: Array<{
+    parameter_id: string;
+    name: string;
+    value: number;
+    unit: "mm";
+    minimum?: number | null;
+    maximum?: number | null;
+    bindings: Array<{
+      binding_type: "rectangle_profile_width" | "circle_center_x" | "hole_position_x" | "hole_diameter";
+      target_id: string;
+      scale: number;
+      offset: number;
+    }>;
+  }>;
   artifacts: SketchMathArtifact[];
   provenance: Record<string, unknown>;
   last_rebuild?: SketchMathFeatureRebuildReport | null;
 };
 
 export type SketchMathFeatureCommand = {
-  version: "1.0";
+  version: "1.0" | "1.1";
   operation_id: string;
   mode: "preview" | "commit";
   base_revision: number;
-  operation_type: "add_feature" | "replace_feature" | "delete_feature" | "set_feature_suppressed" | "rebuild";
+  operation_type: "add_feature" | "replace_feature" | "delete_feature" | "set_feature_suppressed" | "set_design_parameter" | "rebuild";
   target_id?: string | null;
   parameters: Record<string, unknown>;
 };
