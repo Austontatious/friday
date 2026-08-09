@@ -53,10 +53,10 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | --- | --- | --- |
 | SM-SK / SM-SOL parametric sketcher | Gate B passed for documented modeled envelope | General topology begins at SM-TOP; broader constraint geometry remains explicit partial/unknown |
 | SM-TOP general topology | Passed for documented v0.9 envelope | `b29d504`; adversarial fixtures, stable IDs, point selection, promotion/reference recovery, and nested browser reload |
-| SM-FEAT feature history | Deferred | Canonical document/feature model plus rebuild tests |
+| SM-FEAT feature history | `SM-FEAT-001` passed; `SM-FEAT-002` partial | `f1431ec`, `b1e5ac4`, `df1363c`; v1 document/commands/schemas, pure rebuild, persisted revision history, guarded property editor, live reload acceptance |
 | SM-REF reference stability | Deferred | Upstream-edit survival/repair tests |
 | SM-WS / SM-VIEW CAD workspace | Partial | Model tree/property editor, multi-sketch, manual/browser camera acceptance |
-| SM-DOC document architecture | Partial | Versioned schema, migration, revisions, stale/concurrent-write tests |
+| SM-DOC document architecture | Passed for one-sketch/one-worker v1 envelope | Legacy wrapping, versioned schemas, monotonic revisions, stale-write refusal, disk rehydration; multi-worker coordination remains open |
 | SM-ART artifacts | Partial | STL, revision association, lifecycle/cleanup, golden geometric properties |
 | SM-AI model-aware copilot | Early translator only | Structured model context, typed multi-step proposals, state-based semantic benchmark |
 | SM-QA / SM-OPS / SM-SEC hardening | Partial | Adversarial, performance, async jobs, instrumentation, kernel isolation |
@@ -65,7 +65,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 
 | Requirement | Current state | Evidence | Limitation |
 | --- | --- | --- | --- |
-| SM-ARCH-001 canonical document boundary | Design accepted | ADR 004 | Document envelope and migration are not implemented. |
+| SM-ARCH-001 canonical document boundary | Passed for default-off compatibility envelope | ADR 004; `SketchMathDocument` v1; legacy one-sketch wrapping; generated schemas; disk round trip | Multi-sketch/body authoring and default-on migration remain open. |
 | SM-ARCH-003 solver boundary | Adopted Phase 1 backend | ADR 005; `SolverAnalysis`; unified `SolverRunResult` v1.1; generated schema; SciPy benchmark and adversarial production tests | Async cancellation remains an open operations boundary. |
 | SM-SOL-001 state reporting | Passed for modeled residual subset | Nonlinear consistency/redundancy/residual tests; live Normal labels plus Advanced diagnostics in unit and Playwright coverage | Minimal conflict sets are not claimed; conflicts are deterministic residual witnesses. |
 | SM-SOL-002 defensible DOF | Passed for modeled residual subset | Central-difference Jacobian rank over deterministic point/circle/arc variables; explicit partial/unknown results for unmodeled entities | Coordinate-only legacy geometry and future geometry families remain partial. |
@@ -79,5 +79,8 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | SM-TOP-002 stable identity and selection | Passed | Canonical SHA-256 IDs, winding normalization, nesting depth, point statuses, v0.9 preview commands, React backend-authoritative overlays | Boundary clicks require a clear interior point or explicit list choice. |
 | SM-TOP-003 adversarial topology | Passed | 17 focused topology tests plus API/semantic/frontend and nested-region Playwright acceptance | Arbitrary automatic split/trim/extend repair remains outside this topology slice. |
 | SM-REF-002 topology profile preservation | Passed for region-backed sketch profiles | `source_region_id`, source-set recovery, bundle transform synchronization, structured missing/ambiguous/hole-change rollback, disk reload | Stable downstream solid face/edge naming remains a future feature-model concern. |
+| SM-FEAT-001 canonical feature history | Passed for extrusion/rebuild envelope | Immutable IDs, explicit dependencies, revision-checked typed operations, deterministic pure rebuild, structured failure, persistence, guarded UI, feature undo/redo | Kernel materialization and broad feature families remain open. |
+| SM-FEAT-002 extrusion modes | Partial | Deterministic new-body/add/cut, direction, symmetric, and one-/two-sided measurement/rebuild tests | Only new-body/add creation and depth replacement are exposed in UI; canonical rebuild does not yet create a kernel solid. |
+| SM-DOC-001 versioned persistence | Passed for filesystem compatibility adapter | Dual read/new write behind default-off flag, entity-ID preservation, monotonic revisions, stale conflict, reload | Session cache remains process-local and single-worker. |
 | SM-UNIT-001 centralized tolerances | Initial implementation | Versioned `NumericalTolerancePolicy` | Unit expansion and display formatting remain open. |
 | SM-OPS-002 async boundary | Design accepted | ADR 006 | Job runtime is not implemented; current export remains synchronous. |

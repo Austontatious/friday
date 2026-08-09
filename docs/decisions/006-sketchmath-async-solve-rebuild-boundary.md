@@ -15,7 +15,7 @@ Date: 2026-08-08
 
 ## Current debt
 
-`extrude_profile` currently runs FreeCAD during command execution, and history replay can repeat that side effect. This remains within the stabilized MVP envelope but blocks generalized feature history. Phase 3 must move kernel work behind the job/rebuild boundary before adding broad features.
+Legacy `extrude_profile` still runs FreeCAD during command execution, and replay of legacy geometry history can repeat that side effect. Canonical v1 feature operations are now separated from this path: preview/commit/rebuild/undo/redo are pure document work and never invoke FreeCAD. Kernel-backed canonical rebuild, artifact jobs, cancellation, and stale-result disposal remain open before broad solid features can claim production completion.
 
 ## Rollout
 

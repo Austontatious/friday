@@ -2,14 +2,14 @@
 
 Updated: 2026-08-09
 
-Current phase: Phase 2 — general planar topology
+Current phase: Phase 3 — canonical feature history and rebuild
 
-Gate: General topology passed for the documented v0.9 extraction, selection, promotion, and reference-preservation envelope
+Gate: `SM-FEAT-001` passed for the documented default-off v1 single-sketch extrusion/rebuild envelope; broader feature modeling remains open
 
 ## Baseline
 
 - Audited checkout: `21b8153`
-- Latest SketchMath product code commit: `326e813`
+- Latest SketchMath product code commit: `df1363c`
 - Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
@@ -70,6 +70,17 @@ On 2026-08-09 for topology checkpoint `b29d504` plus session serialization fix `
 - Generated schema drift, TypeScript, production build, Compose, and 13 repository standards checks passed.
 - The production build reports only the existing stale Browserslist database notice.
 
+## Current Feature History Validation
+
+On 2026-08-09 for model/rebuild checkpoint `f1431ec`, persistence/API checkpoint `b1e5ac4`, and guarded UI checkpoint `df1363c`:
+
+- 35 focused feature-history and SketchMath API tests passed.
+- Nine pure feature/rebuild tests cover deterministic dependency order, hole-aware measurements, extent modes, stale revisions, structured failure, replacement, suppression, and safe delete.
+- All 66 existing frontend tests passed with the new feature-history gate absent, proving the legacy UI path remains compatible.
+- Generated v1 document, feature-command, rebuild-report, and operation-result schemas match their Pydantic models.
+- TypeScript and the production frontend build passed; the build reports only the existing stale Browserslist database notice.
+- The targeted live Playwright workflow passed with no console/page errors and proved create, property edit, signature change, stable ID, monotonic feature undo/redo, disk reload, and history persistence.
+
 ## Active Phase 1 Slice
 
 - ADRs 004-006 define the canonical document migration, solver/licensing, and async execution boundaries.
@@ -101,6 +112,16 @@ On 2026-08-09 for topology checkpoint `b29d504` plus session serialization fix `
 - The filesystem session store now serializes mutation, undo, and redo per session so overlapping browser commits cannot collide on the atomic persistence file.
 - Current evidence: 187 Python/runtime tests, 65 semantic evals, 66 frontend tests, all 17 serial shell/product Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards checks pass. See `general_topology_contract.md`.
 
+## Active Phase 3 Slice
+
+- `SketchMathDocument` v1 now owns immutable body/sketch/feature IDs, revision, explicit dependencies, artifact records, provenance, and the last rebuild report.
+- The default-off compatibility adapter preserves legacy sketch entity IDs while wrapping one `SelectionContext` as `body_main` / `sketch_main`.
+- Revision-checked add/replace/delete/suppress operations persist independently from sketch-command history; feature undo/redo assigns new monotonic revisions.
+- Pure rebuild topologically orders dependencies, detects missing references/cycles, propagates blocked status, validates source profiles/holes/region identity, and emits deterministic hashes, signatures, bounds, net area, signed volume, and structured errors.
+- Typed extrusion parameters cover new-body/add/cut, positive/negative direction, symmetric, and one-/two-sided measurement semantics. Broad kernel-backed feature reconstruction is not claimed.
+- The guarded React panel creates extrusion features from the selected profile, edits depth with stable identity, reports rebuild evidence, and exposes dedicated feature undo/redo.
+- Legacy FreeCAD `extrude_profile` preview/export remains separate; canonical feature commits never replay external CAD work. See `feature_history_contract.md`.
+
 ## Gate A Outcome
 
 Completed and published:
@@ -120,8 +141,8 @@ Completed and published:
 - Production solve covers the documented point/circle/arc residual subset. Coordinate-only legacy lines and future geometry/constraint families remain partial/unknown.
 - Split/trim/extend intentionally reject profile- or constraint-referenced targets; automatic topology repair is not implemented.
 - Circle and finite-arc topology uses a deterministic 2-degree piecewise-linear approximation; exact analytic curved-region area is not claimed.
-- The product lacks a canonical multi-body/feature document model and downstream rebuild graph.
-- Multi-sketch, property editing, model tree, and stable face/edge references are not implemented.
+- Canonical document v1 and deterministic extrusion history exist, but the compatibility session path is still single-sketch and the rebuild does not yet materialize kernel solids.
+- Multi-sketch, a full model tree, broad feature property editing, and stable face/edge references are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
 - STEP lifecycle is only partially managed; STL is not implemented.
 - 3D camera mechanics pass automation, but CAD-like pan/tilt feel requires explicit manual acceptance.
@@ -139,7 +160,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Implement canonical feature history and deterministic rebuild (`SM-FEAT-001`) before broadening CAD operations.
+Broaden canonical feature operations and add semantic solid references before artifact lifecycle and golden-part release evidence.
 
 ## Release Status
 

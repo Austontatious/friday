@@ -1,6 +1,6 @@
 # ADR 004: SketchMath canonical document and migration boundary
 
-Status: accepted architecture checkpoint
+Status: accepted; v1 compatibility envelope implemented behind a default-off flag
 
 Date: 2026-08-08
 
@@ -24,15 +24,15 @@ That shape cannot safely own multiple sketches, bodies, feature dependencies, re
 
 1. A versioned reader continues accepting current session JSON.
 2. Legacy state is wrapped as one document, one body, and one sketch without changing existing entity IDs.
-3. A future default-off migration flag may enable dual-read/new-write behavior after golden migration fixtures exist.
+3. `FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED` enables dual-read/new-write behavior for the accepted one-sketch compatibility envelope. It remains default off while broader migration/golden fixtures are open.
 4. Destructive in-place migration is prohibited. Original session files remain recoverable until the new format passes reload and rollback gates.
 
 ## Consequences
 
 - Phase 1 solver work can continue against `SelectionContext` through an explicit sketch-state adapter.
 - New 3D features must not be added as metadata-only operations once feature-history implementation begins.
-- The current synchronous `extrude_profile` replay behavior is accepted technical debt for the MVP and must be removed before generalized feature history.
-- This ADR defines ownership and migration; it does not claim that the document envelope is implemented.
+- The synchronous `extrude_profile` path remains accepted legacy technical debt, but v1 feature history is a separate pure rebuild path and never replays that external side effect.
+- The v1 document envelope, revision checks, legacy wrapping, deterministic extrusion rebuild, persistence, and feature undo/redo are implemented. Multi-sketch authoring, kernel materialization, and default-on migration are not claimed.
 
 ## Boundary ownership
 

@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-08-09 - SketchMath Canonical Feature History and Deterministic Rebuild
+
+### What Changed
+- Added `SketchMathDocument` schema v1 with immutable document/body/sketch/feature identities, monotonic revision, explicit dependencies, artifacts/provenance, and a last-rebuild report. A default-off compatibility adapter wraps one legacy `SelectionContext` without changing sketch entity IDs.
+- Added typed v1 add/replace/delete/suppress/rebuild operations with base-revision validation, pure preview, structured dependency/rebuild errors, stable feature replacement, disk persistence, and separate monotonic feature undo/redo.
+- Added a deterministic extrusion rebuild engine covering dependency order, blocked propagation, source profile/hole/region validation, new-body/add/cut semantics, direction and one-/two-sided/symmetric extents, hashes, signatures, bounds, net area, signed volume, and hole count.
+- Added generated JSON schemas, backend feature routes, guarded frontend document types/API, and a Feature history panel for selected-profile extrusion, depth editing, rebuild evidence, and dedicated feature undo/redo. Canonical feature commits never invoke the legacy FreeCAD export path.
+
+### Why
+- `SM-FEAT-001` requires a canonical persisted feature graph and deterministic rebuild before downstream solid references or broad CAD operations can be safe.
+- Revision checks and side-effect-free feature history prevent stale writes and prevent undo/reload from repeating CAD exports.
+
+### New Env Flags
+- `FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED=0` enables backend document wrapping, persistence, and feature routes when set to `1`.
+- `REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED=0` exposes the browser Feature history panel when set to `1`.
+- Both default off and are additive to the existing SketchMath frontend/backend gates.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py tests/test_sketchmath_api.py tests/test_sketchmath_slice5_api.py` — 35 passed.
+- `python3 -m sketchmath.schemas.generate --check` — all nine generated schemas match.
+- `cd frontend && npx tsc --noEmit && CI=true npm test -- --runInBand --watchAll=false && npm run build` — type-check/build and all 66 frontend tests passed; build emitted only the pre-existing Browserslist-age notice.
+- `cd frontend && npx playwright test e2e/sketchmath.spec.ts --grep "commits revisioned extrusion history" --workers=1` — targeted live create/edit/signature/undo/redo/reload workflow passed with no browser errors.
+
+### Remaining Product Work
+- Broaden canonical feature families and kernel-backed artifact jobs, add semantic face/edge reference recovery, then complete multi-sketch/model-tree, artifact lifecycle, golden-part, and release-hardening evidence.
+
+---
+
 ## 2026-08-09 - SketchMath Deterministic General Planar Topology
 
 ### What Changed

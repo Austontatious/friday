@@ -106,6 +106,8 @@ Phase 2 status: passed for the documented v0.9 regular-line, circle, and finite-
 - `SM-REF-001`: downstream references use semantic source/signature/recovery data rather than permanent raw kernel indices.
 - `SM-REF-002`: upstream edits either preserve references correctly or fail explicitly and repairably.
 
+Phase 3 status: `SM-FEAT-001` is passed for the default-off v1 single-sketch extrusion/rebuild envelope at `f1431ec`, `b1e5ac4`, and `df1363c`. Canonical revisions, dependencies, deterministic rebuild reports, persisted feature undo/redo, and property editing are live without replaying FreeCAD side effects. `SM-FEAT-002` is partial: new-body/add/cut and extent semantics are modeled and tested, but broad kernel-backed solid reconstruction and the remaining feature families are not complete. See `feature_history_contract.md`.
+
 ## Workspace and Document Requirements
 
 - `SM-WS-001`: multi-sketch documents support principal planes and safe planar-face attachments, visibility, reference geometry, origins, axes, and cross-feature dependencies.

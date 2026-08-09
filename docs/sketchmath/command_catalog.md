@@ -310,6 +310,43 @@ The browser workspace exposes Extrude only for a selected closed profile. It sen
 
 Stored profile holes are included by the backend when `parameters.holes` is absent, so rectangle/profile hole UX does not need a second frontend hole list.
 
+## Canonical Feature Operations (Document v1)
+
+The default-off document-v1 path is separate from the legacy `extrude_profile` preview/export command. It persists typed feature parameters and deterministic rebuild evidence without invoking FreeCAD or writing an artifact.
+
+Feature operations use schema version `1.0`, an operation ID, an exact `base_revision`, preview/commit mode, an operation type, an optional target ID, and typed parameters. Supported operations are add, replace, delete, suppress/unsuppress, and preview-only rebuild. Stale revisions return `revision_conflict`; rebuild failures return `feature_rebuild_error` with the full per-feature report.
+
+```json
+{
+  "version": "1.0",
+  "operation_id": "add_feature_plate",
+  "mode": "commit",
+  "base_revision": 0,
+  "operation_type": "add_feature",
+  "parameters": {
+    "feature": {
+      "feature_id": "feature_plate",
+      "feature_type": "extrude",
+      "name": "Plate",
+      "body_id": "body_main",
+      "sketch_id": "sketch_main",
+      "profile_id": "profile_plate",
+      "source_region_id": "region_plate",
+      "dependencies": [],
+      "parameters": {
+        "depth_mm": 10,
+        "extent": "one_sided",
+        "direction": "positive",
+        "operation": "new_body"
+      },
+      "suppressed": false
+    }
+  }
+}
+```
+
+Feature replacement sends the complete feature with the same immutable `feature_id` and names that ID in `target_id`. See `feature_history_contract.md` for rebuild, persistence, and undo/redo semantics.
+
 ## Validation Errors
 
 - `missing_entity`
@@ -320,6 +357,8 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 - `invalid_units`
 - `invalid_command`
 - `selection_resolution_error`, including `unsafe_referenced_curve_edit`, `cutter_misses_segment`, and invalid primitive geometry details
+- `revision_conflict`
+- `feature_rebuild_error`
 
 ## Constraint Solver Limits
 

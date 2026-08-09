@@ -47,7 +47,7 @@ The backend remains the source of truth for committed geometry and history repla
 3. Use the guided workflow panel: Draw, Dimension, Hole, Extrude, Export.
 4. For independent or nested curve boundaries, use Region select, click clearly inside a backend-detected region, then promote it to a profile.
 5. Let the solver update the sketch status in the normal UI.
-6. Use the Selected Object and workflow controls for profile dimensions, selected-hole edits, delete, extrusion, and STEP export.
+6. Use the Selected Object and workflow controls for profile dimensions, selected-hole edits, delete, extrusion, and STEP export. When document v1 is enabled, use Feature history for revisioned extrusion creation and depth editing.
 7. Use Advanced Constraints or Advanced / Debug only when you need manual constraints, raw JSON, measurements, command history, system events, debug labels, or backend details.
 
 The default workspace is canvas-first and hides raw command JSON, proposed command JSON, backend error payloads, internal point/line IDs, system events, and other DSL internals unless the advanced view is opened explicitly. Normal errors are shown as short user-facing messages; raw backend details stay in `Error details` under Advanced / Debug.
@@ -86,6 +86,8 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Region promotion commits `make_region_profile`, creates the outer/hole profiles in one history step, and keeps the resulting `source_region_id` across reload. React never calculates or assigns region identity itself.
 - Add center hole commits a centered typed `add_profile_hole` command. Add Hole enters placement mode; `Add Centered Hole` or a click inside the selected profile commits the same command shape with the chosen center.
 - Existing holes can be selected on canvas. The workflow panel exposes diameter/center controls that commit a typed `update_profile_hole` command and immediately refresh the committed session state.
+- The default-off Feature history panel consumes the backend `SketchMathDocument` directly. It shows the monotonic revision, deterministic rebuild status/signature/measurements, creates an extrusion from the selected profile, replaces depth without changing feature identity, and exposes dedicated feature undo/redo.
+- Feature history requires `FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED=1` and `REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED=1`. It does not invoke the legacy `extrude_profile` FreeCAD export path; STEP export remains an explicit separate workflow.
 - Selected rectangles show width/height dimension labels on canvas. Selected holes show a diameter label on canvas.
 - Profile and hole selection use friendly labels in the default UI. Raw entity IDs remain available only under Advanced / Debug.
 - Circle is a first-class selectable entity with direct drawing, driving radius/diameter editing, an extrusion profile adapter, exact center/radius DOF analysis, and optional reuse as a profile hole.
@@ -125,6 +127,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 - The backend runtime must include `shapely>=2.0.0` for profile-hole validation and general planar-region extraction. Missing Shapely is surfaced in the UI as a dependency/configuration message, with the raw backend payload only available under Advanced / Debug.
 - The canonical app backend currently runs SketchMath with `FRIDAY_WEB_CONCURRENCY=1` because sessions are cached in the backend process. Multi-worker deployment needs a shared session-store invalidation/pass-through pass before it is safe for this workflow.
+- Canonical document v1 is a compatibility adapter over exactly one sketch in the current workspace. Multi-sketch authoring is intentionally refused until the model-tree phase.
 
 ## Visual System
 
