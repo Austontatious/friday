@@ -1111,6 +1111,7 @@ describe("SketchMath workspace", () => {
     delete process.env.REACT_APP_SKETCHMATH_HOLE_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_REVOLVE_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_FILLET_FEATURES_ENABLED;
+    delete process.env.REACT_APP_SKETCHMATH_CHAMFER_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED;
     stamp.value = 1710000000000;
     jest.spyOn(Date, "now").mockImplementation(() => stamp.value);
@@ -1185,6 +1186,7 @@ describe("SketchMath workspace", () => {
       canRedo: false,
       holeFeaturesEnabled: false,
       filletFeaturesEnabled: false,
+      chamferFeaturesEnabled: false,
       artifactJobsEnabled: false,
       artifactJobs: {},
       revolveAxes: [axis],
@@ -1192,8 +1194,10 @@ describe("SketchMath workspace", () => {
       onAddExtrusion: jest.fn(),
       onAddFullRevolve,
       onAddOuterFillet: jest.fn(),
+      onAddOuterChamfer: jest.fn(),
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
+      onUpdateChamferDistance: jest.fn(),
       onAddSimpleHole: jest.fn(),
       onBuildArtifact: jest.fn(),
       onRetryArtifact: jest.fn(),
@@ -1278,6 +1282,7 @@ describe("SketchMath workspace", () => {
       holeFeaturesEnabled: false,
       revolveFeaturesEnabled: false,
       filletFeaturesEnabled: true,
+      chamferFeaturesEnabled: false,
       artifactJobsEnabled: true,
       revolveAxes: [],
       artifactJobs: {},
@@ -1285,8 +1290,10 @@ describe("SketchMath workspace", () => {
       onAddExtrusion: jest.fn(),
       onAddFullRevolve: jest.fn(),
       onAddOuterFillet,
+      onAddOuterChamfer: jest.fn(),
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
+      onUpdateChamferDistance: jest.fn(),
       onAddSimpleHole: jest.fn(),
       onBuildArtifact,
       onRetryArtifact: jest.fn(),

@@ -313,6 +313,11 @@ export type SketchMathFilletParameters = {
   operation: "modify";
 };
 
+export type SketchMathChamferParameters = {
+  distance_mm: number;
+  operation: "modify";
+};
+
 export type SketchMathTopologyReferenceSelector = {
   reference_id: string;
   owner_feature_id: string;
@@ -368,7 +373,13 @@ export type SketchMathFilletFeature = SketchMathFeatureBase & {
   parameters: SketchMathFilletParameters;
 };
 
-export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature | SketchMathRevolveFeature | SketchMathFilletFeature;
+export type SketchMathChamferFeature = SketchMathFeatureBase & {
+  feature_type: "chamfer";
+  profile_id?: null;
+  parameters: SketchMathChamferParameters;
+};
+
+export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature | SketchMathRevolveFeature | SketchMathFilletFeature | SketchMathChamferFeature;
 
 export type SketchMathFeatureBuildRecord = {
   feature_id: string;
@@ -773,6 +784,14 @@ export const isSketchMathRevolveFeaturesEnabled = (): boolean => {
 
 export const isSketchMathFilletFeaturesEnabled = (): boolean => {
   const raw = process.env.REACT_APP_SKETCHMATH_FILLET_FEATURES_ENABLED;
+  if (raw == null || String(raw).trim() === "") {
+    return false;
+  }
+  return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
+};
+
+export const isSketchMathChamferFeaturesEnabled = (): boolean => {
+  const raw = process.env.REACT_APP_SKETCHMATH_CHAMFER_FEATURES_ENABLED;
   if (raw == null || String(raw).trim() === "") {
     return false;
   }

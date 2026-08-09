@@ -29,6 +29,7 @@ type FeatureHistoryPanelProps = {
   holeFeaturesEnabled: boolean;
   revolveFeaturesEnabled: boolean;
   filletFeaturesEnabled: boolean;
+  chamferFeaturesEnabled: boolean;
   artifactJobsEnabled: boolean;
   revolveAxes: SketchMathLineEntity[];
   artifactJobs: Record<string, SketchMathArtifactJobManifest>;
@@ -40,8 +41,14 @@ type FeatureHistoryPanelProps = {
     edgeReferences: SketchMathSemanticTopologyReference[],
     radius: number,
   ) => void;
+  onAddOuterChamfer: (
+    feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
+    edgeReferences: SketchMathSemanticTopologyReference[],
+    distance: number,
+  ) => void;
   onUpdateDepth: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, depth: number) => void;
   onUpdateFilletRadius: (feature: Extract<SketchMathFeature, { feature_type: "fillet" }>, radius: number) => void;
+  onUpdateChamferDistance: (feature: Extract<SketchMathFeature, { feature_type: "chamfer" }>, distance: number) => void;
   onAddSimpleHole: (
     feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
     topReference: SketchMathSemanticTopologyReference,
@@ -75,6 +82,7 @@ const FeatureHistoryPanel = ({
   holeFeaturesEnabled,
   revolveFeaturesEnabled,
   filletFeaturesEnabled,
+  chamferFeaturesEnabled,
   artifactJobsEnabled,
   revolveAxes,
   artifactJobs,
@@ -82,8 +90,10 @@ const FeatureHistoryPanel = ({
   onAddExtrusion,
   onAddFullRevolve,
   onAddOuterFillet,
+  onAddOuterChamfer,
   onUpdateDepth,
   onUpdateFilletRadius,
+  onUpdateChamferDistance,
   onAddSimpleHole,
   onBuildArtifact,
   onRetryArtifact,
@@ -94,6 +104,7 @@ const FeatureHistoryPanel = ({
   const [depthDrafts, setDepthDrafts] = useState<Record<string, string>>({});
   const [holeDrafts, setHoleDrafts] = useState<Record<string, HoleDraft>>({});
   const [filletDrafts, setFilletDrafts] = useState<Record<string, string>>({});
+  const [chamferDrafts, setChamferDrafts] = useState<Record<string, string>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
   const buildRecords = useMemo(
     () => recordByFeature(document.last_rebuild?.records || []),
@@ -105,6 +116,17 @@ const FeatureHistoryPanel = ({
       document.features
         .filter((feature): feature is Extract<SketchMathFeature, { feature_type: "extrude" }> => feature.feature_type === "extrude")
         .map((feature) => [feature.feature_id, String(feature.parameters.depth_mm)]),
+    ));
+  }, [document.features]);
+
+  useEffect(() => {
+    setChamferDrafts((current) => Object.fromEntries(
+      document.features
+        .filter((feature) => feature.feature_type === "extrude" || feature.feature_type === "chamfer")
+        .map((feature) => [
+          feature.feature_id,
+          feature.feature_type === "chamfer" ? String(feature.parameters.distance_mm) : current[feature.feature_id] || "2",
+        ]),
     ));
   }, [document.features]);
 
@@ -229,8 +251,11 @@ const FeatureHistoryPanel = ({
           const filletDraft = filletDrafts[feature.feature_id]
             ?? (feature.feature_type === "fillet" ? String(feature.parameters.radius_mm) : "2");
           const nextFilletRadius = validDepth(filletDraft);
+          const chamferDraft = chamferDrafts[feature.feature_id]
+            ?? (feature.feature_type === "chamfer" ? String(feature.parameters.distance_mm) : "2");
+          const nextChamferDistance = validDepth(chamferDraft);
           const artifactJob = artifactJobs[feature.feature_id];
-          const artifactFormat: "step" | "stl" = feature.feature_type === "fillet" ? "step" : "stl";
+          const artifactFormat: "step" | "stl" = ["fillet", "chamfer"].includes(feature.feature_type) ? "step" : "stl";
           const registeredArtifact = artifactJob?.result?.artifact
             || document.artifacts.find((artifact) => (
               artifact.feature_id === feature.feature_id
@@ -249,14 +274,14 @@ const FeatureHistoryPanel = ({
           const bodyGraph = document.features.slice(0, featureIndex + 1).filter(
             (candidate) => candidate.body_id === feature.body_id && !candidate.suppressed,
           );
-          const graphSupportsFilletStep = feature.feature_type === "fillet"
+          const graphSupportsEdgeFinishStep = (feature.feature_type === "fillet" || feature.feature_type === "chamfer")
             && bodyGraph.length === 2
             && bodyGraph[0].feature_type === "extrude"
             && bodyGraph[0].parameters.operation === "new_body"
-            && bodyGraph[1].feature_type === "fillet";
+            && bodyGraph[1].feature_type === feature.feature_type;
           const canBuildArtifact = record?.status === "succeeded"
             && laterBodyFeatures.length === 0
-            && (artifactFormat === "stl" ? graphSupportsStl : graphSupportsFilletStep);
+            && (artifactFormat === "stl" ? graphSupportsStl : graphSupportsEdgeFinishStep);
           const artifactBusy = artifactJob?.state === "READY" || artifactJob?.state === "RUNNING";
           const topReference = record?.generated_topology.find((reference) => reference.topology_type === "face" && reference.role === "top");
           const verticalOuterEdges = record?.generated_topology.filter(
@@ -286,6 +311,7 @@ const FeatureHistoryPanel = ({
                 {feature.feature_type === "hole" ? ` · ${feature.parameters.style} ${feature.parameters.termination}` : ""}
                 {feature.feature_type === "revolve" ? ` · ${feature.parameters.angle_deg}° about ${feature.parameters.axis_entity_id}` : ""}
                 {feature.feature_type === "fillet" ? ` · radius ${feature.parameters.radius_mm} mm` : ""}
+                {feature.feature_type === "chamfer" ? ` · distance ${feature.parameters.distance_mm} mm` : ""}
                 {record ? ` · ${record.generated_topology.length} semantic refs` : ""}
               </Text>
               {record?.measurements ? (
@@ -346,6 +372,31 @@ const FeatureHistoryPanel = ({
                   </Button>
                 </HStack>
               ) : null}
+              {chamferFeaturesEnabled && feature.feature_type === "extrude" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-chamfer-editor-${feature.feature_id}`}>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    aria-label={`Chamfer distance ${feature.feature_id}`}
+                    value={chamferDraft}
+                    onChange={(event) => setChamferDrafts((current) => ({ ...current, [feature.feature_id]: event.target.value }))}
+                    width="110px"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => nextChamferDistance != null && onAddOuterChamfer(feature, verticalOuterEdges, nextChamferDistance)}
+                    isDisabled={
+                      nextChamferDistance == null
+                      || verticalOuterEdges.length === 0
+                      || document.features.length !== 1
+                      || busy
+                    }
+                  >
+                    Chamfer outer edges
+                  </Button>
+                </HStack>
+              ) : null}
               {feature.feature_type === "fillet" ? (
                 <HStack spacing={2} flexWrap="wrap" mt={2}>
                   <Input
@@ -364,6 +415,27 @@ const FeatureHistoryPanel = ({
                     isDisabled={nextFilletRadius == null || nextFilletRadius === feature.parameters.radius_mm || busy}
                   >
                     Apply radius
+                  </Button>
+                </HStack>
+              ) : null}
+              {feature.feature_type === "chamfer" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2}>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    aria-label={`Chamfer distance ${feature.feature_id}`}
+                    value={chamferDraft}
+                    onChange={(event) => setChamferDrafts((current) => ({ ...current, [feature.feature_id]: event.target.value }))}
+                    width="110px"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => nextChamferDistance != null && onUpdateChamferDistance(feature, nextChamferDistance)}
+                    isDisabled={nextChamferDistance == null || nextChamferDistance === feature.parameters.distance_mm || busy}
+                  >
+                    Apply distance
                   </Button>
                 </HStack>
               ) : null}

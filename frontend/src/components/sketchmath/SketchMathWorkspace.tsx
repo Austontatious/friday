@@ -40,6 +40,7 @@ import {
   createSketchMathSession,
   getSketchMathArtifactJob,
   getSketchMathSession,
+  isSketchMathChamferFeaturesEnabled,
   isSketchMathArtifactJobsEnabled,
   isSketchMathEnabled,
   isSketchMathFeatureHistoryEnabled,
@@ -454,6 +455,7 @@ const SketchMathWorkspace = () => {
   const [holeFeaturesEnabled] = useState<boolean>(isSketchMathHoleFeaturesEnabled());
   const [revolveFeaturesEnabled] = useState<boolean>(isSketchMathRevolveFeaturesEnabled());
   const [filletFeaturesEnabled] = useState<boolean>(isSketchMathFilletFeaturesEnabled());
+  const [chamferFeaturesEnabled] = useState<boolean>(isSketchMathChamferFeaturesEnabled());
   const [artifactJobsEnabled] = useState<boolean>(isSketchMathArtifactJobsEnabled());
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -1864,6 +1866,69 @@ const SketchMathWorkspace = () => {
         feature: {
           ...feature,
           parameters: { ...feature.parameters, radius_mm: radius },
+        },
+      },
+    });
+  };
+
+  const handleAddOuterChamfer = async (
+    target: Extract<SketchMathFeature, { feature_type: "extrude" }>,
+    edgeReferences: SketchMathSemanticTopologyReference[],
+    distance: number,
+  ) => {
+    if (
+      !sketchDocument
+      || !chamferFeaturesEnabled
+      || sketchDocument.features.length !== 1
+      || edgeReferences.length === 0
+    ) return;
+    const featureId = `chamfer_${target.feature_id.replace(/[^a-zA-Z0-9_-]+/g, "_")}`;
+    const feature: SketchMathFeature = {
+      feature_id: featureId,
+      feature_type: "chamfer",
+      name: "Outer edge chamfer",
+      body_id: target.body_id,
+      sketch_id: target.sketch_id,
+      profile_id: null,
+      source_region_id: null,
+      dependencies: [target.feature_id],
+      topology_references: edgeReferences.map((edge) => ({
+        reference_id: edge.reference_id,
+        owner_feature_id: target.feature_id,
+        topology_type: "edge",
+        role: edge.role,
+        source_entity_id: edge.source_entity_id || null,
+        expected_signature: edge.geometric_signature,
+      })),
+      parameters: { distance_mm: distance, operation: "modify" },
+      suppressed: false,
+    };
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `add_${featureId}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "add_feature",
+      parameters: { feature },
+    });
+  };
+
+  const handleUpdateChamferDistance = async (
+    feature: Extract<SketchMathFeature, { feature_type: "chamfer" }>,
+    distance: number,
+  ) => {
+    if (!sketchDocument || !chamferFeaturesEnabled) return;
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "replace_feature",
+      target_id: feature.feature_id,
+      parameters: {
+        feature: {
+          ...feature,
+          parameters: { ...feature.parameters, distance_mm: distance },
         },
       },
     });
@@ -4174,6 +4239,7 @@ const SketchMathWorkspace = () => {
                   holeFeaturesEnabled={holeFeaturesEnabled}
                   revolveFeaturesEnabled={revolveFeaturesEnabled}
                   filletFeaturesEnabled={filletFeaturesEnabled}
+                  chamferFeaturesEnabled={chamferFeaturesEnabled}
                   artifactJobsEnabled={artifactJobsEnabled}
                   revolveAxes={revolveAxes}
                   artifactJobs={artifactJobs}
@@ -4183,8 +4249,12 @@ const SketchMathWorkspace = () => {
                   onAddOuterFillet={(feature, edgeReferences, radius) => (
                     void handleAddOuterFillet(feature, edgeReferences, radius)
                   )}
+                  onAddOuterChamfer={(feature, edgeReferences, distance) => (
+                    void handleAddOuterChamfer(feature, edgeReferences, distance)
+                  )}
                   onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
                   onUpdateFilletRadius={(feature, radius) => void handleUpdateFilletRadius(feature, radius)}
+                  onUpdateChamferDistance={(feature, distance) => void handleUpdateChamferDistance(feature, distance)}
                   onAddSimpleHole={(feature, topReference, position, diameter, termination, depth) => (
                     void handleAddSimpleHole(feature, topReference, position, diameter, termination, depth)
                   )}

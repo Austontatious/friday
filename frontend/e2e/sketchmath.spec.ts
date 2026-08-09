@@ -525,6 +525,61 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId(`sketchmath-artifact-download-${filletFeatureId}`)).toBeVisible();
   });
 
+  test("creates an outer-edge chamfer and downloads its revisioned kernel STEP", async ({ page }) => {
+    await openSketchMath(page);
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+
+    await page.getByRole("button", { name: "Rectangle" }).first().click();
+    await clickSvgViewBoxPoint(page, 140, 120);
+    await clickSvgViewBoxPoint(page, 360, 200);
+    const panel = page.getByTestId("sketchmath-feature-history-panel");
+    await page.getByLabel("Feature extrusion depth").fill("10");
+    await panel.getByRole("button", { name: "Add extrusion feature" }).click();
+    await expect(panel).toContainText("Revision 2");
+
+    const baseSnapshot = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as {
+      document: { features: Array<{ feature_id: string }> };
+    };
+    const baseFeatureId = baseSnapshot.document.features[0].feature_id;
+    const baseRow = page.getByTestId(`sketchmath-feature-${baseFeatureId}`);
+    await baseRow.getByLabel(`Chamfer distance ${baseFeatureId}`).fill("3");
+    await baseRow.getByRole("button", { name: "Chamfer outer edges" }).click();
+    await expect(panel).toContainText("Revision 3");
+
+    const chamferSnapshot = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as {
+      document: {
+        features: Array<{ feature_id: string; feature_type: string; parameters: { distance_mm?: number } }>;
+        last_rebuild: { records: Array<{ feature_id: string; measurement_coverage?: string; resolved_references: unknown[] }> };
+      };
+    };
+    const chamferFeature = chamferSnapshot.document.features.find((feature) => feature.feature_type === "chamfer");
+    expect(chamferFeature?.parameters.distance_mm).toBe(3);
+    const chamferFeatureId = chamferFeature!.feature_id;
+    const chamferRecord = chamferSnapshot.document.last_rebuild.records.find((record) => record.feature_id === chamferFeatureId);
+    expect(chamferRecord?.measurement_coverage).toBe("kernel_required");
+    expect(chamferRecord?.resolved_references).toHaveLength(4);
+
+    const chamferRow = page.getByTestId(`sketchmath-feature-${chamferFeatureId}`);
+    await chamferRow.getByRole("button", { name: "Build STEP" }).click();
+    await expect(page.getByTestId(`sketchmath-artifact-status-${chamferFeatureId}`)).toContainText(
+      "STEP artifact · DONE · complete · revision 3",
+      { timeout: 20000 },
+    );
+    const artifactSnapshot = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as {
+      document: { artifacts: Array<{ feature_id: string; revision: number; format: string; metadata: Record<string, any> }> };
+    };
+    expect(artifactSnapshot.document.artifacts[0]).toMatchObject({ feature_id: chamferFeatureId, revision: 3, format: "step" });
+    expect(artifactSnapshot.document.artifacts[0].metadata.measurements.distance_mm).toBe(3);
+    expect(artifactSnapshot.document.artifacts[0].metadata.measurements.reference_policy).toBe("semantic_endpoints_unique_match");
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId(`sketchmath-artifact-download-${chamferFeatureId}`).click();
+    expect((await downloadPromise).suggestedFilename()).toMatch(/\.step$/);
+    await page.reload();
+    await expect(page.getByLabel(`Chamfer distance ${chamferFeatureId}`)).toHaveValue("3");
+  });
+
   test("creates a center-defined rectangle through the canonical rectangle bundle", async ({ page }) => {
     await openSketchMath(page);
     await page.getByRole("button", { name: "Center rectangle", exact: true }).click();
