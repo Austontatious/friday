@@ -44,6 +44,7 @@ import {
   isSketchMathEnabled,
   isSketchMathFeatureHistoryEnabled,
   isSketchMathHoleFeaturesEnabled,
+  isSketchMathRevolveFeaturesEnabled,
   previewSketchMathCommand,
   redoSketchMathSession,
   redoSketchMathFeature,
@@ -450,6 +451,7 @@ const SketchMathWorkspace = () => {
   const [enabled] = useState<boolean>(isSketchMathEnabled());
   const [featureHistoryEnabled] = useState<boolean>(isSketchMathFeatureHistoryEnabled());
   const [holeFeaturesEnabled] = useState<boolean>(isSketchMathHoleFeaturesEnabled());
+  const [revolveFeaturesEnabled] = useState<boolean>(isSketchMathRevolveFeaturesEnabled());
   const [artifactJobsEnabled] = useState<boolean>(isSketchMathArtifactJobsEnabled());
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -767,6 +769,12 @@ const SketchMathWorkspace = () => {
   const activeProfileForHole = selectedRectangleProfile || selectedClosedProfile || selectedHoleParentProfile;
   const activeProfileHoleCount = activeProfileForHole ? activeProfileForHole.holes?.length || 0 : null;
   const activeProfileForCad = selectedRectangleProfile || selectedClosedProfile || selectedCircleProfile || selectedHoleParentProfile;
+  const revolveAxes = useMemo(
+    () => committedEntities.filter(
+      (entity): entity is Extract<SketchMathEntity, { type: "line_2d" | "construction_line_2d" }> => entity.type === "construction_line_2d",
+    ),
+    [committedEntities],
+  );
   const allGeometryBounds = useMemo<ViewBoxState | null>(() => {
     const points = committedEntities.flatMap((entity) => {
       if (isPointEntity(entity)) {
@@ -1754,6 +1762,45 @@ const SketchMathWorkspace = () => {
           parameters: { ...feature.parameters, depth_mm: depth },
         },
       },
+    });
+  };
+
+  const handleAddFullRevolve = async (
+    profile: Extract<SketchMathEntity, { type: "profile_2d" }>,
+    axis: Extract<SketchMathEntity, { type: "line_2d" | "construction_line_2d" }>,
+  ) => {
+    if (!sketchDocument || !revolveFeaturesEnabled || sketchDocument.features.length > 0) return;
+    const body = sketchDocument.bodies[0];
+    const sketch = sketchDocument.sketches[0];
+    if (!body || !sketch) {
+      setUserError("The active document does not contain a body and sketch for this feature.");
+      return;
+    }
+    const featureId = `revolve_${profile.id.replace(/[^a-zA-Z0-9_-]+/g, "_")}`;
+    const feature: SketchMathFeature = {
+      feature_id: featureId,
+      feature_type: "revolve",
+      name: "Revolve 1",
+      body_id: body.body_id,
+      sketch_id: sketch.sketch_id,
+      profile_id: profile.id,
+      source_region_id: profile.source_region_id || null,
+      dependencies: [],
+      topology_references: [],
+      parameters: {
+        axis_entity_id: axis.id,
+        angle_deg: 360,
+        operation: "new_body",
+      },
+      suppressed: false,
+    };
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `add_${featureId}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "add_feature",
+      parameters: { feature },
     });
   };
 
@@ -4060,10 +4107,13 @@ const SketchMathWorkspace = () => {
                   canUndo={canFeatureUndo}
                   canRedo={canFeatureRedo}
                   holeFeaturesEnabled={holeFeaturesEnabled}
+                  revolveFeaturesEnabled={revolveFeaturesEnabled}
                   artifactJobsEnabled={artifactJobsEnabled}
+                  revolveAxes={revolveAxes}
                   artifactJobs={artifactJobs}
                   onNewDepthValueChange={setExtrudeDepthValue}
                   onAddExtrusion={(profile, depth) => void handleAddFeatureExtrusion(profile, depth)}
+                  onAddFullRevolve={(profile, axis) => void handleAddFullRevolve(profile, axis)}
                   onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
                   onAddSimpleHole={(feature, topReference, position, diameter, termination, depth) => (
                     void handleAddSimpleHole(feature, topReference, position, diameter, termination, depth)

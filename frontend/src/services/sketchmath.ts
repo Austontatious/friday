@@ -302,6 +302,12 @@ export type SketchMathHoleParameters = {
   operation: "cut";
 };
 
+export type SketchMathRevolveParameters = {
+  axis_entity_id: string;
+  angle_deg: number;
+  operation: "new_body" | "add" | "cut";
+};
+
 export type SketchMathTopologyReferenceSelector = {
   reference_id: string;
   owner_feature_id: string;
@@ -345,7 +351,13 @@ export type SketchMathHoleFeature = SketchMathFeatureBase & {
   parameters: SketchMathHoleParameters;
 };
 
-export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature;
+export type SketchMathRevolveFeature = SketchMathFeatureBase & {
+  feature_type: "revolve";
+  profile_id: string;
+  parameters: SketchMathRevolveParameters;
+};
+
+export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature | SketchMathRevolveFeature;
 
 export type SketchMathFeatureBuildRecord = {
   feature_id: string;
@@ -733,6 +745,14 @@ export const isSketchMathFeatureHistoryEnabled = (): boolean => {
 
 export const isSketchMathHoleFeaturesEnabled = (): boolean => {
   const raw = process.env.REACT_APP_SKETCHMATH_HOLE_FEATURES_ENABLED;
+  if (raw == null || String(raw).trim() === "") {
+    return false;
+  }
+  return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
+};
+
+export const isSketchMathRevolveFeaturesEnabled = (): boolean => {
+  const raw = process.env.REACT_APP_SKETCHMATH_REVOLVE_FEATURES_ENABLED;
   if (raw == null || String(raw).trim() === "") {
     return false;
   }

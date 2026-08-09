@@ -1,6 +1,7 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import FeatureHistoryPanel from "./FeatureHistoryPanel";
 import SketchMathWorkspace from "./SketchMathWorkspace";
 
 jest.mock("@chakra-ui/react", () => {
@@ -32,6 +33,7 @@ jest.mock("@chakra-ui/react", () => {
     HStack: makeElement("div"),
     Input,
     Link: makeElement("a"),
+    Select: makeElement("select"),
     Spinner: makeElement("div"),
     Text: makeElement("span"),
     Textarea,
@@ -1107,6 +1109,7 @@ describe("SketchMath workspace", () => {
     process.env.REACT_APP_SKETCHMATH_ENABLED = "1";
     delete process.env.REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_HOLE_FEATURES_ENABLED;
+    delete process.env.REACT_APP_SKETCHMATH_REVOLVE_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED;
     stamp.value = 1710000000000;
     jest.spyOn(Date, "now").mockImplementation(() => stamp.value);
@@ -1141,6 +1144,67 @@ describe("SketchMath workspace", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it("keeps full revolve creation behind its flag and uses a construction axis", async () => {
+    const activeProfile = {
+      id: "profile_ring",
+      type: "profile_2d" as const,
+      vertices: [[8, 2], [10, 2], [10, 8], [8, 8]] as [number, number][],
+      area: 12,
+      winding: "counterclockwise" as const,
+      closed: true,
+    };
+    const axis = {
+      id: "axis_y",
+      type: "construction_line_2d" as const,
+      start: [0, 0] as [number, number],
+      end: [0, 10] as [number, number],
+    };
+    const document = {
+      schema_version: "1.0",
+      document_id: "doc_revolve",
+      name: "Revolve test",
+      units: "mm",
+      revision: 0,
+      bodies: [{ body_id: "body_1", name: "Body 1", sketch_ids: ["sketch_1"], feature_ids: [], visible: true }],
+      sketches: [],
+      features: [],
+      artifacts: [],
+      provenance: {},
+      last_rebuild: null,
+    } as any;
+    const onAddFullRevolve = jest.fn();
+    const props = {
+      document,
+      activeProfile,
+      newDepthValue: "10",
+      busy: false,
+      canUndo: false,
+      canRedo: false,
+      holeFeaturesEnabled: false,
+      artifactJobsEnabled: false,
+      artifactJobs: {},
+      revolveAxes: [axis],
+      onNewDepthValueChange: jest.fn(),
+      onAddExtrusion: jest.fn(),
+      onAddFullRevolve,
+      onUpdateDepth: jest.fn(),
+      onAddSimpleHole: jest.fn(),
+      onBuildArtifact: jest.fn(),
+      onRetryArtifact: jest.fn(),
+      artifactDownloadUrl: jest.fn(),
+      onUndo: jest.fn(),
+      onRedo: jest.fn(),
+    };
+
+    const { rerender } = render(<FeatureHistoryPanel {...props} revolveFeaturesEnabled={false} />);
+    expect(screen.queryByTestId("sketchmath-revolve-editor")).toBeNull();
+
+    rerender(<FeatureHistoryPanel {...props} revolveFeaturesEnabled />);
+    expect(screen.getByRole("combobox", { name: "Revolve axis" })).toHaveValue("axis_y");
+    await userEvent.click(screen.getByRole("button", { name: "Add full revolve" }));
+    expect(onAddFullRevolve).toHaveBeenCalledWith(activeProfile, axis);
   });
 
   it("loads canvas-first and keeps advanced JSON hidden by default", async () => {

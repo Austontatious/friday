@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Button, Heading, HStack, Input, Link, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Input, Link, Select, Text, VStack } from "@chakra-ui/react";
 
 import type {
   SketchMathArtifactJobManifest,
   SketchMathDocument,
   SketchMathFeature,
   SketchMathFeatureBuildRecord,
+  SketchMathLineEntity,
   SketchMathProfileEntity,
   SketchMathSemanticTopologyReference,
 } from "../../services/sketchmath";
@@ -26,10 +27,13 @@ type FeatureHistoryPanelProps = {
   canUndo: boolean;
   canRedo: boolean;
   holeFeaturesEnabled: boolean;
+  revolveFeaturesEnabled: boolean;
   artifactJobsEnabled: boolean;
+  revolveAxes: SketchMathLineEntity[];
   artifactJobs: Record<string, SketchMathArtifactJobManifest>;
   onNewDepthValueChange: (value: string) => void;
   onAddExtrusion: (profile: SketchMathProfileEntity, depth: number) => void;
+  onAddFullRevolve: (profile: SketchMathProfileEntity, axis: SketchMathLineEntity) => void;
   onUpdateDepth: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, depth: number) => void;
   onAddSimpleHole: (
     feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
@@ -62,10 +66,13 @@ const FeatureHistoryPanel = ({
   canUndo,
   canRedo,
   holeFeaturesEnabled,
+  revolveFeaturesEnabled,
   artifactJobsEnabled,
+  revolveAxes,
   artifactJobs,
   onNewDepthValueChange,
   onAddExtrusion,
+  onAddFullRevolve,
   onUpdateDepth,
   onAddSimpleHole,
   onBuildArtifact,
@@ -76,6 +83,7 @@ const FeatureHistoryPanel = ({
 }: FeatureHistoryPanelProps) => {
   const [depthDrafts, setDepthDrafts] = useState<Record<string, string>>({});
   const [holeDrafts, setHoleDrafts] = useState<Record<string, HoleDraft>>({});
+  const [revolveAxisId, setRevolveAxisId] = useState("");
   const buildRecords = useMemo(
     () => recordByFeature(document.last_rebuild?.records || []),
     [document.last_rebuild?.records],
@@ -108,6 +116,13 @@ const FeatureHistoryPanel = ({
   }, [buildRecords, document.features]);
 
   const newDepth = validDepth(newDepthValue);
+  const revolveAxis = revolveAxes.find((axis) => axis.id === revolveAxisId) || revolveAxes[0] || null;
+
+  useEffect(() => {
+    if (!revolveAxes.some((axis) => axis.id === revolveAxisId)) {
+      setRevolveAxisId(revolveAxes[0]?.id || "");
+    }
+  }, [revolveAxes, revolveAxisId]);
 
   return (
     <Box className="sketchmath-panel sketchmath-feature-history" data-testid="sketchmath-feature-history-panel">
@@ -145,6 +160,41 @@ const FeatureHistoryPanel = ({
         </HStack>
       </Box>
 
+      {revolveFeaturesEnabled ? (
+        <Box className="sketchmath-inline-editor" mt={3} data-testid="sketchmath-revolve-editor">
+          <Text fontSize="sm" fontWeight="600">New full revolve</Text>
+          <Text fontSize="sm" opacity={0.75} mt={1}>
+            {activeProfile
+              ? "Choose a construction-line axis. The profile must remain on one side of the axis."
+              : "Select a closed profile and create a construction line for the axis."}
+          </Text>
+          <HStack spacing={2} flexWrap="wrap" mt={2}>
+            <Select
+              aria-label="Revolve axis"
+              value={revolveAxis?.id || ""}
+              onChange={(event) => setRevolveAxisId(event.target.value)}
+              width="190px"
+              placeholder="No construction axis"
+            >
+              {revolveAxes.map((axis) => (
+                <option key={axis.id} value={axis.id}>{axis.label || axis.id}</option>
+              ))}
+            </Select>
+            <Button
+              size="sm"
+              onClick={() => activeProfile && revolveAxis && onAddFullRevolve(activeProfile, revolveAxis)}
+              isDisabled={!activeProfile || !revolveAxis || document.features.length > 0 || busy}
+              data-testid="sketchmath-add-revolve-feature"
+            >
+              Add full revolve
+            </Button>
+          </HStack>
+          {document.features.length > 0 ? (
+            <Text fontSize="xs" opacity={0.65} mt={1}>The guarded UI currently creates new-body revolves only.</Text>
+          ) : null}
+        </Box>
+      ) : null}
+
       <VStack align="stretch" spacing={3} mt={3}>
         {document.features.length === 0 ? (
           <Text fontSize="sm" opacity={0.72}>No committed features yet.</Text>
@@ -168,7 +218,7 @@ const FeatureHistoryPanel = ({
             (candidate) => candidate.body_id !== feature.body_id
               || candidate.suppressed
               || candidate.feature_type === "extrude"
-              || candidate.parameters.style === "simple",
+              || (candidate.feature_type === "hole" && candidate.parameters.style === "simple"),
           );
           const canBuildArtifact = record?.status === "succeeded"
             && laterBodyFeatures.length === 0
@@ -193,7 +243,9 @@ const FeatureHistoryPanel = ({
               <Text fontWeight="600">{feature.name}</Text>
               <Text fontSize="sm" opacity={0.75}>
                 {feature.feature_type} · {feature.parameters.operation} · {record?.status || "not rebuilt"}
-                {feature.feature_type === "extrude" ? ` · profile ${feature.profile_id}` : ` · ${feature.parameters.style} ${feature.parameters.termination}`}
+                {feature.feature_type === "extrude" ? ` · profile ${feature.profile_id}` : ""}
+                {feature.feature_type === "hole" ? ` · ${feature.parameters.style} ${feature.parameters.termination}` : ""}
+                {feature.feature_type === "revolve" ? ` · ${feature.parameters.angle_deg}° about ${feature.parameters.axis_entity_id}` : ""}
                 {record ? ` · ${record.generated_topology.length} semantic refs` : ""}
               </Text>
               {record?.measurements ? (
