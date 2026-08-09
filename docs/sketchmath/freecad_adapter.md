@@ -1,13 +1,14 @@
 # SketchMath FreeCAD Adapter
 
-SketchMath uses a narrow, headless FreeCAD worker only for `extrude_profile`.
+SketchMath uses narrow, headless FreeCAD workers for legacy `extrude_profile` and the supported canonical extrusion-to-fillet STEP graph.
 
 ## Boundary
 
 - Input stays typed and deterministic inside SketchMath.
-- The worker receives a single closed outer `profile_2d` plus optional closed hole profiles.
+- The extrusion worker receives a single closed outer `profile_2d` plus optional closed hole profiles.
+- The feature-graph worker additionally receives a typed fillet radius and canonical semantic outer-vertical-edge descriptors.
 - The worker exports STEP and writes validation metadata back to the SketchMath adapter.
-- No GUI, no MCP wrapper, no arbitrary Python execution, and no general feature tree.
+- No GUI, no MCP wrapper, no arbitrary Python execution, and no general feature-tree interpreter.
 
 ## Strategy
 
@@ -16,6 +17,8 @@ SketchMath uses a narrow, headless FreeCAD worker only for `extrude_profile`.
 3. Try face-with-holes construction first.
 4. If construction, extrusion, export, validation, bbox, or volume sanity checks fail, fall back to boolean subtraction.
 5. Accept only validated STEP output.
+
+For fillet graphs, reconstruct that same base, match every semantic edge descriptor to exactly one unused FreeCAD edge by unordered 3D endpoints, apply the radius, and validate solid state, unchanged bounds, and material removal. FreeCAD edge ordinals are diagnostic output only and never become canonical references.
 
 ## Validation Rules
 
@@ -27,6 +30,7 @@ SketchMath uses a narrow, headless FreeCAD worker only for `extrude_profile`.
 - The resulting solid must validate in FreeCAD.
 - The solid bbox must match the outer profile bbox plus extrusion depth.
 - The solid volume must match outer area minus hole area within tolerance.
+- A supported convex fillet must produce a valid positive solid, preserve the base bbox, and remove measurable material.
 
 ## Metadata
 
@@ -37,6 +41,7 @@ The export metadata records:
 - outer and hole winding information
 - expected bbox and volume
 - hole count
+- fillet radius, base/final volume, semantic endpoint mapping, and transient matched edge ordinals for fillet artifacts
 
 ## Browser Download
 

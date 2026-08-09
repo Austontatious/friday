@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-09 - SketchMath Semantic Edge Fillet and Kernel STEP
+
+### What Changed
+- Added typed fillet features with finite radius, exact/recovered convex outer-vertical-edge selectors, semantic adjacency/signature/3D endpoint data, radius bounds, generated fillet-surface identity, and explicit `kernel_required` measurement coverage.
+- Added a narrow FreeCAD feature-graph worker for one positive independent extrusion followed by one terminal fillet. It uniquely resolves semantic endpoints to unused kernel edges, validates final solid/bounds/material removal, and records transient edge ordinals only as diagnostics.
+- Routed fillet STEP through persistent revision-bound artifact jobs and added a default-off browser workflow for creation, radius replacement, job polling/retry, STEP download, and reload.
+
+### Why
+- Fillet is the first kernel-backed stress test of persistent edge references; a transient FreeCAD edge number cannot be the source of truth.
+- Canonical rebuild must not fabricate post-fillet analytic measurements when the kernel is authoritative.
+
+### New Env Flags
+- `FRIDAY_SKETCHMATH_FILLET_FEATURES_ENABLED=0` gates backend fillet creation.
+- `REACT_APP_SKETCHMATH_FILLET_FEATURES_ENABLED=0` exposes the guarded outer-edge fillet editor.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py tests/test_sketchmath_api.py tests/test_sketchmath_cad_adapter.py tests/test_sketchmath_feature_artifact.py tests/test_sketchmath_artifact_jobs.py tests/test_sketchmath_stl_export.py tests/test_sketchmath_golden_mounting_plate.py` — 75 focused tests.
+- `python3 -m sketchmath.schemas.generate --check` and `docker compose -f docker-compose.app.yml config --quiet` — schemas/deployment validate.
+- `cd frontend && npx tsc --noEmit && npm test -- --runInBand --watchAll=false` — TypeScript and all 68 frontend tests pass.
+- `cd frontend && npx playwright test e2e/sketchmath.spec.ts --grep "outer-edge fillet"` — live kernel STEP workflow passes in 8.4 seconds.
+
+### Checkpoints and Remaining Work
+- Code checkpoints: `1f1b034`, `30af86a`, `e6b272f`, `53a39ed`.
+- Chamfer, broader fillet targets/graphs, fillet STL, general kernel-topology reconciliation, golden mounting-plate fillets, and final release hardening remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Explicit-Axis Full Revolve
 
 ### What Changed

@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `07e9880` (guarded full-revolve slice; evidence: `feature_history_contract.md` and `status.md`)
+Last validated SketchMath code milestone: `53a39ed` (guarded kernel-backed fillet slice; evidence: `fillet_feature_contract.md` and `status.md`)
 
 ## Mission
 
@@ -106,7 +106,7 @@ Phase 2 status: passed for the documented v0.9 regular-line, circle, and finite-
 - `SM-REF-001`: downstream references use semantic source/signature/recovery data rather than permanent raw kernel indices.
 - `SM-REF-002`: upstream edits either preserve references correctly or fail explicitly and repairably.
 
-Phase 3 status: `SM-FEAT-001` is passed for the default-off v1 single-sketch extrusion/hole envelope. `SM-FEAT-002` remains partial but now includes semantic top/bottom attachment and physically placed add/cut bounds. `SM-FEAT-004` is partial: simple/counterbore/countersink and through/blind semantics rebuild deterministically, while the browser exposes simple through/blind and layered STL supports simple holes. `SM-REF-001/002` pass for generated extrusion/hole source-role-signature references, exact/recovered state, and explicit missing/ambiguous failure; kernel-index reconciliation and viewport picking remain open. See `feature_history_contract.md`.
+Phase 3 status: `SM-FEAT-001` passes for the default-off v1 extrusion/hole/full-revolve/terminal-fillet envelope. `SM-FEAT-002/003/004` remain bounded as recorded in traceability. `SM-FEAT-005` now includes a kernel-backed convex outer-vertical-edge fillet over one independent extrusion, with semantic endpoint reconciliation, editable radius, asynchronous STEP, and live browser evidence; chamfer and broader edge/body graphs remain open. `SM-REF-001/002` pass for the documented generated-reference envelope, while arbitrary viewport picking and general kernel-topology reconciliation remain open. See `feature_history_contract.md` and `fillet_feature_contract.md`.
 
 ## Workspace and Document Requirements
 

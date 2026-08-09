@@ -90,7 +90,8 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Add extrusions attach to the most recent supported extrusion top face by semantic reference. The browser refuses creation when that attachment is unavailable rather than inventing a raw face index.
 - With `FRIDAY_SKETCHMATH_HOLE_FEATURES_ENABLED=1` and `REACT_APP_SKETCHMATH_HOLE_FEATURES_ENABLED=1`, each built extrusion exposes numeric X/Y/diameter placement for simple through or blind holes. The request records the current semantic top face; typed counterbore/countersink exists at the API/model layer but is not exposed by this editor.
 - With `FRIDAY_SKETCHMATH_REVOLVE_FEATURES_ENABLED=1` and `REACT_APP_SKETCHMATH_REVOLVE_FEATURES_ENABLED=1`, an empty feature history exposes a full-revolve editor. It creates a new body from the selected closed profile about a chosen construction line. Profiles crossing the axis are rejected by rebuild; partial angles, browser add/cut, and revolve artifacts are outside this guarded UI slice.
-- With `FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED=1` and `REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED=1`, the terminal supported body feature exposes Build STL. The panel displays READY/RUNNING/DONE/FAILED, step, input revision, retry, and Download STL; reload recovers the registered artifact from the document.
+- With `FRIDAY_SKETCHMATH_FILLET_FEATURES_ENABLED=1` and `REACT_APP_SKETCHMATH_FILLET_FEATURES_ENABLED=1`, a single supported extrusion exposes a radius and `Fillet outer edges`. The resulting feature keeps semantic edge selectors, exposes radius replacement, and builds/downloads a revision-bound kernel STEP. Arbitrary edge picking and broader graphs are not exposed.
+- With `FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED=1` and `REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED=1`, the terminal supported body feature exposes Build STL or, for the bounded fillet graph, Build STEP. The panel displays READY/RUNNING/DONE/FAILED, step, input revision, retry, and download; reload recovers the registered artifact from the document.
 - Feature history requires `FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED=1` and `REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED=1`. Canonical commits never invoke the legacy synchronous FreeCAD path. Revision-bound STL jobs are separate, while legacy STEP remains an explicit workflow.
 - Selected rectangles show width/height dimension labels on canvas. Selected holes show a diameter label on canvas.
 - Profile and hole selection use friendly labels in the default UI. Raw entity IDs remain available only under Advanced / Debug.
@@ -132,7 +133,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Build STL submits a persistent asynchronous request for the selected terminal feature and current document revision.
 - The current layered materializer supports vertical extrusion graphs and simple typed holes. It validates analytic bounds/volume, closed edges, safe paths, and content hash before registration.
 - STL files are downloaded through `GET /api/sketchmath/artifacts/stl?path=...`, restricted to `.stl` below the configured CAD export root.
-- Counterbore/countersink STL, full-graph STEP, cancellation, and automatic artifact cleanup remain outside this UI envelope. See `artifact_job_contract.md`.
+- Counterbore/countersink/fillet STL, STEP beyond independent extrusion or terminal fillet, cancellation, and automatic artifact cleanup remain outside this UI envelope. See `artifact_job_contract.md`.
 
 ## Runtime Dependencies
 
