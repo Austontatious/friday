@@ -2,7 +2,7 @@
 
 Updated: 2026-08-09
 
-Status: passed for canonical rebuild, semantic recovery, serialization, terminal fillet, native STEP validation, resumable registration, and reload; the full browser parameter-edit scenario remains partial
+Status: passed for canonical rebuild, typed parameter editing, semantic recovery, undo/redo, serialization/reload, terminal fillet, native STEP validation, resumable registration, and browser acceptance
 
 ## Canonical Part
 
@@ -40,8 +40,12 @@ The bounded feature-graph worker executes the seven analytic pre-finish operatio
 
 Layered STL deliberately refuses the terminal kernel-only fillet with `unsupported_stl_feature_type`; it does not silently omit the feature.
 
-## Remaining Acceptance Work
+## Parameter-Edit Acceptance Evidence
 
-The widened/Ø6 canonical edit is not yet driven through one browser-visible undo/redo workflow and has not produced its own post-edit STEP artifact. Those proofs, plus full browser history-tree acceptance, remain required before declaring the Section 29 and release-train gates complete.
+Document schema `1.1` defines `plate_width_mm` and `corner_hole_diameter_mm` as named bounded parameters. The width binding updates the plate profile, right-side hole offsets, boss/boss-hole center, and derived circular profile. The diameter binding updates all four mounting-hole features without replacing their IDs. Invalid values and deletion of bound targets fail atomically.
 
-Evidence: `sketchmath/features/golden_mounting_plate.py`, `sketchmath/cad/freecad_feature_graph.py`, `tests/test_sketchmath_golden_mounting_plate.py`; checkpoints `5973c89` and `3e309de`.
+The live browser workflow commits 80→100 mm and Ø5→Ø6, verifies the canonical sketch and feature state, undoes/redoes the diameter change, reloads both values, builds revision-12 STEP, and downloads it with zero relevant console/page errors. Native inspection reports approximately `(0,100,0,50,0,13)` bounds, five holes, four Ø6 corner-hole cylinders, the Ø10 boss hole, the Ø30 boss, four 2 mm fillets, and final volume `24920 + 1315π mm³` within `1e-5`.
+
+This closes Sections 28–30 for the documented golden model. The broader release train remains open for the bounded feature-property, revolve/kernel, multi-sketch, AI, and final full-regression requirements recorded in status/traceability.
+
+Evidence: `sketchmath/features/golden_mounting_plate.py`, `sketchmath/cad/freecad_feature_graph.py`, `tests/test_sketchmath_golden_mounting_plate.py`, `frontend/e2e/sketchmath.spec.ts`; checkpoints `5973c89`, `3e309de`, `d74a10f`, and `f445b0c`.

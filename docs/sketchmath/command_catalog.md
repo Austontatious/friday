@@ -314,7 +314,7 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 
 The default-off document-v1 path is separate from the legacy `extrude_profile` preview/export command. It persists typed feature parameters and deterministic rebuild evidence without invoking FreeCAD or writing an artifact.
 
-Feature operations use schema version `1.0`, an operation ID, an exact `base_revision`, preview/commit mode, an operation type, an optional target ID, and typed parameters. Supported operations are add, replace, delete, suppress/unsuppress, and preview-only rebuild. Stale revisions return `revision_conflict`; rebuild failures return `feature_rebuild_error` with the full per-feature report.
+Feature operations accept schema versions `1.0` and `1.1`, an operation ID, an exact `base_revision`, preview/commit mode, an operation type, an optional target ID, and typed parameters. Version `1.1` adds `set_design_parameter`; existing add, replace, delete, suppress/unsuppress, and preview-only rebuild operations remain compatible. Stale revisions return `revision_conflict`; rebuild failures return `feature_rebuild_error` with the full per-feature report.
 
 ```json
 {
@@ -346,6 +346,8 @@ Feature operations use schema version `1.0`, an operation ID, an exact `base_rev
 ```
 
 Feature replacement sends the complete feature with the same immutable `feature_id` and names that ID in `target_id`. See `feature_history_contract.md` for rebuild, persistence, and undo/redo semantics.
+
+Design-parameter edits require version `1.1`, name the immutable parameter ID in `target_id`, and send a finite numeric `parameters.value`. Bindings are canonical document state; a commit applies them atomically to their supported sketch entities/features, validates bounds, rebuilds downstream history, and refuses missing, invalid, or bound-deletion targets structurally.
 
 ## Validation Errors
 

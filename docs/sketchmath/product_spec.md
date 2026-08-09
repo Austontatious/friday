@@ -144,7 +144,7 @@ The normative full-product scenarios are:
 
 Detailed scenario traceability and current evidence live in `docs/sketchmath/traceability.md`.
 
-Acceptance scenario 1 is partially represented by `golden_mounting_plate_v1.md`: the exact eight-feature 80 × 50 release geometry, edge-offset holes, analytic circular boss, cumulative through-hole, semantic fillets, canonical width/diameter intent edits, reload-safe identities, and revision-bound native STEP validation pass. AI construction and the combined browser width/diameter undo-redo/reload/post-edit-STEP sequence remain open, so this is not a release verdict.
+Acceptance scenario 1 now passes for the manual/canonical golden workflow documented by `golden_mounting_plate_v1.md`: exact eight-feature 80 × 50 geometry, edge-offset holes, analytic circular boss, cumulative through-hole, semantic fillets, browser-driven width/diameter intent edits, undo/redo/reload, and revision-bound post-edit native STEP validation. AI construction remains open, so this is not the full-product release verdict.
 
 ## Phase Gates
 

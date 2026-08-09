@@ -9,7 +9,7 @@ Gate: `SM-FEAT-001` and the documented generated-reference subset pass; `SM-FEAT
 ## Baseline
 
 - Audited checkout: `21b8153`
-- Latest SketchMath product code commit: `3e309de`
+- Latest SketchMath product code commits: `d74a10f`, `f445b0c`
 - Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
@@ -212,7 +212,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Close the golden parameter-edit workflow next: typed 80→100 width edit, Ø5→Ø6 four-hole edit, undo/redo/reload, then native STEP validation of the edited revision through browser-visible history and artifact state.
+Close the remaining feature-property editing envelope next: edit existing hole diameter/depth/type and full-revolve angle/axis through typed replacement operations, then prove the supported changes through undo/redo/reload. Follow with the remaining bounded revolve/kernel and release-regression gaps.
 
 ## Release Status
 

@@ -19,12 +19,13 @@ Both default to off. The existing `FRIDAY_SKETCHMATH_ENABLED` and `REACT_APP_SKE
 
 ## Canonical State
 
-`SketchMathDocument` schema version `1.0` owns:
+`SketchMathDocument` schema version `1.1` owns:
 
 - immutable document, body, sketch, feature, and artifact IDs;
 - a monotonic document revision;
 - body-to-sketch and body-to-feature membership;
 - one or more typed features with explicit dependencies;
+- typed design parameters with bounded affine bindings to supported sketch entities and feature properties;
 - provenance and revision-associated artifact records;
 - the last deterministic rebuild report.
 
@@ -32,15 +33,16 @@ The current compatibility adapter wraps one legacy `SelectionContext` as `body_m
 
 ## Feature Operations
 
-`FeatureCommand` schema version `1.0` supports:
+`FeatureCommand` accepts versions `1.0` and `1.1`. Version `1.1` adds the design-parameter operation while retaining:
 
 - `add_feature`
 - `replace_feature`
 - `delete_feature`
 - `set_feature_suppressed`
+- `set_design_parameter` (`1.1` only)
 - preview-only `rebuild`
 
-Every operation carries `base_revision`. A stale write fails with `revision_conflict` before mutation. Replacement cannot change the feature ID. Delete refuses a feature referenced by downstream dependencies. Successful committed operations increment the document revision and persist a before/after feature-history record.
+Every operation carries `base_revision`. A stale write fails with `revision_conflict` before mutation. Replacement cannot change the feature ID. Delete refuses a feature referenced by downstream dependencies or a design-parameter binding. A parameter commit validates finite bounds and binding targets, mutates a deep candidate, synchronizes the primary sketch/session state, and accepts only a successful downstream rebuild. Successful committed operations increment the document revision and persist a before/after feature-history record.
 
 The API surface is:
 
@@ -81,14 +83,15 @@ Preview is side-effect free. Feature commits, rebuild, undo, redo, and reload ne
 When the frontend flag is enabled, the workspace shows Feature history with:
 
 - current document revision and rebuild status;
+- bounded user-facing design-parameter editors without raw binding IDs;
 - a minimum model tree for canonical body, sketch, and typed feature nodes, with selection, bounded properties, and immutable-ID feature rename;
 - selected-profile extrusion creation;
 - stable feature IDs, build status, measurements, and shortened output signatures;
 - in-place extrusion-depth replacement;
 - numeric simple-hole placement with through/blind termination against the current semantic top face;
 - default-off new-body full-revolve creation from a selected closed profile and chosen construction-line axis;
-- default-off outer-vertical-edge fillet creation, radius replacement, kernel STEP build, and download for the supported two-feature graph;
-- default-off outer-vertical-edge chamfer creation, distance replacement, kernel STEP build, and download for its supported two-feature graph;
+- default-off outer-vertical-edge fillet creation, radius replacement, kernel STEP build, and download for the supported bounded vertical feature graph;
+- default-off outer-vertical-edge chamfer creation, distance replacement, kernel STEP build, and download for its supported bounded vertical feature graph;
 - dedicated feature undo and redo.
 
 Normal-mode tree labels use names and feature types rather than raw body/sketch/feature/profile/axis IDs. Persisted body/sketch visibility is shown read-only until renderer behavior supports a truthful mutation control. See `model_tree_contract.md`.
@@ -99,8 +102,9 @@ A revision conflict refreshes the backend-authoritative session before the user 
 
 - Unit/kernel coverage proves the prior envelope plus stable vertical-edge identities, fillet/chamfer recovery/refusal, unique semantic-to-FreeCAD edge resolution, expected rounded/beveled box volumes, bounds/solid validity, and resumable STEP registration.
 - API coverage proves default-off document/hole/revolve/fillet/chamfer gating, preview/commit isolation, disk rehydration, conflict status, geometry/document synchronization, reference recovery, and monotonic feature undo/redo.
-- Frontend type-check and all 69 unit tests pass. Targeted Playwright proves model-tree selection/rename/reload plus fillet and chamfer create/edit, kernel STEP polling/download, artifact metadata, and reload.
+- Frontend type-check and the 44 focused workspace tests pass. Targeted Playwright proves model-tree selection/rename/reload plus fillet and chamfer create/edit, kernel STEP polling/download, artifact metadata, and reload.
 - A live Playwright workflow creates a rectangle feature, edits depth, observes a changed signature with a stable ID, performs feature undo/redo, reloads, creates a typed through hole, recovers its reference after another base edit, builds/downloads a terminal graph STL, and accepts no console/page errors.
+- The golden browser workflow commits 80→100 mm width and Ø5→Ø6 four-hole design parameters, preserves offsets/centering and stable IDs, performs undo/redo/reload, then builds and downloads a revision-12 native STEP with exact supported topology and no browser errors.
 
 ## Open Boundaries
 

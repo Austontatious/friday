@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-08-09 - SketchMath Golden Parametric Edit Acceptance
+
+### What Changed
+- Added document/feature-command schema `1.1` design parameters with bounded affine bindings, atomic typed commits, downstream rebuild, protected bound targets, and synchronized sketch/session state.
+- Bound the golden plate width and four-hole diameter to stable canonical sketch/feature identities; removed false fixture topology-region references that caused Normal-mode 409 responses.
+- Added user-facing parameter editors and widened terminal fillet/chamfer STEP eligibility to the already-supported positive extrusion/simple-hole graph.
+- Added browser acceptance for 80→100 mm, Ø5→Ø6, undo/redo/reload, revision-12 STEP generation/download, and deterministic kernel geometry validation.
+
+### Why
+- The release sheet's centerpiece workflow required the edit intent to be a real persisted operation, not a Python fixture helper.
+- Feature undo previously restored feature records but not parameter-bound sketch geometry; this made the interrupted slice incomplete.
+
+### New Env Flags
+- None. The existing default-off document-v1, feature-history, fillet, and artifact-job flags gate the workflow.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py`
+- `python3 -m sketchmath.evals.run_sketchmath_evals`
+- `python3 -m sketchmath.schemas.generate --check`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm test -- --runInBand --watchAll=false src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npx playwright test e2e/sketchmath.spec.ts --grep "golden mounting plate"`
+
+### Evidence
+- Code checkpoints: `d74a10f`, `f445b0c`.
+- Native widened STEP: supported bounds `(0,100,0,50,0,13)`, five holes, four Ø6 corner holes, Ø30 boss, four 2 mm fillets, and volume `24920 + 1315π mm³` within `1e-5`.
+
+---
+
 ## 2026-08-09 - SketchMath Release-Spec Golden Mounting Plate STEP
 
 ### What Changed
