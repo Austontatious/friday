@@ -1,0 +1,2562 @@
+{
+  "$defs": {
+    "AngleConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "angle": {
+          "title": "Angle",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "angle_constraint",
+          "default": "angle_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "deg",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points",
+        "angle"
+      ],
+      "title": "AngleConstraint",
+      "type": "object"
+    },
+    "Arc2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "center": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center",
+          "type": "array"
+        },
+        "center_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Center Point Id"
+        },
+        "construction": {
+          "enum": [
+            "center",
+            "three_point"
+          ],
+          "title": "Construction",
+          "type": "string"
+        },
+        "end_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Point Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "radius": {
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "start_angle_deg": {
+          "title": "Start Angle Deg",
+          "type": "number"
+        },
+        "start_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Point Id"
+        },
+        "sweep_angle_deg": {
+          "title": "Sweep Angle Deg",
+          "type": "number"
+        },
+        "through_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Through Point Id"
+        },
+        "type": {
+          "const": "arc_2d",
+          "default": "arc_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "center",
+        "radius",
+        "start_angle_deg",
+        "sweep_angle_deg",
+        "construction"
+      ],
+      "title": "Arc2DEntity",
+      "type": "object"
+    },
+    "ArtifactRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "feature_id": {
+          "title": "Feature Id",
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "step",
+            "stl"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "feature_id",
+        "revision",
+        "format",
+        "path",
+        "content_hash"
+      ],
+      "title": "ArtifactRecord",
+      "type": "object"
+    },
+    "Axis2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Direction",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Origin",
+          "type": "array"
+        },
+        "type": {
+          "const": "axis_2d",
+          "default": "axis_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "origin",
+        "direction"
+      ],
+      "title": "Axis2DEntity",
+      "type": "object"
+    },
+    "BodyRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "body_id": {
+          "title": "Body Id",
+          "type": "string"
+        },
+        "feature_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Feature Ids",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "sketch_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sketch Ids",
+          "type": "array"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "body_id",
+        "name"
+      ],
+      "title": "BodyRecord",
+      "type": "object"
+    },
+    "Circle2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "center": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center",
+          "type": "array"
+        },
+        "center_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Center Point Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "radius": {
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "type": {
+          "const": "circle_2d",
+          "default": "circle_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "center",
+        "radius"
+      ],
+      "title": "Circle2DEntity",
+      "type": "object"
+    },
+    "CoincidentConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "coincident_constraint",
+          "default": "coincident_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "CoincidentConstraint",
+      "type": "object"
+    },
+    "CollinearConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "collinear_constraint",
+          "default": "collinear_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "CollinearConstraint",
+      "type": "object"
+    },
+    "ConcentricConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Entities",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "concentric_constraint",
+          "default": "concentric_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "entities"
+      ],
+      "title": "ConcentricConstraint",
+      "type": "object"
+    },
+    "ConstructionLine2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "End",
+          "type": "array"
+        },
+        "end_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Point Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "start": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Start",
+          "type": "array"
+        },
+        "start_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Point Id"
+        },
+        "type": {
+          "const": "construction_line_2d",
+          "default": "construction_line_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end"
+      ],
+      "title": "ConstructionLine2DEntity",
+      "type": "object"
+    },
+    "DiameterConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "circle_id": {
+          "title": "Circle Id",
+          "type": "string"
+        },
+        "diameter": {
+          "exclusiveMinimum": 0,
+          "title": "Diameter",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "diameter_constraint",
+          "default": "diameter_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "circle_id",
+        "diameter"
+      ],
+      "title": "DiameterConstraint",
+      "type": "object"
+    },
+    "DistanceConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "default": "midpoint",
+          "enum": [
+            "point_a",
+            "point_b",
+            "midpoint"
+          ],
+          "title": "Anchor",
+          "type": "string"
+        },
+        "distance": {
+          "title": "Distance",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "distance_constraint",
+          "default": "distance_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points",
+        "distance"
+      ],
+      "title": "DistanceConstraint",
+      "type": "object"
+    },
+    "EqualAngleConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 6,
+          "minItems": 6,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "equal_angle_constraint",
+          "default": "equal_angle_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "EqualAngleConstraint",
+      "type": "object"
+    },
+    "EqualLengthConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "equal_length_constraint",
+          "default": "equal_length_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "EqualLengthConstraint",
+      "type": "object"
+    },
+    "ExtrudeParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "depth_mm": {
+          "exclusiveMinimum": 0,
+          "title": "Depth Mm",
+          "type": "number"
+        },
+        "direction": {
+          "default": "positive",
+          "enum": [
+            "positive",
+            "negative"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "extent": {
+          "default": "one_sided",
+          "enum": [
+            "one_sided",
+            "symmetric",
+            "two_sided"
+          ],
+          "title": "Extent",
+          "type": "string"
+        },
+        "operation": {
+          "default": "new_body",
+          "enum": [
+            "new_body",
+            "add",
+            "cut"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "second_depth_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Second Depth Mm"
+        }
+      },
+      "required": [
+        "depth_mm"
+      ],
+      "title": "ExtrudeParameters",
+      "type": "object"
+    },
+    "FeatureBuildError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "additionalProperties": true,
+          "title": "Detail",
+          "type": "object"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "FeatureBuildError",
+      "type": "object"
+    },
+    "FeatureBuildRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FeatureBuildError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "feature_id": {
+          "title": "Feature Id",
+          "type": "string"
+        },
+        "input_hash": {
+          "title": "Input Hash",
+          "type": "string"
+        },
+        "measurements": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FeatureMeasurements"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "order": {
+          "title": "Order",
+          "type": "integer"
+        },
+        "output_signature": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Signature"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "suppressed",
+            "failed",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "feature_id",
+        "order",
+        "status",
+        "input_hash"
+      ],
+      "title": "FeatureBuildRecord",
+      "type": "object"
+    },
+    "FeatureCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "base_revision": {
+          "minimum": 0,
+          "title": "Base Revision",
+          "type": "integer"
+        },
+        "mode": {
+          "default": "preview",
+          "enum": [
+            "preview",
+            "commit"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "operation_type": {
+          "enum": [
+            "add_feature",
+            "replace_feature",
+            "delete_feature",
+            "set_feature_suppressed",
+            "rebuild"
+          ],
+          "title": "Operation Type",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Id"
+        },
+        "version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "base_revision",
+        "operation_type"
+      ],
+      "title": "FeatureCommand",
+      "type": "object"
+    },
+    "FeatureMeasurements": {
+      "additionalProperties": false,
+      "properties": {
+        "bounds_mm": {
+          "maxItems": 6,
+          "minItems": 6,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Bounds Mm",
+          "type": "array"
+        },
+        "hole_count": {
+          "title": "Hole Count",
+          "type": "integer"
+        },
+        "net_profile_area_mm2": {
+          "title": "Net Profile Area Mm2",
+          "type": "number"
+        },
+        "volume_delta_mm3": {
+          "title": "Volume Delta Mm3",
+          "type": "number"
+        }
+      },
+      "required": [
+        "net_profile_area_mm2",
+        "volume_delta_mm3",
+        "bounds_mm",
+        "hole_count"
+      ],
+      "title": "FeatureMeasurements",
+      "type": "object"
+    },
+    "FeatureRebuildReport": {
+      "additionalProperties": false,
+      "properties": {
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "document_id": {
+          "title": "Document Id",
+          "type": "string"
+        },
+        "input_revision": {
+          "title": "Input Revision",
+          "type": "integer"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "rebuild_order": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rebuild Order",
+          "type": "array"
+        },
+        "records": {
+          "items": {
+            "$ref": "#/$defs/FeatureBuildRecord"
+          },
+          "title": "Records",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_id",
+        "input_revision",
+        "ok",
+        "content_hash"
+      ],
+      "title": "FeatureRebuildReport",
+      "type": "object"
+    },
+    "FeatureRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "body_id": {
+          "title": "Body Id",
+          "type": "string"
+        },
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "feature_id": {
+          "title": "Feature Id",
+          "type": "string"
+        },
+        "feature_type": {
+          "const": "extrude",
+          "default": "extrude",
+          "title": "Feature Type",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "$ref": "#/$defs/ExtrudeParameters"
+        },
+        "profile_id": {
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "sketch_id": {
+          "title": "Sketch Id",
+          "type": "string"
+        },
+        "source_region_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Region Id"
+        },
+        "suppressed": {
+          "default": false,
+          "title": "Suppressed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "feature_id",
+        "name",
+        "body_id",
+        "sketch_id",
+        "profile_id",
+        "parameters"
+      ],
+      "title": "FeatureRecord",
+      "type": "object"
+    },
+    "FixedPointConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "coords": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coords",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "point_id": {
+          "title": "Point Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "fixed_point_constraint",
+          "default": "fixed_point_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "point_id",
+        "coords"
+      ],
+      "title": "FixedPointConstraint",
+      "type": "object"
+    },
+    "HorizontalConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "horizontal_constraint",
+          "default": "horizontal_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "HorizontalConstraint",
+      "type": "object"
+    },
+    "HorizontalDistanceConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "default": "midpoint",
+          "enum": [
+            "point_a",
+            "point_b",
+            "midpoint"
+          ],
+          "title": "Anchor",
+          "type": "string"
+        },
+        "direction": {
+          "default": 1,
+          "enum": [
+            -1,
+            1
+          ],
+          "title": "Direction",
+          "type": "integer"
+        },
+        "distance": {
+          "exclusiveMinimum": 0,
+          "title": "Distance",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "horizontal_distance_constraint",
+          "default": "horizontal_distance_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points",
+        "distance"
+      ],
+      "title": "HorizontalDistanceConstraint",
+      "type": "object"
+    },
+    "Line2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "End",
+          "type": "array"
+        },
+        "end_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Point Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "start": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Start",
+          "type": "array"
+        },
+        "start_point_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Point Id"
+        },
+        "type": {
+          "const": "line_2d",
+          "default": "line_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end"
+      ],
+      "title": "Line2DEntity",
+      "type": "object"
+    },
+    "MidpointConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "line_points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Line Points",
+          "type": "array"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "point_id": {
+          "title": "Point Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "midpoint_constraint",
+          "default": "midpoint_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "point_id",
+        "line_points"
+      ],
+      "title": "MidpointConstraint",
+      "type": "object"
+    },
+    "ParallelConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "parallel_constraint",
+          "default": "parallel_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "ParallelConstraint",
+      "type": "object"
+    },
+    "PerpendicularConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "perpendicular_constraint",
+          "default": "perpendicular_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "PerpendicularConstraint",
+      "type": "object"
+    },
+    "Point2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "construction": {
+          "default": false,
+          "title": "Construction",
+          "type": "boolean"
+        },
+        "coords": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coords",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "point_2d",
+          "default": "point_2d",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "coords"
+      ],
+      "title": "Point2DEntity",
+      "type": "object"
+    },
+    "Profile2DEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "title": "Area",
+          "type": "number"
+        },
+        "closed": {
+          "default": true,
+          "title": "Closed",
+          "type": "boolean"
+        },
+        "holes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Holes",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "source_circle_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Circle Id"
+        },
+        "source_curve_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Curve Ids",
+          "type": "array"
+        },
+        "source_line_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Line Ids",
+          "type": "array"
+        },
+        "source_region_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Region Id"
+        },
+        "type": {
+          "const": "profile_2d",
+          "default": "profile_2d",
+          "title": "Type",
+          "type": "string"
+        },
+        "vertices": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Vertices",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "winding": {
+          "enum": [
+            "clockwise",
+            "counterclockwise",
+            "degenerate"
+          ],
+          "title": "Winding",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "vertices",
+        "area",
+        "winding"
+      ],
+      "title": "Profile2DEntity",
+      "type": "object"
+    },
+    "RadiusConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "circle_id": {
+          "title": "Circle Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "radius": {
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "type": {
+          "const": "radius_constraint",
+          "default": "radius_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "circle_id",
+        "radius"
+      ],
+      "title": "RadiusConstraint",
+      "type": "object"
+    },
+    "SelectionContext": {
+      "additionalProperties": false,
+      "properties": {
+        "constraints": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "angle_constraint": "#/$defs/AngleConstraint",
+                "coincident_constraint": "#/$defs/CoincidentConstraint",
+                "collinear_constraint": "#/$defs/CollinearConstraint",
+                "concentric_constraint": "#/$defs/ConcentricConstraint",
+                "diameter_constraint": "#/$defs/DiameterConstraint",
+                "distance_constraint": "#/$defs/DistanceConstraint",
+                "equal_angle_constraint": "#/$defs/EqualAngleConstraint",
+                "equal_length_constraint": "#/$defs/EqualLengthConstraint",
+                "fixed_point_constraint": "#/$defs/FixedPointConstraint",
+                "horizontal_constraint": "#/$defs/HorizontalConstraint",
+                "horizontal_distance_constraint": "#/$defs/HorizontalDistanceConstraint",
+                "midpoint_constraint": "#/$defs/MidpointConstraint",
+                "parallel_constraint": "#/$defs/ParallelConstraint",
+                "perpendicular_constraint": "#/$defs/PerpendicularConstraint",
+                "radius_constraint": "#/$defs/RadiusConstraint",
+                "symmetric_constraint": "#/$defs/SymmetricConstraint",
+                "tangent_constraint": "#/$defs/TangentConstraint",
+                "vertical_constraint": "#/$defs/VerticalConstraint",
+                "vertical_distance_constraint": "#/$defs/VerticalDistanceConstraint"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/FixedPointConstraint"
+              },
+              {
+                "$ref": "#/$defs/DistanceConstraint"
+              },
+              {
+                "$ref": "#/$defs/HorizontalDistanceConstraint"
+              },
+              {
+                "$ref": "#/$defs/VerticalDistanceConstraint"
+              },
+              {
+                "$ref": "#/$defs/RadiusConstraint"
+              },
+              {
+                "$ref": "#/$defs/DiameterConstraint"
+              },
+              {
+                "$ref": "#/$defs/AngleConstraint"
+              },
+              {
+                "$ref": "#/$defs/ParallelConstraint"
+              },
+              {
+                "$ref": "#/$defs/PerpendicularConstraint"
+              },
+              {
+                "$ref": "#/$defs/EqualLengthConstraint"
+              },
+              {
+                "$ref": "#/$defs/EqualAngleConstraint"
+              },
+              {
+                "$ref": "#/$defs/HorizontalConstraint"
+              },
+              {
+                "$ref": "#/$defs/VerticalConstraint"
+              },
+              {
+                "$ref": "#/$defs/CoincidentConstraint"
+              },
+              {
+                "$ref": "#/$defs/MidpointConstraint"
+              },
+              {
+                "$ref": "#/$defs/CollinearConstraint"
+              },
+              {
+                "$ref": "#/$defs/SymmetricConstraint"
+              },
+              {
+                "$ref": "#/$defs/ConcentricConstraint"
+              },
+              {
+                "$ref": "#/$defs/TangentConstraint"
+              }
+            ]
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "frame": {
+          "const": "canvas_2d",
+          "default": "canvas_2d",
+          "title": "Frame",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "arc_2d": "#/$defs/Arc2DEntity",
+                "axis_2d": "#/$defs/Axis2DEntity",
+                "circle_2d": "#/$defs/Circle2DEntity",
+                "construction_line_2d": "#/$defs/ConstructionLine2DEntity",
+                "line_2d": "#/$defs/Line2DEntity",
+                "point_2d": "#/$defs/Point2DEntity",
+                "profile_2d": "#/$defs/Profile2DEntity"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Point2DEntity"
+              },
+              {
+                "$ref": "#/$defs/Line2DEntity"
+              },
+              {
+                "$ref": "#/$defs/Axis2DEntity"
+              },
+              {
+                "$ref": "#/$defs/ConstructionLine2DEntity"
+              },
+              {
+                "$ref": "#/$defs/Circle2DEntity"
+              },
+              {
+                "$ref": "#/$defs/Arc2DEntity"
+              },
+              {
+                "$ref": "#/$defs/Profile2DEntity"
+              }
+            ]
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "named_references": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Named References",
+          "type": "object"
+        },
+        "selection_set_id": {
+          "title": "Selection Set Id",
+          "type": "string"
+        },
+        "units": {
+          "title": "Units",
+          "type": "string"
+        }
+      },
+      "required": [
+        "selection_set_id",
+        "units"
+      ],
+      "title": "SelectionContext",
+      "type": "object"
+    },
+    "SketchMathDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/ArtifactRecord"
+          },
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "bodies": {
+          "items": {
+            "$ref": "#/$defs/BodyRecord"
+          },
+          "title": "Bodies",
+          "type": "array"
+        },
+        "document_id": {
+          "title": "Document Id",
+          "type": "string"
+        },
+        "features": {
+          "items": {
+            "$ref": "#/$defs/FeatureRecord"
+          },
+          "title": "Features",
+          "type": "array"
+        },
+        "last_rebuild": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FeatureRebuildReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "default": "SketchMath document",
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "additionalProperties": true,
+          "title": "Provenance",
+          "type": "object"
+        },
+        "revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "sketches": {
+          "items": {
+            "$ref": "#/$defs/SketchRecord"
+          },
+          "title": "Sketches",
+          "type": "array"
+        },
+        "units": {
+          "default": "mm",
+          "title": "Units",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_id"
+      ],
+      "title": "SketchMathDocument",
+      "type": "object"
+    },
+    "SketchRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "plane": {
+          "default": "xy",
+          "enum": [
+            "xy",
+            "xz",
+            "yz"
+          ],
+          "title": "Plane",
+          "type": "string"
+        },
+        "sketch_id": {
+          "title": "Sketch Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SelectionContext"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sketch_id",
+        "name",
+        "state"
+      ],
+      "title": "SketchRecord",
+      "type": "object"
+    },
+    "SymmetricConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "symmetric_constraint",
+          "default": "symmetric_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "SymmetricConstraint",
+      "type": "object"
+    },
+    "TangentConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "entities": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Entities",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "tangency": {
+          "default": "external",
+          "enum": [
+            "external",
+            "internal"
+          ],
+          "title": "Tangency",
+          "type": "string"
+        },
+        "type": {
+          "const": "tangent_constraint",
+          "default": "tangent_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "entities"
+      ],
+      "title": "TangentConstraint",
+      "type": "object"
+    },
+    "VerticalConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "vertical_constraint",
+          "default": "vertical_constraint",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "title": "VerticalConstraint",
+      "type": "object"
+    },
+    "VerticalDistanceConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "default": "midpoint",
+          "enum": [
+            "point_a",
+            "point_b",
+            "midpoint"
+          ],
+          "title": "Anchor",
+          "type": "string"
+        },
+        "direction": {
+          "default": 1,
+          "enum": [
+            -1,
+            1
+          ],
+          "title": "Direction",
+          "type": "integer"
+        },
+        "distance": {
+          "exclusiveMinimum": 0,
+          "title": "Distance",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "points": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Points",
+          "type": "array"
+        },
+        "type": {
+          "const": "vertical_distance_constraint",
+          "default": "vertical_distance_constraint",
+          "title": "Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "points",
+        "distance"
+      ],
+      "title": "VerticalDistanceConstraint",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "after": {
+      "$ref": "#/$defs/SketchMathDocument"
+    },
+    "before": {
+      "$ref": "#/$defs/SketchMathDocument"
+    },
+    "changed_feature_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Changed Feature Ids",
+      "type": "array"
+    },
+    "command": {
+      "$ref": "#/$defs/FeatureCommand"
+    },
+    "rebuild": {
+      "$ref": "#/$defs/FeatureRebuildReport"
+    },
+    "status": {
+      "enum": [
+        "preview",
+        "committed"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "command",
+    "status",
+    "before",
+    "after",
+    "rebuild"
+  ],
+  "title": "FeatureOperationResult",
+  "type": "object"
+}

@@ -70,3 +70,11 @@ class SolverError(SketchMathError):
 
 class ClarificationRequiredError(SketchMathError):
     code = "clarification_required"
+
+
+class RevisionConflictError(SketchMathError):
+    code = "revision_conflict"
+
+
+class FeatureRebuildError(SketchMathError):
+    code = "feature_rebuild_error"

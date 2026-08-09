@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_revision": {
+      "minimum": 0,
+      "title": "Base Revision",
+      "type": "integer"
+    },
+    "mode": {
+      "default": "preview",
+      "enum": [
+        "preview",
+        "commit"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "operation_id": {
+      "title": "Operation Id",
+      "type": "string"
+    },
+    "operation_type": {
+      "enum": [
+        "add_feature",
+        "replace_feature",
+        "delete_feature",
+        "set_feature_suppressed",
+        "rebuild"
+      ],
+      "title": "Operation Type",
+      "type": "string"
+    },
+    "parameters": {
+      "additionalProperties": true,
+      "title": "Parameters",
+      "type": "object"
+    },
+    "target_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Id"
+    },
+    "version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "operation_id",
+    "base_revision",
+    "operation_type"
+  ],
+  "title": "FeatureCommand",
+  "type": "object"
+}

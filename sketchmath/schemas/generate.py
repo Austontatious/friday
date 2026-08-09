@@ -7,6 +7,8 @@ from typing import TypeAlias
 
 from pydantic import BaseModel
 
+from sketchmath.models.document import FeatureRebuildReport, SketchMathDocument
+from sketchmath.models.feature_command import FeatureCommand, FeatureOperationResult
 from sketchmath.models.geometry_command import GeometryCommand
 from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
@@ -16,11 +18,15 @@ from sketchmath.models.solver_run_result import SolverRunResult
 
 SchemaModel: TypeAlias = type[BaseModel]
 SCHEMA_MODELS: dict[str, SchemaModel] = {
+    "feature_command.schema.json": FeatureCommand,
+    "feature_operation_result.schema.json": FeatureOperationResult,
+    "feature_rebuild_report.schema.json": FeatureRebuildReport,
     "geometry_command.schema.json": GeometryCommand,
     "selection_context.schema.json": SelectionContext,
     "operation_result.schema.json": OperationResult,
     "solver_analysis.schema.json": SolverAnalysis,
     "solver_run_result.schema.json": SolverRunResult,
+    "sketchmath_document.schema.json": SketchMathDocument,
 }
 SCHEMA_ROOT = Path(__file__).resolve().parent
 
