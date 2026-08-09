@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from sketchmath.cad.adapter import CadAdapter
+from sketchmath.cad.feature_mesh import build_feature_body_mesh
 from sketchmath.cad.preview_mesh import build_preview_mesh
 from sketchmath.cad.solid_validation import validate_solid_measurements
 from sketchmath.cad.stl_export import write_ascii_stl
@@ -49,31 +50,6 @@ def _validated_feature(document: SketchMathDocument, feature_id: str) -> tuple[F
         )
     if feature.suppressed:
         raise CadExportError("Suppressed feature cannot produce an artifact", detail={"feature_id": feature_id})
-    if feature.feature_type != "extrude":
-        raise CadExportError(
-            "Canonical artifact materialization currently supports extrusion features",
-            detail={"feature_id": feature_id, "feature_type": feature.feature_type, "error_code": "unsupported_artifact_feature_type"},
-        )
-    if feature.parameters.operation != "new_body" or feature.dependencies:
-        raise CadExportError(
-            "Canonical artifact materialization currently requires one independent new-body extrusion",
-            detail={
-                "feature_id": feature_id,
-                "operation": feature.parameters.operation,
-                "dependency_ids": feature.dependencies,
-                "error_code": "unsupported_feature_graph_for_artifact",
-            },
-        )
-    if feature.parameters.extent != "one_sided" or feature.parameters.direction != "positive":
-        raise CadExportError(
-            "Canonical artifact materialization currently supports positive one-sided extrusion",
-            detail={
-                "feature_id": feature_id,
-                "extent": feature.parameters.extent,
-                "direction": feature.parameters.direction,
-                "error_code": "unsupported_extrusion_extent_for_artifact",
-            },
-        )
     return feature, record.measurements.model_dump(mode="json")
 
 
@@ -99,8 +75,7 @@ def materialize_feature_artifact(
             "Canonical feature artifacts support STEP and STL",
             detail={"format": artifact_format},
         )
-    feature, expected = _validated_feature(document, feature_id)
-    profile, holes = _source_geometry(document, feature)
+    feature, _ = _validated_feature(document, feature_id)
     feature_root = (
         output_root.resolve()
         / _safe_segment(document.document_id)
@@ -110,10 +85,11 @@ def materialize_feature_artifact(
     feature_root.mkdir(parents=True, exist_ok=True)
 
     if normalized_format == "stl":
-        mesh = build_preview_mesh(profile, holes=holes, depth=feature.parameters.depth_mm, depth_unit=document.units)
+        mesh = build_feature_body_mesh(document, feature.feature_id)
         path = feature_root / f"{_safe_segment(document.document_id)}_{_safe_segment(feature.feature_id)}_r{document.revision}.stl"
         measurements = write_ascii_stl(mesh, path, solid_name=_safe_segment(feature.feature_id))
-        bounds = expected["bounds_mm"]
+        bounds = mesh["metadata"]["expected_bounds_mm"]
+        expected_volume = float(mesh["metadata"]["expected_volume_mm3"])
         validation = validate_solid_measurements(
             actual_bbox=measurements["bbox"],
             actual_volume_mm3=measurements["volume_mm3"],
@@ -126,7 +102,8 @@ def materialize_feature_artifact(
                 "zmin": bounds[4],
                 "zmax": bounds[5],
             },
-            expected_volume_mm3=abs(expected["volume_delta_mm3"]),
+            expected_volume_mm3=expected_volume,
+            volume_tolerance_mm3=max(1e-4, abs(expected_volume) * 1e-5),
         )
         if not validation.ok:
             path.unlink(missing_ok=True)
@@ -134,7 +111,41 @@ def materialize_feature_artifact(
                 validation.message or "STL validation failed",
                 detail={"error_code": validation.error_code, **validation.details, **validation.measurements},
             )
+        measurements.update(
+            {
+                "analytic_volume_mm3": expected_volume,
+                "volume_error_mm3": measurements["volume_mm3"] - expected_volume,
+                "feature_ids": mesh["metadata"]["feature_ids"],
+                "layer_count": mesh["metadata"]["layer_count"],
+            }
+        )
     else:
+        if feature.feature_type != "extrude":
+            raise CadExportError(
+                "Canonical STEP materialization currently supports extrusion features",
+                detail={"feature_id": feature_id, "feature_type": feature.feature_type, "error_code": "unsupported_artifact_feature_type"},
+            )
+        if feature.parameters.operation != "new_body" or feature.dependencies:
+            raise CadExportError(
+                "Canonical STEP materialization currently requires one independent new-body extrusion",
+                detail={
+                    "feature_id": feature_id,
+                    "operation": feature.parameters.operation,
+                    "dependency_ids": feature.dependencies,
+                    "error_code": "unsupported_feature_graph_for_artifact",
+                },
+            )
+        if feature.parameters.extent != "one_sided" or feature.parameters.direction != "positive":
+            raise CadExportError(
+                "Canonical STEP materialization currently supports positive one-sided extrusion",
+                detail={
+                    "feature_id": feature_id,
+                    "extent": feature.parameters.extent,
+                    "direction": feature.parameters.direction,
+                    "error_code": "unsupported_extrusion_extent_for_artifact",
+                },
+            )
+        profile, holes = _source_geometry(document, feature)
         adapter = cad_adapter or CadAdapter(export_dir=feature_root)
         result = adapter.extrude_profile(
             profile,

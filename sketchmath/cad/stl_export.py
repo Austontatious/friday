@@ -58,8 +58,13 @@ def mesh_measurements(mesh: dict[str, Any]) -> dict[str, Any]:
     ys = [float(vertex[1]) for vertex in vertices]
     zs = [float(vertex[2]) for vertex in vertices]
     signed_volume = 0.0
+    edge_counts: dict[tuple[int, int], int] = {}
     for triangle in triangles:
-        a, b, c = (vertices[int(index)] for index in triangle["indices"])
+        indices = tuple(int(index) for index in triangle["indices"])
+        a, b, c = (vertices[index] for index in indices)
+        for start, end in ((indices[0], indices[1]), (indices[1], indices[2]), (indices[2], indices[0])):
+            edge = (min(start, end), max(start, end))
+            edge_counts[edge] = edge_counts.get(edge, 0) + 1
         signed_volume += (
             float(a[0]) * (float(b[1]) * float(c[2]) - float(b[2]) * float(c[1]))
             - float(a[1]) * (float(b[0]) * float(c[2]) - float(b[2]) * float(c[0]))
@@ -77,7 +82,8 @@ def mesh_measurements(mesh: dict[str, Any]) -> dict[str, Any]:
         "volume_mm3": round(abs(signed_volume), 9),
         "triangle_count": len(triangles),
         "vertex_count": len(vertices),
-        "is_closed_mesh": True,
+        "is_closed_mesh": bool(edge_counts) and all(count == 2 for count in edge_counts.values()),
+        "nonmanifold_edge_count": sum(1 for count in edge_counts.values() if count != 2),
     }
 
 
