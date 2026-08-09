@@ -866,6 +866,35 @@ def test_sketchmath_fillet_features_default_off_and_gate_feature_route(monkeypat
     client.close()
 
 
+def test_sketchmath_chamfer_features_default_off_and_gate_feature_route(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.delenv("FRIDAY_SKETCHMATH_CHAMFER_FEATURES_ENABLED", raising=False)
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={})
+    chamfer = {
+        "feature_id": "feature_gated_chamfer",
+        "feature_type": "chamfer",
+        "name": "Gated chamfer",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": None,
+        "dependencies": ["feature_missing"],
+        "topology_references": [],
+        "parameters": {"distance_mm": 2, "operation": "modify"},
+    }
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{created.json()['session_id']}/features/preview",
+        json={"command": _feature_command("add_feature", "gated_chamfer", 0, feature=chamfer)},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "sketchmath_chamfer_features_disabled"
+    client.close()
+
+
 def test_sketchmath_artifact_job_build_poll_register_download_and_replay(monkeypatch, tmp_path):
     monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
     monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")

@@ -115,6 +115,16 @@ def _require_enabled_feature_family(command: Dict[str, Any]) -> None:
                 False,
             ),
         )
+    if isinstance(feature, dict) and feature.get("feature_type") == "chamfer" and not SketchMathConfig.from_env().chamfer_features_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=_error_payload(
+                "sketchmath_chamfer_features_disabled",
+                "SketchMath chamfer features are disabled",
+                "Set FRIDAY_SKETCHMATH_CHAMFER_FEATURES_ENABLED=1",
+                False,
+            ),
+        )
 
 
 def _cad_export_root() -> Path:
