@@ -105,6 +105,16 @@ def _require_enabled_feature_family(command: Dict[str, Any]) -> None:
                 False,
             ),
         )
+    if isinstance(feature, dict) and feature.get("feature_type") == "fillet" and not SketchMathConfig.from_env().fillet_features_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=_error_payload(
+                "sketchmath_fillet_features_disabled",
+                "SketchMath fillet features are disabled",
+                "Set FRIDAY_SKETCHMATH_FILLET_FEATURES_ENABLED=1",
+                False,
+            ),
+        )
 
 
 def _cad_export_root() -> Path:
