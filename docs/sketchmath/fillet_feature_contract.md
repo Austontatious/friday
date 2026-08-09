@@ -20,10 +20,7 @@ Rebuild resolves references as exact or recovered and refuses missing, ambiguous
 
 ## Kernel Boundary
 
-The revision-bound STEP job currently accepts exactly this body graph:
-
-1. one independent positive, one-sided new-body extrusion;
-2. one terminal fillet over one or more supported convex outer vertical edges.
+The minimum revision-bound STEP graph is one independent positive, one-sided new-body extrusion followed by one terminal fillet over supported convex outer vertical edges. The worker also accepts bounded positive additive extrusions and simple holes before that terminal feature; the release-spec golden mounting plate is the permanent proof for that wider envelope.
 
 The worker reconstructs the base solid, enumerates FreeCAD edges, and matches each semantic selector by unordered 3D endpoints within tolerance. Every selector must resolve to exactly one unused kernel edge. A transient FreeCAD edge ordinal is retained only as diagnostic artifact metadata; it is never persisted as the canonical reference.
 
@@ -45,4 +42,4 @@ Checkpoints: `1f1b034`, `30af86a`, `e6b272f`, `53a39ed`.
 
 ## Explicitly Open
 
-Arbitrary edge picking, concave/horizontal/curved edges, multi-stage body graphs, fillet STL, downstream kernel-topology reconciliation, and fillets on the seven-feature golden mounting plate remain open. Equal-distance chamfer now shares this selector and kernel-job discipline as documented in `chamfer_feature_contract.md`; neither edge finish completes `SM-FEAT-005` or the final golden-part scenario.
+Arbitrary edge picking, concave/horizontal/curved edges, unsupported intermediate body features, fillet STL, and downstream general kernel-topology reconciliation remain open. The eight-feature golden mounting plate now validates a terminal fillet after bounded additive-extrusion/simple-hole operations. Equal-distance chamfer shares this selector and kernel-job discipline as documented in `chamfer_feature_contract.md`; pattern/mirror/shell and the full browser golden edit still keep `SM-FEAT-005` and final acceptance partial.

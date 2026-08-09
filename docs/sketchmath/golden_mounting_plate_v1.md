@@ -2,44 +2,46 @@
 
 Updated: 2026-08-09
 
-Status: passed for canonical rebuild, reference recovery, serialization, and layered STL geometry; not the full release acceptance part
+Status: passed for canonical rebuild, semantic recovery, serialization, terminal fillet, native STEP validation, resumable registration, and reload; the full browser parameter-edit scenario remains partial
 
 ## Canonical Part
 
-`build_golden_mounting_plate()` defines one body and one sketch with seven ordered features:
+`build_golden_mounting_plate()` defines one body and one sketch with eight ordered features matching the release fixture:
 
-1. 100 × 60 × 8 mm new-body plate.
-2. Four 6 mm edge-offset through holes at `(12,12)`, `(88,12)`, `(88,48)`, and `(12,48)`.
-3. A 30 × 20 × 5 mm raised boss attached to the plate top face, spanning Z=8..13 mm.
-4. A 10 mm through-hole on the boss top face spanning the cumulative body depth Z=0..13 mm.
+1. 80 × 50 × 5 mm new-body plate.
+2. Four Ø5 mm through holes at `(7,7)`, `(73,7)`, `(73,43)`, and `(7,43)`.
+3. A centered analytic Ø30 mm circular boss, additive from Z=5 to Z=13 mm.
+4. A centered Ø10 mm through-hole spanning Z=0..13 mm.
+5. A terminal 2 mm fillet over the four semantic outer vertical plate edges.
 
-Every subtractive/additive feature uses a semantic face selector. The four mounting holes and boss reference the stable plate top role; the boss hole references the stable boss top role.
+Every subtractive/additive feature uses a semantic face selector. The terminal fillet retains source/adjacency signatures and unordered 3D endpoint descriptors; transient FreeCAD edge ordinals remain artifact diagnostics only.
 
-## Analytic Ledger
+## Geometric Ledger
 
-- Body bounds: `(0, 100, 0, 60, 0, 13)` mm.
-- Positive volume: `100×60×8 + 30×20×5 = 51000 mm³`.
-- Removed volume: four `Ø6×8` cylinders plus one `Ø10×13` cylinder, or `613π mm³`.
-- Expected cumulative volume: `51000 − 613π mm³`.
+- Body bounds: `(0, 80, 0, 50, 0, 13)` mm.
+- Positive volume before holes: `80×50×5 + π×15²×8 = 20000 + 1800π mm³`.
+- Removed hole volume: four `Ø5×5` cylinders plus one `Ø10×13` cylinder, or `450π mm³`.
+- Pre-fillet volume: `20000 + 1350π mm³`.
+- Four 2 mm corner fillets remove `80(1−π/4) mm³`.
+- Final expected kernel volume: `19920 + 1370π mm³`.
 - Expected through-hole count: five.
 
-The width-edit test changes the plate profile from 100 mm to 120 mm without replacing feature IDs or selectors. Downstream plate references recover semantically, body width becomes 120 mm, and the volume increases by exactly `20×60×8 mm³`.
+The parameter-intent test widens the plate to 100 mm while keeping corner holes 7 mm from the relevant edges and recentering the boss/through-hole at X=50. A second edit changes all four corner holes to Ø6 without replacing feature IDs. Downstream face/edge references recover semantically.
 
-## STL Evidence
+## STEP and Job Evidence
 
-The terminal `feature_boss_hole` produces a two-layer ASCII STL. Validation asserts:
+The bounded feature-graph worker executes the seven analytic pre-finish operations, validates their exact canonical volume/bounds, uniquely matches the four fillet selectors, calls native FreeCAD `makeFillet`, and exports revision-8 STEP. Validation asserts:
 
-- deterministic content hash across deep-copy rebuild/materialization;
-- exact 0..100, 0..60, 0..13 mm bounds;
-- mesh volume within 0.5 mm³ of the analytic ledger;
-- every undirected mesh edge has incidence two;
-- zero non-manifold edges;
-- revision-safe output path ending in `_r7.stl`.
+- valid positive one-solid result with exact 0..80, 0..50, 0..13 mm bounds;
+- final volume within `1e-5 mm³` of `19920 + 1370π`;
+- four Ø5 cylindrical hole faces, a Ø10 through-hole face, and an Ø30 boss face;
+- four selected fillet edges and 2 mm radius;
+- revision-bound READY/RUNNING/DONE registration, idempotent replay, persisted artifact metadata, and session reload.
 
-The circular mesh boundary is a declared deterministic 360-segment approximation; the analytic volume and approximation error are preserved separately.
+Layered STL deliberately refuses the terminal kernel-only fillet with `unsupported_stl_feature_type`; it does not silently omit the feature.
 
-## Explicitly Open
+## Remaining Acceptance Work
 
-This fixture does not yet contain fillets, does not prove counterbore/countersink STL, and does not produce a full-graph STEP artifact without a kernel worker. It is therefore a golden feature/artifact proof for the supported vertical envelope, not completion of product-spec acceptance scenario 1.
+The widened/Ø6 canonical edit is not yet driven through one browser-visible undo/redo workflow and has not produced its own post-edit STEP artifact. Those proofs, plus full browser history-tree acceptance, remain required before declaring the Section 29 and release-train gates complete.
 
-Evidence: `sketchmath/features/golden_mounting_plate.py`, `tests/test_sketchmath_golden_mounting_plate.py`, checkpoint `a3d705c`.
+Evidence: `sketchmath/features/golden_mounting_plate.py`, `sketchmath/cad/freecad_feature_graph.py`, `tests/test_sketchmath_golden_mounting_plate.py`; checkpoints `5973c89` and `3e309de`.

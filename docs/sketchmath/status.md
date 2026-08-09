@@ -9,7 +9,7 @@ Gate: `SM-FEAT-001` and the documented generated-reference subset pass; `SM-FEAT
 ## Baseline
 
 - Audited checkout: `21b8153`
-- Latest SketchMath product code commit: `bc650ca`
+- Latest SketchMath product code commit: `3e309de`
 - Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
@@ -83,13 +83,14 @@ On 2026-08-09 for model/rebuild checkpoint `f1431ec`, persistence/API checkpoint
 
 ## Current Semantic Feature, Artifact, and Golden Validation
 
-On 2026-08-09 for semantic holes `f0c2f49`/`cc08509`, semantic attachments `99e2322`, layered golden STL `a3d705c`, and terminal graph UX `0979dfe`:
+On 2026-08-09 for the prior hole/artifact foundation through release-spec golden checkpoints `5973c89`/`3e309de`:
 
-- 53 focused feature/API/artifact/golden Python tests cover typed hole styles and terminations, stable/recovered topology references, boolean face attachment, wrong-direction/edge-breakout/depth refusal, persistent job state, stale-result rejection, deterministic STL, golden serialization, and geometric validation.
-- Generated schemas match the canonical Pydantic models; TypeScript and all 66 frontend tests pass.
-- The targeted Playwright workflow passes create/edit/undo/redo/reload, typed hole creation, upstream reference recovery, two asynchronous revision-bound STL jobs, reload persistence, and browser downloads.
-- The seven-feature golden mounting plate matches bounds `(0,100,0,60,0,13)`, analytic volume `51000−613π mm³`, five through holes, stable serialization, upstream-width recovery, deterministic STL content, and zero non-manifold edges.
-- Compose validates with every new capability default off outside the dedicated acceptance harness.
+- Eight canonical features now produce the 80 × 50 × 5 mm plate, four Ø5 holes at 7 mm edge offsets, centered analytic Ø30 × 8 mm boss, centered Ø10 through-hole, and four 2 mm outer vertical fillets.
+- Exact pre-fillet volume is `20000+1350π mm³`; native FreeCAD final volume matches `19920+1370π mm³` within `1e-5`, with bounds `(0,80,0,50,0,13)`, valid solid state, and expected cylindrical face radii.
+- Width 80→100 recenters the boss/boss-hole and keeps right holes at X=93; a following Ø5→Ø6 edit preserves all four 7 mm offsets and stable feature IDs. Semantic face/edge references recover.
+- Revision-8 STEP passes the durable job state machine, idempotent replay, artifact registration, and session reload. Terminal fillet STL is explicitly refused rather than omitted.
+- The focused feature/API/CAD/artifact/golden suite passes all 71 tests. The widened/Ø6 edit still needs one undo/redo browser workflow plus its own final STEP to complete Section 29.
+- Generated schemas, TypeScript, Compose, and all 69 frontend tests remain green at the preceding model-tree checkpoint; the golden changes do not alter those contracts.
 
 ## Current Full-Revolve Validation
 
@@ -106,7 +107,7 @@ On 2026-08-09 for semantic model `1f1b034`, FreeCAD boundary `30af86a`, API gate
 - 75 focused feature/API/CAD/artifact/golden Python tests pass. The live FreeCAD rounded-box proof selects four canonical vertical edges, uniquely reconciles them by unordered 3D endpoints, produces the expected volume `1000−80(1−π/4) mm³`, preserves `(0,20,0,10,0,5)` bounds, validates the solid, and registers STEP through resumable job markers.
 - Generated schemas, TypeScript, Compose, and all 68 frontend tests pass.
 - Targeted Playwright passes rectangle → extrusion → radius-3 outer fillet → asynchronous STEP → metadata/download → reload in 8.4 seconds, without making transient FreeCAD edge ordinals canonical.
-- The envelope is one independent positive one-sided extrusion followed by one terminal convex outer-vertical-edge fillet. Rebuild truthfully marks measurements `kernel_required`; broader graphs, arbitrary picking, fillet STL, and golden mounting-plate fillets remain open.
+- At that checkpoint the envelope was one independent positive one-sided extrusion followed by one terminal convex outer-vertical-edge fillet. Rebuild truthfully marked measurements `kernel_required`; `5973c89`/`3e309de` later closed the bounded golden additive/simple-hole graph while arbitrary picking and fillet STL remain open.
 
 ## Current Kernel-Chamfer Validation
 
@@ -194,7 +195,7 @@ Completed and published:
 - Canonical document v1 remains a single-sketch, single-worker compatibility path. The minimum single-body/sketch feature tree passes, while multi-sketch/body workspace behavior and visibility mutation are not implemented.
 - Generated extrusion/hole semantic face/edge references are stable and recoverable, but browser face/edge picking and raw kernel-topology reconciliation are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
-- Layered STL supports vertical extrusion/simple-hole graphs; STEP supports independent extrusion and documented terminal-fillet/chamfer graphs. Counterbore/countersink/revolve/edge-finish STL, partial revolve, spatial revolve booleans, broader edge finishes, shell/pattern features, and general full-graph STEP remain open.
+- Layered STL supports vertical extrusion/simple-hole graphs; STEP supports bounded positive base/additive-extrusion/simple-hole graphs with one terminal fillet/chamfer. Counterbore/countersink/revolve/edge-finish STL, partial revolve, spatial revolve booleans, other intermediate STEP graphs, shell/pattern features, and general full-graph STEP remain open.
 - Artifact cancellation, automatic TTL/quota cleanup, and worker-process isolation are not implemented.
 - 3D camera mechanics pass automation, but CAD-like pan/tilt feel requires explicit manual acceptance.
 - AI translation covers a small command subset and does not yet plan over a canonical feature model.
@@ -211,7 +212,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Complete the golden mounting-plate model with terminal fillets and deterministically validated STEP next, widening the kernel graph only as required by that acceptance fixture.
+Close the golden parameter-edit workflow next: typed 80→100 width edit, Ø5→Ø6 four-hole edit, undo/redo/reload, then native STEP validation of the edited revision through browser-visible history and artifact state.
 
 ## Release Status
 

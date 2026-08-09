@@ -105,6 +105,6 @@ A revision conflict refreshes the backend-authoritative session before the user 
 ## Open Boundaries
 
 - The adapter supports one sketch and one process-authoritative session cache.
-- Deterministic layered STL materializes supported vertical extrusion/simple-hole graphs; STEP additionally materializes the documented base-extrusion/terminal-fillet-or-chamfer graphs. Broader full-graph STEP remains open.
+- Deterministic layered STL materializes supported vertical extrusion/simple-hole graphs; STEP additionally materializes a bounded positive base/additive-extrusion/simple-hole graph with one terminal fillet or chamfer. Other intermediate feature types and general full-graph STEP remain open.
 - Partial revolve, kernel-backed revolve boolean/artifact validation, broader fillet/chamfer, shell, and feature pattern/mirror operations remain open.
 - Semantic source/role/signature recovery is implemented for generated extrusion/hole/revolve/edge-finish-input topology. Fillet/chamfer artifact execution uniquely reconciles supported edges by endpoints; arbitrary browser picking and general kernel-topology reconciliation remain open.

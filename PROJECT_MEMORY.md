@@ -7,6 +7,29 @@
 
 ---
 
+## 2026-08-09 - SketchMath Release-Spec Golden Mounting Plate STEP
+
+### What Changed
+- Replaced the historical seven-feature demonstration fixture with the eight-feature release model: 80 × 50 × 5 plate, four Ø5 holes at 7 mm offsets, centered analytic Ø30 × 8 boss, centered Ø10 through-hole, and terminal 2 mm outer-edge fillets.
+- Widened the narrow FreeCAD graph worker to supported positive additive extrusions and simple holes before one terminal fillet/chamfer. Canonical pre-finish volume/bounds, analytic source circles, semantic endpoint matching, final solid validity, and cylindrical face radii are validated.
+- Added deterministic parameter-intent edits for width 80→100 and all four corner holes Ø5→Ø6 while retaining IDs, offsets, centering, and semantic reference recovery.
+- Added native revision-8 STEP, durable artifact-job registration/idempotency, and disk reload evidence. Kernel-only fillet STL now refuses structurally instead of dereferencing missing measurements or omitting the feature.
+
+### Why
+- The prior golden fixture did not match the execution-sheet dimensions, lacked fillets, used a rectangular boss, and proved only layered STL.
+- The release gate requires kernel interrogation of the complete part, not merely existence of a STEP file.
+
+### Flags and Evidence
+- No new flags; existing default-off document, fillet, and artifact-job gates apply.
+- All 71 focused feature/API/CAD/artifact/golden tests pass, including two native golden FreeCAD paths.
+- Expected final volume is `19920+1370π mm³`; native STEP matches within `1e-5` at exact `(0,80,0,50,0,13)` bounds with five hole cylinders, Ø30 boss, four semantic fillets, valid solid state, durable registration, and reload.
+- Code checkpoints: `5973c89`, `3e309de`.
+
+### Remaining Release Gate
+- Drive width and four-hole diameter edits through one typed browser-visible undo/redo/reload workflow, then validate STEP for that edited revision. General full-graph STEP, fillet STL, and unrelated feature families remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Minimum Semantic Model Tree
 
 ### What Changed

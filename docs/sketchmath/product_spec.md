@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `bc650ca` (minimum semantic model tree and persistent rename; evidence: `model_tree_contract.md` and `status.md`)
+Last validated SketchMath code milestone: `3e309de` (complete golden geometry and native terminal-fillet STEP; evidence: `golden_mounting_plate_v1.md` and `status.md`)
 
 ## Mission
 
@@ -106,7 +106,7 @@ Phase 2 status: passed for the documented v0.9 regular-line, circle, and finite-
 - `SM-REF-001`: downstream references use semantic source/signature/recovery data rather than permanent raw kernel indices.
 - `SM-REF-002`: upstream edits either preserve references correctly or fail explicitly and repairably.
 
-Phase 3 status: `SM-FEAT-001` passes for the default-off v1 extrusion/hole/full-revolve/terminal-fillet-or-chamfer envelope. `SM-FEAT-002/003/004` remain bounded as recorded in traceability. `SM-FEAT-005` now includes kernel-backed convex outer-vertical-edge fillet and equal-distance chamfer over one independent extrusion, with semantic endpoint reconciliation, editable parameters, asynchronous STEP, and live browser evidence; broader edge/body graphs, pattern/mirror, and shell remain open. `SM-REF-001/002` pass for the documented generated-reference envelope, while arbitrary viewport picking and general kernel-topology reconciliation remain open. See the feature-history and edge-finish contracts.
+Phase 3 status: `SM-FEAT-001` passes for the default-off v1 extrusion/hole/full-revolve/terminal-fillet-or-chamfer envelope. `SM-FEAT-002/003/004` remain bounded as recorded in traceability. `SM-FEAT-005` includes kernel-backed convex outer-vertical-edge fillet and equal-distance chamfer with semantic endpoint reconciliation, editable parameters, asynchronous STEP, live browser evidence, and a terminal fillet after the golden plate's bounded additive-extrusion/simple-hole graph. Other intermediate graphs, pattern/mirror, and shell remain open. `SM-REF-001/002` pass for the documented generated-reference envelope, while arbitrary viewport picking and general kernel-topology reconciliation remain open.
 
 ## Workspace and Document Requirements
 
@@ -144,7 +144,7 @@ The normative full-product scenarios are:
 
 Detailed scenario traceability and current evidence live in `docs/sketchmath/traceability.md`.
 
-Acceptance scenario 1 is partially represented by `golden_mounting_plate_v1.md`: four edge-offset holes, a raised boss, a cumulative through-hole, upstream width recovery, reload-safe identities, and watertight STL validation pass. Fillets, AI construction, full-graph STEP, manual hole editing of the golden instance, and the complete scenario-level undo/reload sequence remain open, so this is not a release verdict.
+Acceptance scenario 1 is partially represented by `golden_mounting_plate_v1.md`: the exact eight-feature 80 × 50 release geometry, edge-offset holes, analytic circular boss, cumulative through-hole, semantic fillets, canonical width/diameter intent edits, reload-safe identities, and revision-bound native STEP validation pass. AI construction and the combined browser width/diameter undo-redo/reload/post-edit-STEP sequence remain open, so this is not a release verdict.
 
 ## Phase Gates
 
