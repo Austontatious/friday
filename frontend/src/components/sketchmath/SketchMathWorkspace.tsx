@@ -13,6 +13,7 @@ import TelemetryEventList from "../telemetry/TelemetryEventList";
 import type { TelemetryEvent } from "../../telemetry/sessionTelemetry";
 import { makeTelemetryEvent } from "../../telemetry/sessionTelemetry";
 import type {
+  SketchMathArtifactJobManifest,
   SketchMathCommand,
   SketchMathCommandResponse,
   SketchMathEntity,
@@ -36,15 +37,20 @@ import {
   commitSketchMathCommand,
   commitSketchMathFeature,
   createSketchMathSession,
+  getSketchMathArtifactJob,
   getSketchMathSession,
+  isSketchMathArtifactJobsEnabled,
   isSketchMathEnabled,
   isSketchMathFeatureHistoryEnabled,
   previewSketchMathCommand,
   redoSketchMathSession,
   redoSketchMathFeature,
+  retrySketchMathArtifactJob,
   revertSketchMathSession,
   revertSketchMathFeature,
   sketchMathStepDownloadUrl,
+  sketchMathStlDownloadUrl,
+  startSketchMathArtifactJob,
   translateSketchMathUtterance,
   upsertSketchMathEntity,
 } from "../../services/sketchmath";
@@ -441,12 +447,14 @@ const SketchMathWorkspace = () => {
   const toast = useToast();
   const [enabled] = useState<boolean>(isSketchMathEnabled());
   const [featureHistoryEnabled] = useState<boolean>(isSketchMathFeatureHistoryEnabled());
+  const [artifactJobsEnabled] = useState<boolean>(isSketchMathArtifactJobsEnabled());
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sketchDocument, setSketchDocument] = useState<SketchMathDocument | null>(null);
   const [canFeatureUndo, setCanFeatureUndo] = useState(false);
   const [canFeatureRedo, setCanFeatureRedo] = useState(false);
   const [featureBusy, setFeatureBusy] = useState(false);
+  const [artifactJobs, setArtifactJobs] = useState<Record<string, SketchMathArtifactJobManifest>>({});
   const [committedContext, setCommittedContext] = useState<SketchMathSelectionContext>(sketchmathInitialContext());
   const [history, setHistory] = useState<SketchMathHistoryEntry[]>([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -1362,6 +1370,44 @@ const SketchMathWorkspace = () => {
     window.localStorage.setItem(SESSION_STORAGE_KEY, response.session_id);
   };
 
+  useEffect(() => {
+    if (!artifactJobsEnabled || !sessionId) return;
+    const activeJobs = Object.values(artifactJobs).filter((job) => job.state === "READY" || job.state === "RUNNING");
+    if (activeJobs.length === 0) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const updates = await Promise.all(activeJobs.map((job) => getSketchMathArtifactJob(sessionId, job.job_id)));
+        if (cancelled) return;
+        setArtifactJobs((current) => ({
+          ...current,
+          ...Object.fromEntries(updates.map((job) => [job.feature_id, job])),
+        }));
+        const completed = updates.filter((job) => job.state === "DONE");
+        if (completed.length > 0) {
+          syncSnapshot(await getSketchMathSession(sessionId));
+          appendEvents(completed.map((job) => makeTelemetryEvent("artifact_created", {
+            detail: `STL artifact available for ${job.feature_id} at revision ${job.input_revision}.`,
+            raw: job,
+          })));
+        }
+        const failed = updates.find((job) => job.state === "FAILED");
+        if (failed?.error) {
+          setUserError(failed.error.message, JSON.stringify(failed.error.detail, null, 2));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const { message, debugText } = normalizeCaughtError(err, "Artifact status polling failed");
+          setUserError(message, debugText);
+        }
+      }
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [appendEvents, artifactJobs, artifactJobsEnabled, sessionId]);
+
   const refreshTopology = useCallback(async (activeSessionId: string) => {
     const requestId = topologyRequestRef.current + 1;
     topologyRequestRef.current = requestId;
@@ -1706,6 +1752,39 @@ const SketchMathWorkspace = () => {
       clearErrorState();
     } catch (err) {
       const { message, debugText } = normalizeCaughtError(err, "Feature redo failed");
+      setUserError(message, debugText);
+    } finally {
+      setFeatureBusy(false);
+    }
+  };
+
+  const handleBuildFeatureArtifact = async (feature: SketchMathFeature) => {
+    if (!sessionId || !sketchDocument || featureBusy || !artifactJobsEnabled) return;
+    setFeatureBusy(true);
+    try {
+      const job = await startSketchMathArtifactJob(sessionId, feature.feature_id, sketchDocument.revision, "stl");
+      setArtifactJobs((current) => ({ ...current, [feature.feature_id]: job }));
+      if (job.state === "DONE") {
+        syncSnapshot(await getSketchMathSession(sessionId));
+      }
+      clearErrorState();
+    } catch (err) {
+      const { message, debugText } = normalizeCaughtError(err, "Artifact build could not be started");
+      setUserError(message, debugText);
+    } finally {
+      setFeatureBusy(false);
+    }
+  };
+
+  const handleRetryFeatureArtifact = async (job: SketchMathArtifactJobManifest) => {
+    if (!sessionId || featureBusy || !artifactJobsEnabled) return;
+    setFeatureBusy(true);
+    try {
+      const retried = await retrySketchMathArtifactJob(sessionId, job.job_id);
+      setArtifactJobs((current) => ({ ...current, [retried.feature_id]: retried }));
+      clearErrorState();
+    } catch (err) {
+      const { message, debugText } = normalizeCaughtError(err, "Artifact retry could not be started");
       setUserError(message, debugText);
     } finally {
       setFeatureBusy(false);
@@ -3897,9 +3976,14 @@ const SketchMathWorkspace = () => {
                   busy={featureBusy}
                   canUndo={canFeatureUndo}
                   canRedo={canFeatureRedo}
+                  artifactJobsEnabled={artifactJobsEnabled}
+                  artifactJobs={artifactJobs}
                   onNewDepthValueChange={setExtrudeDepthValue}
                   onAddExtrusion={(profile, depth) => void handleAddFeatureExtrusion(profile, depth)}
                   onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
+                  onBuildArtifact={(feature) => void handleBuildFeatureArtifact(feature)}
+                  onRetryArtifact={(job) => void handleRetryFeatureArtifact(job)}
+                  artifactDownloadUrl={sketchMathStlDownloadUrl}
                   onUndo={() => void handleFeatureUndo()}
                   onRedo={() => void handleFeatureRedo()}
                 />

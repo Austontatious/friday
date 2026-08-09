@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Button, Heading, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Input, Link, Text, VStack } from "@chakra-ui/react";
 
 import type {
+  SketchMathArtifactJobManifest,
   SketchMathDocument,
   SketchMathFeature,
   SketchMathFeatureBuildRecord,
@@ -15,9 +16,14 @@ type FeatureHistoryPanelProps = {
   busy: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  artifactJobsEnabled: boolean;
+  artifactJobs: Record<string, SketchMathArtifactJobManifest>;
   onNewDepthValueChange: (value: string) => void;
   onAddExtrusion: (profile: SketchMathProfileEntity, depth: number) => void;
   onUpdateDepth: (feature: SketchMathFeature, depth: number) => void;
+  onBuildArtifact: (feature: SketchMathFeature) => void;
+  onRetryArtifact: (job: SketchMathArtifactJobManifest) => void;
+  artifactDownloadUrl: (path: string) => string;
   onUndo: () => void;
   onRedo: () => void;
 };
@@ -37,9 +43,14 @@ const FeatureHistoryPanel = ({
   busy,
   canUndo,
   canRedo,
+  artifactJobsEnabled,
+  artifactJobs,
   onNewDepthValueChange,
   onAddExtrusion,
   onUpdateDepth,
+  onBuildArtifact,
+  onRetryArtifact,
+  artifactDownloadUrl,
   onUndo,
   onRedo,
 }: FeatureHistoryPanelProps) => {
@@ -100,6 +111,19 @@ const FeatureHistoryPanel = ({
           const record = buildRecords[feature.feature_id];
           const depthDraft = depthDrafts[feature.feature_id] ?? String(feature.parameters.depth_mm);
           const nextDepth = validDepth(depthDraft);
+          const artifactJob = artifactJobs[feature.feature_id];
+          const registeredArtifact = artifactJob?.result?.artifact
+            || document.artifacts.find((artifact) => (
+              artifact.feature_id === feature.feature_id
+              && artifact.revision === document.revision
+              && artifact.format === "stl"
+            ));
+          const canBuildArtifact = record?.status === "succeeded"
+            && feature.parameters.operation === "new_body"
+            && feature.parameters.extent === "one_sided"
+            && feature.parameters.direction === "positive"
+            && feature.dependencies.length === 0;
+          const artifactBusy = artifactJob?.state === "READY" || artifactJob?.state === "RUNNING";
           return (
             <Box key={feature.feature_id} className="sketchmath-history-row" data-testid={`sketchmath-feature-${feature.feature_id}`}>
               <Text fontWeight="600">{feature.name}</Text>
@@ -136,6 +160,42 @@ const FeatureHistoryPanel = ({
                   Apply depth
                 </Button>
               </HStack>
+              {artifactJobsEnabled ? (
+                <Box mt={2} data-testid={`sketchmath-artifact-job-${feature.feature_id}`}>
+                  <HStack spacing={2} flexWrap="wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onBuildArtifact(feature)}
+                      isDisabled={!canBuildArtifact || artifactBusy || busy}
+                    >
+                      Build STL
+                    </Button>
+                    {artifactJob?.state === "FAILED" ? (
+                      <Button size="sm" variant="outline" onClick={() => onRetryArtifact(artifactJob)} isDisabled={busy}>
+                        Retry STL
+                      </Button>
+                    ) : null}
+                    {registeredArtifact ? (
+                      <Link
+                        href={artifactDownloadUrl(registeredArtifact.path)}
+                        download
+                        data-testid={`sketchmath-artifact-download-${feature.feature_id}`}
+                      >
+                        Download STL
+                      </Link>
+                    ) : null}
+                  </HStack>
+                  {artifactJob ? (
+                    <Text fontSize="xs" opacity={0.72} mt={1} data-testid={`sketchmath-artifact-status-${feature.feature_id}`}>
+                      STL artifact · {artifactJob.state} · {artifactJob.step} · revision {artifactJob.input_revision}
+                      {artifactJob.error ? ` · ${artifactJob.error.code}: ${artifactJob.error.message}` : ""}
+                    </Text>
+                  ) : !canBuildArtifact ? (
+                    <Text fontSize="xs" opacity={0.65} mt={1}>STL build requires one independent positive new-body extrusion.</Text>
+                  ) : null}
+                </Box>
+              ) : null}
             </Box>
           );
         })}

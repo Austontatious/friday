@@ -364,6 +364,46 @@ export type SketchMathFeatureRebuildReport = {
   content_hash: string;
 };
 
+export type SketchMathArtifact = {
+  artifact_id: string;
+  feature_id: string;
+  revision: number;
+  format: "step" | "stl";
+  path: string;
+  content_hash: string;
+  metadata: Record<string, unknown>;
+};
+
+export type SketchMathArtifactJobError = {
+  code: string;
+  message: string;
+  detail: Record<string, unknown>;
+  retryable: boolean;
+};
+
+export type SketchMathArtifactJobManifest = {
+  schema_version: "1.0";
+  job_id: string;
+  document_id: string;
+  session_id: string;
+  feature_id: string;
+  format: "step" | "stl";
+  input_revision: number;
+  input_content_hash: string;
+  state: "READY" | "RUNNING" | "DONE" | "FAILED";
+  attempt: number;
+  created_at: string;
+  updated_at: string;
+  step: string;
+  error?: SketchMathArtifactJobError | null;
+  result?: {
+    artifact: SketchMathArtifact;
+    measurements: Record<string, unknown>;
+    input_revision: number;
+    registered: boolean;
+  } | null;
+};
+
 export type SketchMathDocument = {
   schema_version: "1.0";
   document_id: string;
@@ -385,7 +425,7 @@ export type SketchMathDocument = {
     visible: boolean;
   }>;
   features: SketchMathFeature[];
-  artifacts: Array<Record<string, unknown>>;
+  artifacts: SketchMathArtifact[];
   provenance: Record<string, unknown>;
   last_rebuild?: SketchMathFeatureRebuildReport | null;
 };
@@ -667,8 +707,19 @@ export const isSketchMathFeatureHistoryEnabled = (): boolean => {
   return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
 };
 
+export const isSketchMathArtifactJobsEnabled = (): boolean => {
+  const raw = process.env.REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED;
+  if (raw == null || String(raw).trim() === "") {
+    return false;
+  }
+  return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
+};
+
 export const sketchMathStepDownloadUrl = (stepPath: string): string =>
   `${API_URL}/sketchmath/artifacts/step?path=${encodeURIComponent(stepPath)}`;
+
+export const sketchMathStlDownloadUrl = (stlPath: string): string =>
+  `${API_URL}/sketchmath/artifacts/stl?path=${encodeURIComponent(stlPath)}`;
 
 export const createSketchMathSession = async (
   selectionContext?: Partial<SketchMathSelectionContext>,
@@ -722,6 +773,30 @@ export const revertSketchMathFeature = async (sessionId: string): Promise<Sketch
 
 export const redoSketchMathFeature = async (sessionId: string): Promise<SketchMathSessionSnapshot> =>
   fetchJson<SketchMathSessionSnapshot>(`/sketchmath/sessions/${sessionId}/features/redo`, {});
+
+export const startSketchMathArtifactJob = async (
+  sessionId: string,
+  featureId: string,
+  baseRevision: number,
+  format: "step" | "stl" = "stl",
+): Promise<SketchMathArtifactJobManifest> =>
+  fetchJson<SketchMathArtifactJobManifest>(`/sketchmath/sessions/${sessionId}/artifacts/build`, {
+    feature_id: featureId,
+    format,
+    base_revision: baseRevision,
+  });
+
+export const getSketchMathArtifactJob = async (
+  sessionId: string,
+  jobId: string,
+): Promise<SketchMathArtifactJobManifest> =>
+  fetchJson<SketchMathArtifactJobManifest>(`/sketchmath/sessions/${sessionId}/artifacts/jobs/${jobId}`);
+
+export const retrySketchMathArtifactJob = async (
+  sessionId: string,
+  jobId: string,
+): Promise<SketchMathArtifactJobManifest> =>
+  fetchJson<SketchMathArtifactJobManifest>(`/sketchmath/sessions/${sessionId}/artifacts/jobs/${jobId}/retry`, {});
 
 export const upsertSketchMathEntity = async (
   sessionId: string,

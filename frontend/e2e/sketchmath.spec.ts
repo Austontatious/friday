@@ -371,6 +371,7 @@ test.describe("SketchMath workspace", () => {
       document: {
         revision: number;
         features: Array<{ feature_id: string; parameters: { depth_mm: number } }>;
+        artifacts: Array<{ feature_id: string; revision: number; format: string; path: string }>;
         last_rebuild: { records: Array<{ feature_id: string; output_signature: string }> };
       };
       feature_history_length: number;
@@ -408,6 +409,21 @@ test.describe("SketchMath workspace", () => {
     expect(reloaded.document.last_rebuild.records[0].output_signature).toBe(replacementSignature);
     expect(reloaded.feature_history_length).toBe(2);
     await expect(page.getByTestId(`sketchmath-feature-${featureId}`)).toContainText("succeeded");
+
+    await page.getByTestId(`sketchmath-feature-${featureId}`).getByRole("button", { name: "Build STL" }).click();
+    await expect(page.getByTestId(`sketchmath-artifact-status-${featureId}`)).toContainText("DONE · complete · revision 5", { timeout: 15000 });
+    const artifactResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const artifactSnapshot = await artifactResponse.json() as FeatureSnapshot;
+    expect(artifactSnapshot.document.artifacts).toHaveLength(1);
+    expect(artifactSnapshot.document.artifacts[0]).toMatchObject({ feature_id: featureId, revision: 5, format: "stl" });
+
+    await page.reload();
+    const stlDownload = page.getByTestId(`sketchmath-artifact-download-${featureId}`);
+    await expect(stlDownload).toBeVisible();
+    const downloadPromise = page.waitForEvent("download");
+    await stlDownload.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.stl$/);
   });
 
   test("creates a center-defined rectangle through the canonical rectangle bundle", async ({ page }) => {
