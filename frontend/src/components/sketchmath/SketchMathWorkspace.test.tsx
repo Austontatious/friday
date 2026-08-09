@@ -1163,6 +1163,7 @@ describe("SketchMath workspace", () => {
       start: [0, 0] as [number, number],
       end: [0, 10] as [number, number],
     };
+    const secondAxis = { ...axis, id: "axis_offset", start: [4, 0] as [number, number], end: [4, 10] as [number, number] };
     const document = {
       schema_version: "1.0",
       document_id: "doc_revolve",
@@ -1177,6 +1178,7 @@ describe("SketchMath workspace", () => {
       last_rebuild: null,
     } as any;
     const onAddFullRevolve = jest.fn();
+    const onUpdateFullRevolve = jest.fn();
     const props = {
       document,
       activeProfile,
@@ -1199,6 +1201,7 @@ describe("SketchMath workspace", () => {
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
       onUpdateSimpleHole: jest.fn(),
+      onUpdateFullRevolve,
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
       onAddSimpleHole: jest.fn(),
@@ -1216,6 +1219,29 @@ describe("SketchMath workspace", () => {
     expect(screen.getByRole("combobox", { name: "Revolve axis" })).toHaveValue("axis_y");
     await userEvent.click(screen.getByRole("button", { name: "Add full revolve" }));
     expect(onAddFullRevolve).toHaveBeenCalledWith(activeProfile, axis);
+
+    const revolveFeature = {
+      feature_id: "feature_revolve",
+      feature_type: "revolve" as const,
+      name: "Turned body",
+      body_id: "body_1",
+      sketch_id: "sketch_1",
+      profile_id: activeProfile.id,
+      dependencies: [],
+      topology_references: [],
+      parameters: { axis_entity_id: axis.id, angle_deg: 360, operation: "new_body" as const },
+      suppressed: false,
+    };
+    rerender(<FeatureHistoryPanel
+      {...props}
+      revolveFeaturesEnabled
+      revolveAxes={[axis, secondAxis]}
+      document={{ ...document, revision: 1, features: [revolveFeature] }}
+    />);
+    const editor = screen.getByTestId("sketchmath-existing-revolve-editor-feature_revolve");
+    await userEvent.selectOptions(within(editor).getByRole("combobox", { name: "Revolve axis Turned body" }), secondAxis.id);
+    await userEvent.click(within(editor).getByRole("button", { name: "Apply revolve" }));
+    expect(onUpdateFullRevolve).toHaveBeenCalledWith(revolveFeature, secondAxis.id, 360);
   });
 
   it("creates a semantic outer-edge fillet and routes its terminal artifact to STEP", async () => {
@@ -1298,6 +1324,7 @@ describe("SketchMath workspace", () => {
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
       onUpdateSimpleHole: jest.fn(),
+      onUpdateFullRevolve: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
       onAddSimpleHole: jest.fn(),
@@ -1490,6 +1517,7 @@ describe("SketchMath workspace", () => {
       onUpdateFilletRadius={jest.fn()}
       onUpdateChamferDistance={jest.fn()}
       onUpdateSimpleHole={onUpdateSimpleHole}
+      onUpdateFullRevolve={jest.fn()}
       onSetDesignParameter={onSetDesignParameter}
       onRenameFeature={onRenameFeature}
       onAddSimpleHole={jest.fn()}

@@ -1841,6 +1841,28 @@ const SketchMathWorkspace = () => {
     });
   };
 
+  const handleUpdateFullRevolve = async (
+    feature: Extract<SketchMathFeature, { feature_type: "revolve" }>,
+    axisId: string,
+    angle: number,
+  ) => {
+    if (!sketchDocument || !revolveFeaturesEnabled || angle !== 360) return;
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "replace_feature",
+      target_id: feature.feature_id,
+      parameters: {
+        feature: {
+          ...feature,
+          parameters: { ...feature.parameters, axis_entity_id: axisId, angle_deg: angle },
+        },
+      },
+    });
+  };
+
   const handleAddOuterFillet = async (
     target: Extract<SketchMathFeature, { feature_type: "extrude" }>,
     edgeReferences: SketchMathSemanticTopologyReference[],
@@ -4318,6 +4340,9 @@ const SketchMathWorkspace = () => {
                   onUpdateChamferDistance={(feature, distance) => void handleUpdateChamferDistance(feature, distance)}
                   onUpdateSimpleHole={(feature, diameter, termination, depth) => (
                     void handleUpdateSimpleHole(feature, diameter, termination, depth)
+                  )}
+                  onUpdateFullRevolve={(feature, axisId, angle) => (
+                    void handleUpdateFullRevolve(feature, axisId, angle)
                   )}
                   onSetDesignParameter={(parameterId, value) => void handleSetDesignParameter(parameterId, value)}
                   onRenameFeature={(feature, name) => void handleRenameFeature(feature, name)}

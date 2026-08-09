@@ -19,6 +19,8 @@ type HoleDraft = {
   termination: "through" | "blind";
 };
 
+type RevolveDraft = { axisId: string; angle: string };
+
 type FeatureHistoryPanelProps = {
   document: SketchMathDocument;
   activeProfile: SketchMathProfileEntity | null;
@@ -54,6 +56,11 @@ type FeatureHistoryPanelProps = {
     diameter: number,
     termination: "through" | "blind",
     depth: number | null,
+  ) => void;
+  onUpdateFullRevolve: (
+    feature: Extract<SketchMathFeature, { feature_type: "revolve" }>,
+    axisId: string,
+    angle: number,
   ) => void;
   onSetDesignParameter: (parameterId: string, value: number) => void;
   onRenameFeature: (feature: SketchMathFeature, name: string) => void;
@@ -129,6 +136,7 @@ const FeatureHistoryPanel = ({
   onUpdateFilletRadius,
   onUpdateChamferDistance,
   onUpdateSimpleHole,
+  onUpdateFullRevolve,
   onSetDesignParameter,
   onRenameFeature,
   onAddSimpleHole,
@@ -143,6 +151,7 @@ const FeatureHistoryPanel = ({
   const [filletDrafts, setFilletDrafts] = useState<Record<string, string>>({});
   const [chamferDrafts, setChamferDrafts] = useState<Record<string, string>>({});
   const [parameterDrafts, setParameterDrafts] = useState<Record<string, string>>({});
+  const [revolveDrafts, setRevolveDrafts] = useState<Record<string, RevolveDraft>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
   const defaultSelection = useMemo<ModelTreeSelection | null>(() => {
     const feature = document.features[document.features.length - 1];
@@ -225,6 +234,17 @@ const FeatureHistoryPanel = ({
       designParameters.map((parameter) => [parameter.parameter_id, String(parameter.value)]),
     ));
   }, [designParameters]);
+
+  useEffect(() => {
+    setRevolveDrafts(Object.fromEntries(
+      document.features
+        .filter((feature): feature is Extract<SketchMathFeature, { feature_type: "revolve" }> => feature.feature_type === "revolve")
+        .map((feature) => [feature.feature_id, {
+          axisId: feature.parameters.axis_entity_id,
+          angle: String(feature.parameters.angle_deg),
+        }]),
+    ));
+  }, [document.features]);
 
   const newDepth = validDepth(newDepthValue);
   const revolveAxis = revolveAxes.find((axis) => axis.id === revolveAxisId) || revolveAxes[0] || null;
@@ -537,6 +557,8 @@ const FeatureHistoryPanel = ({
             && (holeDraft.termination === "through" || (Number.isFinite(holeDepth) && holeDepth > 0)),
           );
           const featureParameterBound = boundFeatureIds.has(feature.feature_id);
+          const revolveDraft = revolveDrafts[feature.feature_id];
+          const revolveAngle = Number(revolveDraft?.angle);
           return (
             <Box
               key={feature.feature_id}
@@ -746,6 +768,52 @@ const FeatureHistoryPanel = ({
                     Apply hole
                   </Button>
                   {featureParameterBound ? <Text fontSize="xs">Controlled by a design parameter.</Text> : null}
+                </HStack>
+              ) : null}
+              {revolveFeaturesEnabled && feature.feature_type === "revolve" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-existing-revolve-editor-${feature.feature_id}`}>
+                  <Select
+                    aria-label={`Revolve axis ${feature.name}`}
+                    value={revolveDraft?.axisId || ""}
+                    onChange={(event) => setRevolveDrafts((current) => ({
+                      ...current,
+                      [feature.feature_id]: { ...current[feature.feature_id], axisId: event.target.value },
+                    }))}
+                    width="180px"
+                  >
+                    {revolveAxes.map((axis, index) => (
+                      <option key={axis.id} value={axis.id}>{axis.label || `Construction axis ${index + 1}`}</option>
+                    ))}
+                  </Select>
+                  <Input
+                    type="number"
+                    min="360"
+                    max="360"
+                    aria-label={`Revolve angle ${feature.name}`}
+                    value={revolveDraft?.angle || ""}
+                    onChange={(event) => setRevolveDrafts((current) => ({
+                      ...current,
+                      [feature.feature_id]: { ...current[feature.feature_id], angle: event.target.value },
+                    }))}
+                    width="100px"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => revolveDraft && onUpdateFullRevolve(feature, revolveDraft.axisId, revolveAngle)}
+                    isDisabled={
+                      !revolveDraft?.axisId
+                      || revolveAngle !== 360
+                      || (
+                        revolveDraft.axisId === feature.parameters.axis_entity_id
+                        && revolveAngle === feature.parameters.angle_deg
+                      )
+                      || busy
+                    }
+                  >
+                    Apply revolve
+                  </Button>
+                  <Text fontSize="xs">Full 360° revolves are the supported envelope.</Text>
                 </HStack>
               ) : null}
               {holeFeaturesEnabled && feature.feature_type === "extrude" ? (
