@@ -27,7 +27,9 @@ Both commands participate in preview/commit, batch history, undo/redo, disk pers
 
 ## Solver boundary
 
-Arc geometry is intentionally reported in `SolverAnalysis.unmodeled_entity_ids`, making coverage `partial`. The live workspace therefore says `Partially analyzed` instead of inventing arc DOF or feasibility. The unified `SolverRunResult` remains the future seam for adding arc equations.
+The nonlinear adapter models arc center, radius, start angle, and signed sweep. Optional center/start/end/through point identities contribute linkage equations, and degenerate source identities or collapsed endpoints make the result inconsistent rather than silently detaching the arc. Linked center and three-point arcs therefore participate in exact rank/DOF analysis when every other entity and constraint is modeled.
+
+Concentric constraints accept circle/arc pairs. Tangency accepts line-to-circle/arc and circle/arc pairs, but the converged contact must lie on every finite arc span. Out-of-span contact returns `tangent_outside_arc_span` during command construction or a failed finite-geometry validator during generalized solve; the system is never approximated as a full circle.
 
 ## Current UI
 

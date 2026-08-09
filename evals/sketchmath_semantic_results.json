@@ -2254,11 +2254,16 @@
           ],
           "solver_run": {
             "analysis_after": {
-              "conflicting_constraint_ids": [],
-              "consistency_state": "unknown",
-              "coverage": "partial",
+              "conflicting_constraint_ids": [
+                "c_distance"
+              ],
+              "consistency_state": "inconsistent",
+              "coverage": "exact",
               "diagnostics": [
-                "Nonlinear or unsupported constraints prevent exact DOF classification."
+                "Residual validation rejected the optimizer result as inconsistent.",
+                "Optimizer termination was successful, but constraint residuals were not feasible.",
+                "Nonlinear residuals are normalized by characteristic length 5 mm; angular residuals use radians.",
+                "SciPy termination: `gtol` termination condition is satisfied."
               ],
               "fixed_entity_ids": [
                 "point_A",
@@ -2267,30 +2272,39 @@
               "freedom_state": "unknown",
               "independent_equation_count": 4,
               "invalid_constraint_ids": [],
-              "redundancy_state": "unknown",
+              "redundancy_state": "none",
               "redundant_constraint_ids": [],
               "remaining_dof": null,
               "remaining_tracked_dof_upper_bound": 0,
               "schema_version": "1.0",
-              "supported_constraint_ids": [],
+              "supported_constraint_ids": [
+                "c_distance"
+              ],
               "tolerance_policy": {
                 "coordinate_abs_mm": 1e-09,
                 "linear_rank_abs": 1e-10,
+                "nonlinear_feasibility_abs": 1e-07,
+                "nonlinear_max_evaluations": 800.0,
+                "nonlinear_rank_rel": 1e-08,
+                "nonlinear_seed_perturbation_rel": 0.0001,
                 "scalar_rel": 1e-09,
-                "version": "1.0"
+                "version": "1.1"
               },
               "tracked_variable_count": 4,
               "unmodeled_entity_ids": [],
-              "unsupported_constraint_ids": [
-                "c_distance"
-              ]
+              "unsupported_constraint_ids": []
             },
             "analysis_before": {
-              "conflicting_constraint_ids": [],
-              "consistency_state": "unknown",
-              "coverage": "partial",
+              "conflicting_constraint_ids": [
+                "c_distance"
+              ],
+              "consistency_state": "inconsistent",
+              "coverage": "exact",
               "diagnostics": [
-                "Nonlinear or unsupported constraints prevent exact DOF classification."
+                "Residual validation rejected the optimizer result as inconsistent.",
+                "Optimizer termination was successful, but constraint residuals were not feasible.",
+                "Nonlinear residuals are normalized by characteristic length 5 mm; angular residuals use radians.",
+                "SciPy termination: `gtol` termination condition is satisfied."
               ],
               "fixed_entity_ids": [
                 "point_A",
@@ -2299,40 +2313,61 @@
               "freedom_state": "unknown",
               "independent_equation_count": 4,
               "invalid_constraint_ids": [],
-              "redundancy_state": "unknown",
+              "redundancy_state": "none",
               "redundant_constraint_ids": [],
               "remaining_dof": null,
               "remaining_tracked_dof_upper_bound": 0,
               "schema_version": "1.0",
-              "supported_constraint_ids": [],
+              "supported_constraint_ids": [
+                "c_distance"
+              ],
               "tolerance_policy": {
                 "coordinate_abs_mm": 1e-09,
                 "linear_rank_abs": 1e-10,
+                "nonlinear_feasibility_abs": 1e-07,
+                "nonlinear_max_evaluations": 800.0,
+                "nonlinear_rank_rel": 1e-08,
+                "nonlinear_seed_perturbation_rel": 0.0001,
                 "scalar_rel": 1e-09,
-                "version": "1.0"
+                "version": "1.1"
               },
               "tracked_variable_count": 4,
               "unmodeled_entity_ids": [],
-              "unsupported_constraint_ids": [
-                "c_distance"
-              ]
+              "unsupported_constraint_ids": []
             },
-            "backend": "closed_form_v1",
+            "backend": "scipy_least_squares_v1",
             "changed_entity_ids": [],
+            "characteristic_length_mm": 5.0,
             "diagnostics": [
-              "Nonlinear or unsupported constraints prevent exact DOF classification.",
-              "Distance constraint conflicts with locked points"
+              "Residual validation rejected the optimizer result as inconsistent.",
+              "Optimizer termination was successful, but constraint residuals were not feasible.",
+              "Nonlinear residuals are normalized by characteristic length 5 mm; angular residuals use radians.",
+              "SciPy termination: `gtol` termination condition is satisfied."
             ],
             "feasible": false,
+            "function_evaluations": 3,
+            "jacobian_evaluations": 3,
+            "jacobian_rank": 4,
+            "jacobian_strategy": "scipy_3_point_with_central_rank_check",
+            "max_abs_residual": 0.8,
             "mode": "solve",
-            "outcome": "failed",
+            "optimizer_terminated_successfully": true,
+            "outcome": "inconsistent",
             "proposed_patch": [],
             "requested_constraint_ids": [
               "c_distance"
             ],
-            "residual_norm": null,
-            "schema_version": "1.0",
-            "termination_reason": "closed_form_constraint_failed"
+            "residual_count": 5,
+            "residual_norm": 0.8,
+            "schema_version": "1.1",
+            "seed_count": 3,
+            "termination_reason": "nonlinear_residual_infeasible",
+            "variable_order": [
+              "point_A.x",
+              "point_A.y",
+              "point_B.x",
+              "point_B.y"
+            ]
           }
         },
         "message": "Constraint system cannot be committed",
@@ -2408,117 +2443,139 @@
           ],
           "solver_analysis": {
             "conflicting_constraint_ids": [],
-            "consistency_state": "unknown",
-            "coverage": "partial",
+            "consistency_state": "consistent",
+            "coverage": "exact",
             "diagnostics": [
-              "Nonlinear or unsupported constraints prevent exact DOF classification."
+              "Nonlinear residuals are normalized by characteristic length 4 mm; angular residuals use radians.",
+              "SciPy termination: `gtol` termination condition is satisfied."
             ],
             "fixed_entity_ids": [
               "point_A",
               "point_B",
               "point_C"
             ],
-            "freedom_state": "unknown",
-            "independent_equation_count": 6,
+            "freedom_state": "fully_constrained",
+            "independent_equation_count": 8,
             "invalid_constraint_ids": [],
-            "redundancy_state": "unknown",
+            "redundancy_state": "none",
             "redundant_constraint_ids": [],
-            "remaining_dof": null,
-            "remaining_tracked_dof_upper_bound": 2,
+            "remaining_dof": 0,
+            "remaining_tracked_dof_upper_bound": 0,
             "schema_version": "1.0",
-            "supported_constraint_ids": [],
+            "supported_constraint_ids": [
+              "c_parallel",
+              "c_perp"
+            ],
             "tolerance_policy": {
               "coordinate_abs_mm": 1e-09,
               "linear_rank_abs": 1e-10,
+              "nonlinear_feasibility_abs": 1e-07,
+              "nonlinear_max_evaluations": 800.0,
+              "nonlinear_rank_rel": 1e-08,
+              "nonlinear_seed_perturbation_rel": 0.0001,
               "scalar_rel": 1e-09,
-              "version": "1.0"
+              "version": "1.1"
             },
             "tracked_variable_count": 8,
             "unmodeled_entity_ids": [],
-            "unsupported_constraint_ids": [
-              "c_parallel",
-              "c_perp"
-            ]
+            "unsupported_constraint_ids": []
           },
           "solver_run": {
             "analysis_after": {
               "conflicting_constraint_ids": [],
-              "consistency_state": "unknown",
-              "coverage": "partial",
+              "consistency_state": "consistent",
+              "coverage": "exact",
               "diagnostics": [
-                "Nonlinear or unsupported constraints prevent exact DOF classification."
+                "Nonlinear residuals are normalized by characteristic length 4 mm; angular residuals use radians.",
+                "SciPy termination: `gtol` termination condition is satisfied."
               ],
               "fixed_entity_ids": [
                 "point_A",
                 "point_B",
                 "point_C"
               ],
-              "freedom_state": "unknown",
-              "independent_equation_count": 6,
+              "freedom_state": "fully_constrained",
+              "independent_equation_count": 8,
               "invalid_constraint_ids": [],
-              "redundancy_state": "unknown",
+              "redundancy_state": "none",
               "redundant_constraint_ids": [],
-              "remaining_dof": null,
-              "remaining_tracked_dof_upper_bound": 2,
+              "remaining_dof": 0,
+              "remaining_tracked_dof_upper_bound": 0,
               "schema_version": "1.0",
-              "supported_constraint_ids": [],
+              "supported_constraint_ids": [
+                "c_parallel",
+                "c_perp"
+              ],
               "tolerance_policy": {
                 "coordinate_abs_mm": 1e-09,
                 "linear_rank_abs": 1e-10,
+                "nonlinear_feasibility_abs": 1e-07,
+                "nonlinear_max_evaluations": 800.0,
+                "nonlinear_rank_rel": 1e-08,
+                "nonlinear_seed_perturbation_rel": 0.0001,
                 "scalar_rel": 1e-09,
-                "version": "1.0"
+                "version": "1.1"
               },
               "tracked_variable_count": 8,
               "unmodeled_entity_ids": [],
-              "unsupported_constraint_ids": [
-                "c_parallel",
-                "c_perp"
-              ]
+              "unsupported_constraint_ids": []
             },
             "analysis_before": {
               "conflicting_constraint_ids": [],
-              "consistency_state": "unknown",
-              "coverage": "partial",
+              "consistency_state": "consistent",
+              "coverage": "exact",
               "diagnostics": [
-                "Nonlinear or unsupported constraints prevent exact DOF classification."
+                "Nonlinear residuals are normalized by characteristic length 4 mm; angular residuals use radians.",
+                "SciPy termination: `gtol` termination condition is satisfied."
               ],
               "fixed_entity_ids": [
                 "point_A",
                 "point_B",
                 "point_C"
               ],
-              "freedom_state": "unknown",
-              "independent_equation_count": 6,
+              "freedom_state": "fully_constrained",
+              "independent_equation_count": 8,
               "invalid_constraint_ids": [],
-              "redundancy_state": "unknown",
+              "redundancy_state": "none",
               "redundant_constraint_ids": [],
-              "remaining_dof": null,
-              "remaining_tracked_dof_upper_bound": 2,
+              "remaining_dof": 0,
+              "remaining_tracked_dof_upper_bound": 0,
               "schema_version": "1.0",
-              "supported_constraint_ids": [],
+              "supported_constraint_ids": [
+                "c_parallel",
+                "c_perp"
+              ],
               "tolerance_policy": {
                 "coordinate_abs_mm": 1e-09,
                 "linear_rank_abs": 1e-10,
+                "nonlinear_feasibility_abs": 1e-07,
+                "nonlinear_max_evaluations": 800.0,
+                "nonlinear_rank_rel": 1e-08,
+                "nonlinear_seed_perturbation_rel": 0.0001,
                 "scalar_rel": 1e-09,
-                "version": "1.0"
+                "version": "1.1"
               },
               "tracked_variable_count": 8,
               "unmodeled_entity_ids": [],
-              "unsupported_constraint_ids": [
-                "c_parallel",
-                "c_perp"
-              ]
+              "unsupported_constraint_ids": []
             },
-            "backend": "closed_form_v1",
+            "backend": "scipy_least_squares_v1",
             "changed_entity_ids": [
               "point_D"
             ],
+            "characteristic_length_mm": 4.0,
             "diagnostics": [
-              "Nonlinear or unsupported constraints prevent exact DOF classification.",
-              "Generalized residual norm is unavailable for the closed-form backend."
+              "Nonlinear residuals are normalized by characteristic length 4 mm; angular residuals use radians.",
+              "SciPy termination: `gtol` termination condition is satisfied."
             ],
-            "feasible": null,
+            "feasible": true,
+            "function_evaluations": 7,
+            "jacobian_evaluations": 6,
+            "jacobian_rank": 8,
+            "jacobian_strategy": "scipy_3_point_with_central_rank_check",
+            "max_abs_residual": 8.778003193319281e-16,
             "mode": "solve",
+            "optimizer_terminated_successfully": true,
             "outcome": "solved",
             "proposed_patch": [
               {
@@ -2552,9 +2609,21 @@
               "c_parallel",
               "c_perp"
             ],
-            "residual_norm": null,
-            "schema_version": "1.0",
-            "termination_reason": "closed_form_constraints_applied"
+            "residual_count": 8,
+            "residual_norm": 9.837421534681184e-16,
+            "schema_version": "1.1",
+            "seed_count": 3,
+            "termination_reason": "nonlinear_residual_feasible",
+            "variable_order": [
+              "point_A.x",
+              "point_A.y",
+              "point_B.x",
+              "point_B.y",
+              "point_C.x",
+              "point_C.y",
+              "point_D.x",
+              "point_D.y"
+            ]
           }
         },
         "status": "committed",
@@ -2573,78 +2642,159 @@
           "solver_run": {
             "analysis_after": {
               "conflicting_constraint_ids": [],
-              "consistency_state": "unknown",
-              "coverage": "partial",
+              "consistency_state": "consistent",
+              "coverage": "exact",
               "diagnostics": [
-                "Nonlinear or unsupported constraints prevent exact DOF classification."
+                "Nonlinear residuals are normalized by characteristic length 5 mm; angular residuals use radians.",
+                "SciPy termination: `gtol` termination condition is satisfied."
               ],
               "fixed_entity_ids": [],
-              "freedom_state": "unknown",
-              "independent_equation_count": 0,
+              "freedom_state": "under_constrained",
+              "independent_equation_count": 1,
               "invalid_constraint_ids": [],
-              "redundancy_state": "unknown",
+              "redundancy_state": "none",
               "redundant_constraint_ids": [],
-              "remaining_dof": null,
-              "remaining_tracked_dof_upper_bound": 4,
+              "remaining_dof": 3,
+              "remaining_tracked_dof_upper_bound": 3,
               "schema_version": "1.0",
-              "supported_constraint_ids": [],
+              "supported_constraint_ids": [
+                "c_distance"
+              ],
               "tolerance_policy": {
                 "coordinate_abs_mm": 1e-09,
                 "linear_rank_abs": 1e-10,
+                "nonlinear_feasibility_abs": 1e-07,
+                "nonlinear_max_evaluations": 800.0,
+                "nonlinear_rank_rel": 1e-08,
+                "nonlinear_seed_perturbation_rel": 0.0001,
                 "scalar_rel": 1e-09,
-                "version": "1.0"
+                "version": "1.1"
               },
               "tracked_variable_count": 4,
               "unmodeled_entity_ids": [],
-              "unsupported_constraint_ids": [
-                "c_distance"
-              ]
+              "unsupported_constraint_ids": []
             },
             "analysis_before": {
               "conflicting_constraint_ids": [],
-              "consistency_state": "unknown",
-              "coverage": "partial",
+              "consistency_state": "consistent",
+              "coverage": "exact",
               "diagnostics": [
-                "Nonlinear or unsupported constraints prevent exact DOF classification."
+                "Nonlinear residuals are normalized by characteristic length 5 mm; angular residuals use radians.",
+                "SciPy termination: `gtol` termination condition is satisfied."
               ],
               "fixed_entity_ids": [],
-              "freedom_state": "unknown",
-              "independent_equation_count": 0,
+              "freedom_state": "under_constrained",
+              "independent_equation_count": 1,
               "invalid_constraint_ids": [],
-              "redundancy_state": "unknown",
+              "redundancy_state": "none",
               "redundant_constraint_ids": [],
-              "remaining_dof": null,
-              "remaining_tracked_dof_upper_bound": 4,
+              "remaining_dof": 3,
+              "remaining_tracked_dof_upper_bound": 3,
               "schema_version": "1.0",
-              "supported_constraint_ids": [],
+              "supported_constraint_ids": [
+                "c_distance"
+              ],
               "tolerance_policy": {
                 "coordinate_abs_mm": 1e-09,
                 "linear_rank_abs": 1e-10,
+                "nonlinear_feasibility_abs": 1e-07,
+                "nonlinear_max_evaluations": 800.0,
+                "nonlinear_rank_rel": 1e-08,
+                "nonlinear_seed_perturbation_rel": 0.0001,
                 "scalar_rel": 1e-09,
-                "version": "1.0"
+                "version": "1.1"
               },
               "tracked_variable_count": 4,
               "unmodeled_entity_ids": [],
-              "unsupported_constraint_ids": [
-                "c_distance"
-              ]
+              "unsupported_constraint_ids": []
             },
-            "backend": "closed_form_v1",
-            "changed_entity_ids": [],
-            "diagnostics": [
-              "Nonlinear or unsupported constraints prevent exact DOF classification.",
-              "Closed-form backend cannot resolve all selected constraints."
+            "backend": "scipy_least_squares_v1",
+            "changed_entity_ids": [
+              "point_A",
+              "point_B"
             ],
-            "feasible": null,
+            "characteristic_length_mm": 5.0,
+            "diagnostics": [
+              "Nonlinear residuals are normalized by characteristic length 5 mm; angular residuals use radians.",
+              "SciPy termination: `gtol` termination condition is satisfied."
+            ],
+            "feasible": true,
+            "function_evaluations": 54,
+            "jacobian_evaluations": 25,
+            "jacobian_rank": 1,
+            "jacobian_strategy": "scipy_3_point_with_central_rank_check",
+            "max_abs_residual": 2.7991298168217328e-11,
             "mode": "solve",
+            "optimizer_terminated_successfully": true,
             "outcome": "under_constrained",
-            "proposed_patch": [],
+            "proposed_patch": [
+              {
+                "after": {
+                  "construction": false,
+                  "coords": [
+                    -1.266950033,
+                    -1.268708852
+                  ],
+                  "id": "point_A",
+                  "label": null,
+                  "locked": false,
+                  "type": "point_2d"
+                },
+                "before": {
+                  "construction": false,
+                  "coords": [
+                    0.0,
+                    0.0
+                  ],
+                  "id": "point_A",
+                  "label": null,
+                  "locked": false,
+                  "type": "point_2d"
+                },
+                "entity_id": "point_A",
+                "entity_type": "point_2d"
+              },
+              {
+                "after": {
+                  "construction": false,
+                  "coords": [
+                    2.268200033,
+                    2.267208852
+                  ],
+                  "id": "point_B",
+                  "label": null,
+                  "locked": false,
+                  "type": "point_2d"
+                },
+                "before": {
+                  "construction": false,
+                  "coords": [
+                    1.0,
+                    1.0
+                  ],
+                  "id": "point_B",
+                  "label": null,
+                  "locked": false,
+                  "type": "point_2d"
+                },
+                "entity_id": "point_B",
+                "entity_type": "point_2d"
+              }
+            ],
             "requested_constraint_ids": [
               "c_distance"
             ],
-            "residual_norm": null,
-            "schema_version": "1.0",
-            "termination_reason": "closed_form_constraints_ambiguous"
+            "residual_count": 1,
+            "residual_norm": 2.7991298168217328e-11,
+            "schema_version": "1.1",
+            "seed_count": 3,
+            "termination_reason": "nonlinear_feasible_under_constrained",
+            "variable_order": [
+              "point_A.x",
+              "point_A.y",
+              "point_B.x",
+              "point_B.y"
+            ]
           }
         },
         "message": "Constraint system is under-constrained",
@@ -3095,7 +3245,10 @@
             "conflicting_constraint_ids": [],
             "consistency_state": "consistent",
             "coverage": "exact",
-            "diagnostics": [],
+            "diagnostics": [
+              "Nonlinear residuals are normalized by characteristic length 4 mm; angular residuals use radians.",
+              "SciPy termination: `gtol` termination condition is satisfied."
+            ],
             "fixed_entity_ids": [
               "point_a"
             ],
@@ -3113,8 +3266,12 @@
             "tolerance_policy": {
               "coordinate_abs_mm": 1e-09,
               "linear_rank_abs": 1e-10,
+              "nonlinear_feasibility_abs": 1e-07,
+              "nonlinear_max_evaluations": 800.0,
+              "nonlinear_rank_rel": 1e-08,
+              "nonlinear_seed_perturbation_rel": 0.0001,
               "scalar_rel": 1e-09,
-              "version": "1.0"
+              "version": "1.1"
             },
             "tracked_variable_count": 4,
             "unmodeled_entity_ids": [],
@@ -3125,7 +3282,10 @@
               "conflicting_constraint_ids": [],
               "consistency_state": "consistent",
               "coverage": "exact",
-              "diagnostics": [],
+              "diagnostics": [
+                "Nonlinear residuals are normalized by characteristic length 4 mm; angular residuals use radians.",
+                "SciPy termination: `gtol` termination condition is satisfied."
+              ],
               "fixed_entity_ids": [
                 "point_a"
               ],
@@ -3143,8 +3303,12 @@
               "tolerance_policy": {
                 "coordinate_abs_mm": 1e-09,
                 "linear_rank_abs": 1e-10,
+                "nonlinear_feasibility_abs": 1e-07,
+                "nonlinear_max_evaluations": 800.0,
+                "nonlinear_rank_rel": 1e-08,
+                "nonlinear_seed_perturbation_rel": 0.0001,
                 "scalar_rel": 1e-09,
-                "version": "1.0"
+                "version": "1.1"
               },
               "tracked_variable_count": 4,
               "unmodeled_entity_ids": [],
@@ -3154,7 +3318,10 @@
               "conflicting_constraint_ids": [],
               "consistency_state": "consistent",
               "coverage": "exact",
-              "diagnostics": [],
+              "diagnostics": [
+                "Nonlinear residuals are normalized by characteristic length 4 mm; angular residuals use radians.",
+                "SciPy termination: `gtol` termination condition is satisfied."
+              ],
               "fixed_entity_ids": [
                 "point_a"
               ],
@@ -3172,26 +3339,48 @@
               "tolerance_policy": {
                 "coordinate_abs_mm": 1e-09,
                 "linear_rank_abs": 1e-10,
+                "nonlinear_feasibility_abs": 1e-07,
+                "nonlinear_max_evaluations": 800.0,
+                "nonlinear_rank_rel": 1e-08,
+                "nonlinear_seed_perturbation_rel": 0.0001,
                 "scalar_rel": 1e-09,
-                "version": "1.0"
+                "version": "1.1"
               },
               "tracked_variable_count": 4,
               "unmodeled_entity_ids": [],
               "unsupported_constraint_ids": []
             },
-            "backend": "closed_form_v1",
+            "backend": "scipy_least_squares_v1",
             "changed_entity_ids": [],
-            "diagnostics": [],
+            "characteristic_length_mm": 4.0,
+            "diagnostics": [
+              "Nonlinear residuals are normalized by characteristic length 4 mm; angular residuals use radians.",
+              "SciPy termination: `gtol` termination condition is satisfied."
+            ],
             "feasible": true,
+            "function_evaluations": 1,
+            "jacobian_evaluations": 1,
+            "jacobian_rank": 3,
+            "jacobian_strategy": "scipy_3_point_with_central_rank_check",
+            "max_abs_residual": 0.0,
             "mode": "analyze",
+            "optimizer_terminated_successfully": true,
             "outcome": "analyzed",
             "proposed_patch": [],
             "requested_constraint_ids": [
               "constraint_horizontal"
             ],
-            "residual_norm": null,
-            "schema_version": "1.0",
-            "termination_reason": "analysis_complete"
+            "residual_count": 3,
+            "residual_norm": 0.0,
+            "schema_version": "1.1",
+            "seed_count": 3,
+            "termination_reason": "nonlinear_residual_feasible",
+            "variable_order": [
+              "point_a.x",
+              "point_a.y",
+              "point_b.x",
+              "point_b.y"
+            ]
           }
         },
         "status": "preview",

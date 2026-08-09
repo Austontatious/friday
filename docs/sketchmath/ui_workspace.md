@@ -54,7 +54,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 - The workspace requests the preview-only `analyze_constraints` command after the committed session changes. Analysis does not mutate geometry or enter undo/redo history.
 - Normal mode reports `Under-constrained`, `Fully constrained`, `Over-constrained`, `Conflicting`, or `Partially analyzed` with a short user-facing explanation.
-- `Partially analyzed` is intentional when geometry or constraints fall outside the analyzer's exact subset. It must not be presented as fully constrained merely because a closed-form edit succeeded.
+- `Partially analyzed` is intentional when geometry or constraints fall outside the nonlinear adapter's modeled subset. It must not be presented as fully constrained merely because an edit or optimizer run succeeded.
 - Request failures report `Analysis unavailable`; an in-flight analysis reports `Analyzing constraints…`.
 - Raw coverage, rank/equation counts, remaining DOF, affected constraint/entity IDs, and diagnostics are visible only under Advanced / Debug.
 - Advanced / Debug also shows the unified solver backend, run outcome, termination reason, feasibility, and residual availability.
@@ -78,7 +78,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Selected rectangles show width/height dimension labels on canvas. Selected holes show a diameter label on canvas.
 - Profile and hole selection use friendly labels in the default UI. Raw entity IDs remain available only under Advanced / Debug.
 - Circle is a first-class selectable entity with direct drawing, driving radius/diameter editing, an extrusion profile adapter, exact center/radius DOF analysis, and optional reuse as a profile hole.
-- Arc creates center/start/end points and one canonical center arc; 3-point arc creates start/through/end points and one canonical circumarc. Selection reports radius and sweep, while solver status remains explicitly partial until arc equations exist.
+- Arc creates center/start/end points and one canonical center arc; 3-point arc creates start/through/end points and one canonical circumarc. Selection reports radius and sweep, and linked arc source identities participate in nonlinear rank/DOF analysis and finite tangency validation.
 
 ## View Controls
 

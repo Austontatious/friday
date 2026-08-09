@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-08-09 - SketchMath Residual-Validated Nonlinear and Arc Solver
+
+### What Changed
+- Adopted SciPy `least_squares` as the production generalized solver behind `SolverRunResult`, with deterministic variables/seeds, scaled residual feasibility, finite-difference Jacobian rank, canonical patch replay, and diagnostics that keep optimizer termination separate from constraint success.
+- Modeled point, circle, linked line, and canonical arc variables across the documented dimensional, angular, relational, symmetry, concentricity, and tangency families; added exact linked-arc DOF, source-degeneracy rejection, and finite arc-contact validation.
+- Fixed length-unit replay for distance constraints, rejected contradictory and long-chain false solves, and made under-constrained preview proposals non-committing while retaining strict commit rejection.
+- Kept rectangle creation atomic by using preview mode only for its intentionally under-constrained intermediate solver checkpoint; all geometry, constraints, and profile subcommands remain commits.
+- Updated solver/arc ADRs, contracts, status, traceability, reference review, generated semantic evidence, and browser assertions to the adopted backend and exact modeled coverage.
+
+### Why
+- The prior ordered closed-form path could claim success for infeasible generalized systems and could not provide defensible nonlinear/arc DOF.
+- Gate B requires solver state, conflict behavior, source identity, history, and finite arc semantics to agree across backend and product surfaces.
+
+### New Env Flags
+- None. `scipy>=1.11,<2` is an unconditional production dependency; SketchMath remains behind the existing default-off feature gate.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 160 passed.
+- `PYTHONPATH=. python3 -m sketchmath.evals.run_sketchmath_evals` — 50 passed.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand --runTestsByPath src/App.test.tsx src/components/sketchmath/SketchMathWorkspace.test.tsx src/components/sketchmath/commandBuilders.test.ts src/components/sketchmath/arcGeometry.test.ts` — 63 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npm run test:e2e -- --workers=1` — TypeScript/build and all 15 shell/product browser workflows passed.
+- `PYTHONPATH=. python3 -m sketchmath.schemas.generate --check`, `docker compose config -q`, and `python3 -m pytest -q tests/test_codex_standards.py` passed.
+
+### Remaining Phase 1 Work
+- Complete the Gate B geometry/editing envelope and its single durable browser acceptance workflow before entering general topology.
+
+---
+
 ## 2026-08-08 - SketchMath Point-Backed Polyline Tool
 
 ### What Changed

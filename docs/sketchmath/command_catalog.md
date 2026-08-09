@@ -78,20 +78,20 @@ The canonical machine-readable contracts are generated from the Pydantic models 
 - `make_symmetric`
   - Version `0.6`; selection order is reference point, target point, axis start, axis end. Reflects the target across the infinite axis.
 - `make_concentric`
-  - Version `0.6`; moves the second selected circle or arc center onto the first. Circle-to-circle concentricity participates in exact linear DOF analysis; arc participation remains partial.
+  - Version `0.6`; moves the second selected circle or arc center onto the first. Circle/arc combinations participate in nonlinear residual and exact rank/DOF analysis.
 - `make_tangent`
-  - Version `0.6`; supports line-to-circle and circle-to-circle closed-form tangency with external or internal circle tangency.
-  - Finite-arc tangency is explicitly rejected with `error_code=unsupported_arc_tangency`; it is not approximated as full-circle tangency.
+  - Version `0.6`; supports line-to-circle/arc and circle/arc tangency with external or internal circle-like tangency.
+  - Finite contact is mandatory. A contact outside the selected arc span is rejected with `error_code=tangent_outside_arc_span`; it is not approximated as full-circle tangency.
 - `set_construction`
   - Version `0.7`; converts selected points and lines between regular and construction/reference geometry while preserving stable IDs, endpoint links, constraints, history, and reload behavior.
   - Lines used by a committed profile cannot be converted to construction geometry because that would silently invalidate the profile boundary.
 - `solve_constraints`
-  - Runs the conservative 2D solver over stored constraints through the unified `SolverRunResult` path.
+  - Runs the SciPy residual-validated nonlinear adapter over the full stored system through the unified `SolverRunResult` path, with a conservative closed-form fallback when SciPy is unavailable.
   - Applies only an accepted `solved` coordinate patch. Under-constrained, inconsistent, redundant, and failed proposals return structured errors with the run result and do not commit partial geometry.
 - `analyze_constraints`
   - Version `0.3`, preview-only, and non-mutating.
-  - Reports exact DOF for the covered linear subset: point and circle scalar variables; locked/fixed points/circles; horizontal, vertical, coincident, midpoint, circle concentricity, horizontal/vertical distance, radius, and diameter constraints.
-  - Returns explicit `partial` or `unknown` coverage instead of inventing DOF for nonlinear distance/angle/relation constraints, coordinate-only legacy geometry, or other unmodeled entities.
+  - Reports exact nonlinear rank/DOF for modeled point/circle/arc systems and every supported residual family.
+  - Returns explicit `partial` or `unknown` coverage instead of inventing DOF for coordinate-only legacy lines, invalid references, unsupported constraints, or other unmodeled entities.
   - Reports consistency and proven redundancy separately; a deterministic conflict ID is not claimed to be a minimal conflict set.
   - Returns the same unified `solver_run` envelope as solve mode while retaining `solver_analysis` compatibility metadata for live status.
 - `move_point`
@@ -165,7 +165,7 @@ The canonical machine-readable contracts are generated from the Pydantic models 
 - `concentric_constraint`
 - `tangent_constraint`
 
-Locked entities act as fixed anchors. The production solver only moves unlocked points, and it prefers closed-form cases over iterative search. Solver analysis uses the versioned numerical policy in `sketchmath/geometry/tolerances.py`; those values are computational tolerances, not manufacturing tolerances.
+Locked entities act as fixed anchors. The production solver proposes changes only to unlocked modeled variables and accepts them only after residual and canonical replay validation. Solver analysis uses the versioned numerical policy in `sketchmath/geometry/tolerances.py`; those values are computational tolerances, not manufacturing tolerances.
 Profile hole validation is strict: holes must be closed polygons, strictly inside the outer profile, non-touching, and non-overlapping.
 
 ## Frontend Dimension Payloads
@@ -298,9 +298,9 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 
 ## Constraint Solver Limits
 
-- No general nonlinear CAD solving yet.
-- No full CAD feature tree, trimming workflow, or sketch solver beyond the supported closed-form cases.
-- First-class circles are supported. Arc entities remain deferred and the UI labels Arc as coming soon.
+- General nonlinear solving is limited to the documented point/circle/arc residual families; coordinate-only legacy lines and unsupported geometry remain explicitly partial.
+- No full CAD feature tree or general topology/editing workflow yet.
+- First-class circles and canonical finite arcs are supported; arc participation in general planar topology remains deferred.
 - Profile detection is limited to deterministic simple line cycles; nested/general planar-region extraction remains deferred.
 - No arbitrary Python execution.
 - No hidden geometry mutation outside typed commands.

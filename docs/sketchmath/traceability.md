@@ -18,10 +18,10 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | Capability | State | Evidence surface |
 | --- | --- | --- |
 | Point/line/rectangle/circle/hole sketching | Passed | `tests/test_sketchmath_foundations.py`, `SketchMathWorkspace.test.tsx`, `frontend/e2e/sketchmath.spec.ts` |
-| Distance/angle/parallel/perpendicular/equal constraints | Passed for current closed-form subset | executor/solver tests and browser acceptance |
+| Distance/angle/parallel/perpendicular/equal constraints | Passed for modeled nonlinear subset | residual/Jacobian solver tests and browser acceptance |
 | Driving horizontal/vertical distance and radius/diameter | Passed for Phase 1 linear subset | v0.4 schema/API/solver/frontend/eval tests and live Playwright assertions |
 | Horizontal/vertical/coincident constrained drag | Passed | foundation tests and Playwright constrained-drag workflow |
-| Fixed/midpoint/collinear/symmetric/concentric/tangent constraints | Passed for the deterministic v0.6 envelope | executor/schema/API/semantic/frontend tests; finite-arc tangency is structured unsupported behavior |
+| Fixed/midpoint/collinear/symmetric/concentric/tangent constraints | Passed for the modeled v0.6 envelope | executor/schema/API/semantic/frontend tests; finite arc contacts are span-validated |
 | Mixed-geometry full-constraint lifecycle | Passed for exact point-backed line/circle subset | Playwright remaining-DOF drag, full constraint, dimension re-solve, undo/redo, reload identity, and browser-error assertion |
 | Construction/reference points and lines | Passed for canonical conversion envelope | v0.7 executor/schema/API/semantic/frontend tests plus live conversion/reload browser workflow; committed profile source lines are protected |
 | Center rectangle | Passed for canonical rectangle-bundle envelope | Center/corner unit test and live symmetric-coordinate/reload browser workflow; downstream dimensions/profile/extrusion reuse the corner-rectangle path |
@@ -64,12 +64,12 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | Requirement | Current state | Evidence | Limitation |
 | --- | --- | --- | --- |
 | SM-ARCH-001 canonical document boundary | Design accepted | ADR 004 | Document envelope and migration are not implemented. |
-| SM-ARCH-003 solver boundary | Initial implementation | ADR 005; `SolverAnalysis`; unified `SolverRunResult`; generated schema; SciPy benchmark report/artifact | Production backend remains closed-form; SciPy is `promising_not_ready`. |
-| SM-SOL-001 state reporting | Partial | Exact linear consistency/redundancy tests and semantic eval; live Normal labels plus Advanced-only diagnostics in unit and Playwright coverage | Nonlinear redundancy and minimal conflict sets are unknown. |
-| SM-SOL-002 defensible DOF | Partial | Rank-based exact DOF for point/circle linear systems; explicit partial/unknown results; UI never promotes partial coverage to fully constrained | Arc, standalone-coordinate legacy geometry, and nonlinear DOF are not exact. Arc entities are explicitly listed as unmodeled. |
-| SM-SK-001 arc geometry | Initial implementation | Canonical `arc_2d`; v0.5 center/three-point command paths; point-link sync; SVG workspace tools | Geometry/schema/API/eval/frontend tests and reload-stable live browser workflow pass; arc topology and solver equations remain open. |
+| SM-ARCH-003 solver boundary | Adopted Phase 1 backend | ADR 005; `SolverAnalysis`; unified `SolverRunResult` v1.1; generated schema; SciPy benchmark and adversarial production tests | Async cancellation remains an open operations boundary. |
+| SM-SOL-001 state reporting | Passed for modeled residual subset | Nonlinear consistency/redundancy/residual tests; live Normal labels plus Advanced diagnostics in unit and Playwright coverage | Minimal conflict sets are not claimed; conflicts are deterministic residual witnesses. |
+| SM-SOL-002 defensible DOF | Passed for modeled residual subset | Central-difference Jacobian rank over deterministic point/circle/arc variables; explicit partial/unknown results for unmodeled entities | Coordinate-only legacy geometry and future geometry families remain partial. |
+| SM-SK-001 arc geometry | Passed for canonical geometry and solver envelope | Canonical `arc_2d`; v0.5 center/three-point paths; source-link residuals; finite tangency validation; SVG/history/reload | Arc participation in general topology remains open. |
 | SM-SK-001 construction geometry | Initial implementation | Point construction flag, canonical `construction_line_2d`, v0.7 stable-ID conversion, profile dependency guard, distinct workspace styling | Creation/conversion/schema/API/eval/frontend tests and live reload-stable browser workflow pass; dedicated axis/reference-plane semantics remain open. |
-| SM-SK-003 constraints and driving dimensions | Partial | v0.4 driving dimensions plus v0.6 fixed/midpoint/collinear/symmetric/concentric/tangent commands; exact mixed line/circle browser lifecycle passes | Collinear/symmetric/tangent and existing nonlinear relations remain partial in DOF analysis; finite-arc tangency is unsupported. |
-| SM-SOL-003 invalid commit prevention | Partial | Unified solve proposals apply only on `solved`; structured inconsistent/redundant/under/failed results retain patches without commit | Generalized nonlinear residual feasibility remains unimplemented. |
+| SM-SK-003 constraints and driving dimensions | Passed for modeled families | v0.4 driving dimensions plus v0.6 fixed/midpoint/collinear/symmetric/concentric/tangent residuals; exact mixed line/circle/arc tests | General topology-derived relations remain open. |
+| SM-SOL-003 invalid commit prevention | Passed for modeled residual subset | Scaled residual gate, optimizer-success separation, finite-geometry validators, canonical replay, and non-committing under/inconsistent/redundant/failed outcomes | Async cancellation remains open. |
 | SM-UNIT-001 centralized tolerances | Initial implementation | Versioned `NumericalTolerancePolicy` | Unit expansion and display formatting remain open. |
 | SM-OPS-002 async boundary | Design accepted | ADR 006 | Job runtime is not implemented; current export remains synchronous. |

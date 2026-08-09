@@ -1,6 +1,6 @@
 # SketchMath Development Status
 
-Updated: 2026-08-08
+Updated: 2026-08-09
 
 Current phase: Phase 1 — canonical parametric architecture
 
@@ -22,7 +22,7 @@ Gate: Gate A passed
 
 - Typed deterministic 2D command execution with preview/commit.
 - Point, line, rectangle, circle, and circular-hole workflows.
-- Existing closed-form distance/angle/parallel/perpendicular/equal constraints.
+- Residual-validated nonlinear distance/angle/parallel/perpendicular/equal constraints.
 - Horizontal, vertical, and coincident constraints with endpoint-aware dragging.
 - Driving horizontal/vertical distance and radius/diameter constraints through contract version `0.4`.
 - Simple deterministic line-loop profile detection and explicit promotion.
@@ -30,7 +30,7 @@ Gate: Gate A passed
 - Orbitable deterministic 3D preview plus FreeCAD-backed STEP export/download.
 - Persistent sessions and backend-authoritative undo/redo across reload.
 - Structured errors and Normal/Advanced UI separation.
-- Versioned, non-mutating solver analysis with exact linear point-backed DOF and explicit partial/unknown coverage.
+- Versioned, non-mutating solver analysis with exact Jacobian-rank DOF for modeled point/circle/arc systems and explicit partial/unknown coverage.
 - Live Normal-mode solver labels backed by that analysis, with rank/DOF internals kept under Advanced / Debug.
 
 ## Current Gate A Validation
@@ -53,20 +53,19 @@ The build still reports the repository-wide stale Browserslist database notice. 
 
 - ADRs 004-006 define the canonical document migration, solver/licensing, and async execution boundaries.
 - Command `analyze_constraints` uses contract version `0.3`, is preview-only, and never enters history.
-- Exact rank-based analysis currently covers point/circle variables plus locked/fixed, horizontal, vertical, coincident, horizontal/vertical distance, radius, and diameter equations.
-- Nonlinear constraints and unmodeled geometry return honest partial/unknown results.
+- Exact rank-based analysis covers deterministic point/circle/arc variables plus every documented residual family; coordinate-only legacy lines and unmodeled geometry return honest partial/unknown results.
 - The live workspace now refreshes non-mutating analysis after committed changes and reports Under/Fully/Over/Conflicting/Partially analyzed without exposing rank internals in Normal mode.
 - Driving axis and circle dimensions update canonical geometry, replace same-semantic edits, persist through history/API replay, and remain exact in live solver state.
-- SciPy `least_squares` benchmarked successfully for covered nondegenerate systems, but remains unadopted because optimizer termination can mask infeasible residuals and an analytic zero-length seed failed.
+- SciPy `least_squares` is adopted behind the neutral run boundary with deterministic seeds, scaled residual feasibility, finite-geometry validation, canonical replay, and optimizer-success separation.
 - Analysis and solve now share a typed backend-neutral run result with before/after analysis, feasibility, residual availability, deterministic entity patches, termination reason, and diagnostics.
 - Canonical center and three-point arcs now share one persisted `arc_2d` model, v0.5 typed commands, stable source points, SVG rendering, structured degeneracy errors, and reload-stable history.
-- Gate B fixed, midpoint, collinear, symmetric, concentric, and tangent constraints now use typed v0.6 commands, deterministic closed-form mutation, persistence/dependency handling, constrained drag where linked geometry is addressable, and selection-aware workspace controls.
-- Fixed, midpoint, and circle concentricity extend exact linear analysis. Collinearity, symmetry, and tangency remain explicitly partial until their nonlinear equations are modeled.
+- Gate B fixed, midpoint, collinear, symmetric, concentric, and tangent constraints use typed v0.6 commands, deterministic direct interaction mutation, nonlinear solve/analysis, persistence/dependency handling, constrained drag where linked geometry is addressable, and selection-aware workspace controls.
+- Fixed, midpoint, collinear, symmetric, concentric, tangent, dimensional, and angular relations participate in nonlinear rank/DOF analysis when all referenced geometry is modeled.
 - A live mixed line/circle workflow now proves remaining-DOF drag, full constraint, dimensional edit, unified solve, undo/redo, and identical reload recovery without browser errors.
 - Canonical construction points and construction lines now use stable existing entity identities plus typed v0.7 conversion, profile-source safety checks, distinct rendering, and reload-stable workspace controls.
 - Center rectangle now provides center/corner and center-origin drag construction while committing the existing canonical rectangle bundle, so dimensions, profiles, history, reload, and extrusion remain shared.
 - Open polylines now commit atomically as stable point identities plus linked line segments, with explicit finish/cancel controls and reload-stable shared vertices.
-- Current evidence: 145 focused Python tests, 50 semantic evals, 63 focused frontend tests, 14 live Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- Current evidence: 160 focused Python tests, 50 semantic evals, 63 focused frontend tests, all 15 shell/product Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
 
 ## Gate A Outcome
 
@@ -82,9 +81,9 @@ Completed and published:
 
 ## Known Limitations
 
-- Arc solver equations, arc-aware dimensions/constraints, and arc participation in general planar topology are not implemented; solver coverage is explicitly partial.
-- Finite-arc tangency is rejected rather than approximated as full-circle tangency.
-- Production solve remains a conservative closed-form subset. Exact analysis covers its linear point/circle families; Euclidean distance, angle, parallel/perpendicular, and equality relations remain partial/unknown.
+- Arc-aware dimensions beyond radius and arc participation in general planar topology are not implemented.
+- Finite-arc tangency is supported only when the actual contact lies on the stored finite sweep; out-of-span contacts are rejected.
+- Production solve covers the documented point/circle/arc residual subset. Coordinate-only legacy lines and future geometry/constraint families remain partial/unknown.
 - Topology recognizes deterministic simple line cycles, not general planar regions.
 - The product lacks a canonical multi-body/feature document model and downstream rebuild graph.
 - Multi-sketch, property editing, model tree, and stable face/edge references are not implemented.
@@ -100,12 +99,12 @@ Completed and published:
 - Manual and AI editing share versioned typed operations.
 - Major geometry expansion waits for Gate A.
 - Solver work must start with mathematically defensible subsets and explicit unknown/partial states.
-- Solver backend adoption is deferred behind the neutral contract; SolveSpace is reference-only due GPLv3, and SciPy remains the leading permissive candidate after its first benchmark.
-- The first SciPy benchmark decision is `promising_not_ready`; residual-based feasibility, degeneracy handling, timeout/cancellation, packaging, and broader adversarial cases are required before adoption.
+- SciPy is the adopted permissive production backend behind the neutral contract; SolveSpace remains reference-only due GPLv3.
+- Residual feasibility, source/contact degeneracy, packaging, and adversarial seed/angle/conflict cases are closed for the modeled subset; async cancellation remains governed by ADR 006.
 
 ## Next Highest-Value Work
 
-Complete the remaining Gate B geometry/editing envelope (slot/polygon and safe trim/extend/split/offset/pattern flows), then expand exact solver coverage for nonlinear and arc systems.
+Complete the remaining Gate B geometry/editing envelope (slot/polygon and safe trim/extend/split/offset/pattern flows), then enter general planar topology.
 
 ## Release Status
 

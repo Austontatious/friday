@@ -5,7 +5,7 @@ The goal is to stop guessing at sketcher UX and solver architecture by comparing
 
 ## 2026 Gate B Architecture Update
 
-ADR 005 supersedes the earlier frontend-first solver recommendation for the backend-authoritative product architecture. The current production solver remains in place while a solver-neutral typed analysis/solve contract is established. SolveSpace remains reference-only because its official repository is GPL-3.0-or-later. FreeCAD remains an LGPL kernel/oracle behind a subprocess boundary. SciPy `least_squares` remains the leading permissive nonlinear candidate after the local benchmark in `nonlinear_solver_benchmark.md`: nondegenerate cases passed, but optimizer success did not imply constraint feasibility and the analytic zero-length seed failed. No external solver has been adopted into production.
+ADR 005 supersedes the earlier frontend-first solver recommendation for the backend-authoritative product architecture. SolveSpace remains reference-only because its official repository is GPL-3.0-or-later. FreeCAD remains an LGPL kernel/oracle behind a subprocess boundary. SciPy `least_squares` is the adopted BSD-licensed production backend behind the solver-neutral proposal/result contract. The adapter closes the benchmark failures documented in `nonlinear_solver_benchmark.md` by classifying feasibility from scaled residuals, using deterministic perturbed seeds, validating finite geometry, and replaying canonical rounded patches; optimizer success alone is never accepted.
 
 ## Bottom Line
 
