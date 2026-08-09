@@ -155,7 +155,7 @@ def _extrude_feature(depth: float = 10.0) -> dict[str, object]:
         "body_id": "body_main",
         "sketch_id": "sketch_main",
         "profile_id": "profile_box",
-        "source_region_id": "region_plate",
+        "source_region_id": None,
         "dependencies": [],
         "parameters": {
             "depth_mm": depth,
@@ -765,7 +765,6 @@ def test_sketchmath_feature_history_preview_commit_reload_conflict_and_undo_redo
     client = TestClient(create_app())
     selection = _profile_selection_context_with_hole()
     selection["items"][0]["holes"] = ["profile_inner"]
-    selection["items"][0]["source_region_id"] = "region_plate"
     created = client.post("/api/sketchmath/sessions", json={"selection_context": selection})
 
     assert created.status_code == 200
@@ -829,6 +828,51 @@ def test_sketchmath_feature_history_preview_commit_reload_conflict_and_undo_redo
     assert redone.json()["document"]["revision"] == 4
     assert redone.json()["document"]["features"][0]["parameters"]["depth_mm"] == 25.0
     assert redone.json()["document"]["last_rebuild"]["records"][0]["output_signature"] == replacement_signature
+
+    point_command = _command(
+        "define_point",
+        "feature_history_point",
+        mode="commit",
+        parameters={"name": "inspection_point", "coords": [30, 30]},
+    )
+    point_added = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": point_command})
+    assert point_added.status_code == 200, point_added.text
+    assert point_added.json()["document"]["revision"] == 5
+
+    undo_after_sketch_edit = client.post(f"/api/sketchmath/sessions/{session_id}/features/revert")
+    assert undo_after_sketch_edit.status_code == 200
+    assert undo_after_sketch_edit.json()["document"]["revision"] == 6
+    assert undo_after_sketch_edit.json()["document"]["features"][0]["parameters"]["depth_mm"] == 10.0
+    assert any(
+        item["id"] == "inspection_point"
+        for item in undo_after_sketch_edit.json()["document"]["sketches"][0]["state"]["items"]
+    )
+
+    redo_after_sketch_edit = client.post(f"/api/sketchmath/sessions/{session_id}/features/redo")
+    assert redo_after_sketch_edit.status_code == 200
+    assert redo_after_sketch_edit.json()["document"]["revision"] == 7
+    assert redo_after_sketch_edit.json()["document"]["features"][0]["parameters"]["depth_mm"] == 25.0
+    assert any(
+        item["id"] == "inspection_point"
+        for item in redo_after_sketch_edit.json()["document"]["sketches"][0]["state"]["items"]
+    )
+
+    invalidating_delete = _command(
+        "delete_entity",
+        "delete_feature_source",
+        mode="commit",
+        selection=["profile_box"],
+        parameters={"cascade": True},
+    )
+    refused = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": invalidating_delete})
+    assert refused.status_code == 409
+    error = refused.json()["detail"]["error"]
+    assert error["code"] == "feature_rebuild_error"
+    assert error["detail"]["error_code"] == "feature_reference_invalidated"
+    after_refusal = client.get(f"/api/sketchmath/sessions/{session_id}").json()
+    assert after_refusal["document"]["revision"] == 7
+    assert after_refusal["history_length"] == 1
+    assert any(item["id"] == "profile_box" for item in after_refusal["selection_context"]["items"])
     client.close()
 
 
