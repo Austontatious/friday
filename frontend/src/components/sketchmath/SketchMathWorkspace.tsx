@@ -22,6 +22,7 @@ import type {
   SketchMathFeatureCommand,
   SketchMathFeatureCommandResponse,
   SketchMathHistoryEntry,
+  SketchMathExtrudeParameters,
   SketchMathHoleParameters,
   SketchMathMode,
   SketchMathOperationResult,
@@ -1749,9 +1750,9 @@ const SketchMathWorkspace = () => {
     });
   };
 
-  const handleUpdateFeatureDepth = async (
+  const handleUpdateExtrusion = async (
     feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
-    depth: number,
+    parameters: SketchMathExtrudeParameters,
   ) => {
     if (!sketchDocument) return;
     await commitFeatureOperation({
@@ -1764,7 +1765,7 @@ const SketchMathWorkspace = () => {
       parameters: {
         feature: {
           ...feature,
-          parameters: { ...feature.parameters, depth_mm: depth },
+          parameters,
         },
       },
     });
@@ -4329,7 +4330,7 @@ const SketchMathWorkspace = () => {
                   onAddOuterChamfer={(feature, edgeReferences, distance) => (
                     void handleAddOuterChamfer(feature, edgeReferences, distance)
                   )}
-                  onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
+                  onUpdateExtrusion={(feature, parameters) => void handleUpdateExtrusion(feature, parameters)}
                   onUpdateFilletRadius={(feature, radius) => void handleUpdateFilletRadius(feature, radius)}
                   onUpdateChamferDistance={(feature, distance) => void handleUpdateChamferDistance(feature, distance)}
                   onUpdateHole={(feature, parameters) => (

@@ -399,7 +399,7 @@ test.describe("SketchMath workspace", () => {
     expect(first.feature_history_length).toBe(1);
 
     await page.getByLabel(`Feature depth ${featureId}`).fill("25");
-    await panel.getByRole("button", { name: "Apply depth" }).click();
+    await panel.getByRole("button", { name: "Apply extrusion" }).click();
     await expect(panel).toContainText("Revision 3");
     const replacedResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
     const replaced = await replacedResponse.json() as FeatureSnapshot;
@@ -464,7 +464,7 @@ test.describe("SketchMath workspace", () => {
     await expect(existingHoleEditor.getByLabel("Existing hole depth Hole 1")).toHaveValue("10");
 
     await page.getByLabel(`Feature depth ${featureId}`).fill("30");
-    await page.getByTestId(`sketchmath-feature-${featureId}`).getByRole("button", { name: "Apply depth" }).click();
+    await page.getByTestId(`sketchmath-feature-${featureId}`).getByRole("button", { name: "Apply extrusion" }).click();
     await expect(page.getByTestId("sketchmath-feature-history-panel")).toContainText("Revision 10");
     const recoveredResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
     const recovered = await recoveredResponse.json() as FeatureSnapshot & {
@@ -485,6 +485,64 @@ test.describe("SketchMath workspace", () => {
     const graphDownloadPromise = page.waitForEvent("download");
     await graphDownload.click();
     expect((await graphDownloadPromise).suggestedFilename()).toMatch(/\.stl$/);
+  });
+
+  test("edits extrusion direction and extent with deterministic rebuild history", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Rectangle" }).first().click();
+    await clickSvgViewBoxPoint(page, 160, 120);
+    await clickSvgViewBoxPoint(page, 360, 220);
+    const panel = page.getByTestId("sketchmath-feature-history-panel");
+    await page.getByLabel("Feature extrusion depth").fill("10");
+    await panel.getByRole("button", { name: "Add extrusion feature" }).click();
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+    type ExtrusionSnapshot = {
+      document: {
+        features: Array<{ feature_id: string; parameters: Record<string, any> }>;
+        last_rebuild: { records: Array<{ output_signature: string; measurements: { bounds_mm: number[] } }> };
+      };
+      feature_history_length: number;
+    };
+    const created = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as ExtrusionSnapshot;
+    const featureId = created.document.features[0].feature_id;
+    const editor = page.getByTestId(`sketchmath-feature-${featureId}`);
+
+    await editor.getByLabel(`Feature extent ${featureId}`).selectOption("symmetric");
+    await editor.getByLabel(`Feature direction ${featureId}`).selectOption("negative");
+    await editor.getByRole("button", { name: "Apply extrusion" }).click();
+    const symmetric = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as ExtrusionSnapshot;
+    expect(symmetric.document.features[0]).toMatchObject({
+      feature_id: featureId,
+      parameters: { depth_mm: 10, extent: "symmetric", direction: "negative", second_depth_mm: null },
+    });
+    expect(symmetric.document.last_rebuild.records[0].measurements.bounds_mm.slice(-2)).toEqual([-5, 5]);
+
+    await editor.getByLabel(`Feature extent ${featureId}`).selectOption("two_sided");
+    await editor.getByLabel(`Feature direction ${featureId}`).selectOption("positive");
+    await editor.getByLabel(`Feature second depth ${featureId}`).fill("4");
+    await editor.getByRole("button", { name: "Apply extrusion" }).click();
+    const twoSided = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as ExtrusionSnapshot;
+    expect(twoSided.document.features[0]).toMatchObject({
+      feature_id: featureId,
+      parameters: { depth_mm: 10, extent: "two_sided", direction: "positive", second_depth_mm: 4 },
+    });
+    expect(twoSided.document.last_rebuild.records[0].measurements.bounds_mm.slice(-2)).toEqual([-4, 10]);
+    expect(twoSided.document.last_rebuild.records[0].output_signature).not.toBe(symmetric.document.last_rebuild.records[0].output_signature);
+
+    await panel.getByRole("button", { name: "Undo feature" }).click();
+    await expect(editor.getByLabel(`Feature extent ${featureId}`)).toHaveValue("symmetric");
+    await panel.getByRole("button", { name: "Redo feature" }).click();
+    await expect(editor.getByLabel(`Feature extent ${featureId}`)).toHaveValue("two_sided");
+    await expect(editor.getByLabel(`Feature second depth ${featureId}`)).toHaveValue("4");
+
+    await page.reload();
+    await expect(page.getByLabel(`Feature extent ${featureId}`)).toHaveValue("two_sided");
+    await expect(page.getByLabel(`Feature direction ${featureId}`)).toHaveValue("positive");
+    await expect(page.getByLabel(`Feature second depth ${featureId}`)).toHaveValue("4");
+    const reloaded = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as ExtrusionSnapshot;
+    expect(reloaded.feature_history_length).toBe(3);
+    expect(reloaded.document.features[0].feature_id).toBe(featureId);
   });
 
   test("edits a full revolve axis with stable history and reload identity", async ({ page }) => {

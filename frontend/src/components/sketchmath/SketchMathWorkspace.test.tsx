@@ -1197,7 +1197,7 @@ describe("SketchMath workspace", () => {
       onAddFullRevolve,
       onAddOuterFillet: jest.fn(),
       onAddOuterChamfer: jest.fn(),
-      onUpdateDepth: jest.fn(),
+      onUpdateExtrusion: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
       onUpdateHole: jest.fn(),
@@ -1320,7 +1320,7 @@ describe("SketchMath workspace", () => {
       onAddFullRevolve: jest.fn(),
       onAddOuterFillet,
       onAddOuterChamfer: jest.fn(),
-      onUpdateDepth: jest.fn(),
+      onUpdateExtrusion: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
       onUpdateHole: jest.fn(),
@@ -1493,6 +1493,7 @@ describe("SketchMath workspace", () => {
     const onRenameFeature = jest.fn();
     const onSetDesignParameter = jest.fn();
     const onUpdateHole = jest.fn();
+    const onUpdateExtrusion = jest.fn();
 
     render(<FeatureHistoryPanel
       document={document}
@@ -1513,7 +1514,7 @@ describe("SketchMath workspace", () => {
       onAddFullRevolve={jest.fn()}
       onAddOuterFillet={jest.fn()}
       onAddOuterChamfer={jest.fn()}
-      onUpdateDepth={jest.fn()}
+      onUpdateExtrusion={onUpdateExtrusion}
       onUpdateFilletRadius={jest.fn()}
       onUpdateChamferDistance={jest.fn()}
       onUpdateHole={onUpdateHole}
@@ -1544,6 +1545,16 @@ describe("SketchMath workspace", () => {
     await userEvent.type(widthInput, "100");
     await userEvent.click(screen.getByRole("button", { name: "Apply" }));
     expect(onSetDesignParameter).toHaveBeenCalledWith("plate_width_mm", 100);
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Feature extent feature_internal_extrude" }), "symmetric");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Feature direction feature_internal_extrude" }), "negative");
+    await userEvent.click(within(screen.getByTestId("sketchmath-feature-feature_internal_extrude")).getByRole("button", { name: "Apply extrusion" }));
+    expect(onUpdateExtrusion).toHaveBeenCalledWith(features[0], {
+      ...features[0].parameters,
+      extent: "symmetric",
+      direction: "negative",
+      second_depth_mm: null,
+    });
 
     const holeDiameter = screen.getByRole("spinbutton", { name: "Existing hole diameter Mount hole" });
     await userEvent.clear(holeDiameter);

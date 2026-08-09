@@ -6,6 +6,7 @@ import type {
   SketchMathDocument,
   SketchMathFeature,
   SketchMathFeatureBuildRecord,
+  SketchMathExtrudeParameters,
   SketchMathHoleParameters,
   SketchMathLineEntity,
   SketchMathProfileEntity,
@@ -26,6 +27,7 @@ type HoleDraft = {
 };
 
 type RevolveDraft = { axisId: string; angle: string };
+type ExtrusionDraft = { depth: string; extent: SketchMathExtrudeParameters["extent"]; secondDepth: string; direction: SketchMathExtrudeParameters["direction"] };
 
 type FeatureHistoryPanelProps = {
   document: SketchMathDocument;
@@ -54,7 +56,7 @@ type FeatureHistoryPanelProps = {
     edgeReferences: SketchMathSemanticTopologyReference[],
     distance: number,
   ) => void;
-  onUpdateDepth: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, depth: number) => void;
+  onUpdateExtrusion: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, parameters: SketchMathExtrudeParameters) => void;
   onUpdateFilletRadius: (feature: Extract<SketchMathFeature, { feature_type: "fillet" }>, radius: number) => void;
   onUpdateChamferDistance: (feature: Extract<SketchMathFeature, { feature_type: "chamfer" }>, distance: number) => void;
   onUpdateHole: (
@@ -136,7 +138,7 @@ const FeatureHistoryPanel = ({
   onAddFullRevolve,
   onAddOuterFillet,
   onAddOuterChamfer,
-  onUpdateDepth,
+  onUpdateExtrusion,
   onUpdateFilletRadius,
   onUpdateChamferDistance,
   onUpdateHole,
@@ -150,7 +152,7 @@ const FeatureHistoryPanel = ({
   onUndo,
   onRedo,
 }: FeatureHistoryPanelProps) => {
-  const [depthDrafts, setDepthDrafts] = useState<Record<string, string>>({});
+  const [extrusionDrafts, setExtrusionDrafts] = useState<Record<string, ExtrusionDraft>>({});
   const [holeDrafts, setHoleDrafts] = useState<Record<string, HoleDraft>>({});
   const [filletDrafts, setFilletDrafts] = useState<Record<string, string>>({});
   const [chamferDrafts, setChamferDrafts] = useState<Record<string, string>>({});
@@ -177,10 +179,15 @@ const FeatureHistoryPanel = ({
   );
 
   useEffect(() => {
-    setDepthDrafts(Object.fromEntries(
+    setExtrusionDrafts(Object.fromEntries(
       document.features
         .filter((feature): feature is Extract<SketchMathFeature, { feature_type: "extrude" }> => feature.feature_type === "extrude")
-        .map((feature) => [feature.feature_id, String(feature.parameters.depth_mm)]),
+        .map((feature) => [feature.feature_id, {
+          depth: String(feature.parameters.depth_mm),
+          extent: feature.parameters.extent,
+          secondDepth: String(feature.parameters.second_depth_mm ?? ""),
+          direction: feature.parameters.direction,
+        }]),
     ));
   }, [document.features]);
 
@@ -509,10 +516,21 @@ const FeatureHistoryPanel = ({
           <Text fontSize="sm" opacity={0.72}>No committed features yet.</Text>
         ) : document.features.map((feature, featureIndex) => {
           const record = buildRecords[feature.feature_id];
-          const depthDraft = feature.feature_type === "extrude"
-            ? depthDrafts[feature.feature_id] ?? String(feature.parameters.depth_mm)
-            : "";
-          const nextDepth = feature.feature_type === "extrude" ? validDepth(depthDraft) : null;
+          const extrusionDraft = feature.feature_type === "extrude" ? extrusionDrafts[feature.feature_id] : undefined;
+          const nextDepth = validDepth(extrusionDraft?.depth || "");
+          const nextSecondDepth = validDepth(extrusionDraft?.secondDepth || "");
+          const nextExtrusionParameters: SketchMathExtrudeParameters | null = feature.feature_type === "extrude"
+            && extrusionDraft
+            && nextDepth != null
+            && (extrusionDraft.extent !== "two_sided" || nextSecondDepth != null)
+            ? {
+              ...feature.parameters,
+              depth_mm: nextDepth,
+              extent: extrusionDraft.extent,
+              second_depth_mm: extrusionDraft.extent === "two_sided" ? nextSecondDepth : null,
+              direction: extrusionDraft.direction,
+            }
+            : null;
           const filletDraft = filletDrafts[feature.feature_id]
             ?? (feature.feature_type === "fillet" ? String(feature.parameters.radius_mm) : "2");
           const nextFilletRadius = validDepth(filletDraft);
@@ -649,17 +667,47 @@ const FeatureHistoryPanel = ({
                     min="0.01"
                     step="0.01"
                     aria-label={`Feature depth ${feature.feature_id}`}
-                    value={depthDraft}
-                    onChange={(event) => setDepthDrafts((current) => ({ ...current, [feature.feature_id]: event.target.value }))}
+                    value={extrusionDraft?.depth || ""}
+                    onChange={(event) => setExtrusionDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], depth: event.target.value } }))}
                     width="110px"
                   />
+                  <Select
+                    aria-label={`Feature extent ${feature.feature_id}`}
+                    value={extrusionDraft?.extent || "one_sided"}
+                    onChange={(event) => setExtrusionDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], extent: event.target.value as SketchMathExtrudeParameters["extent"], secondDepth: current[feature.feature_id]?.secondDepth || String(feature.parameters.depth_mm) } }))}
+                    width="130px"
+                  >
+                    <option value="one_sided">One-sided</option>
+                    <option value="symmetric">Symmetric</option>
+                    <option value="two_sided">Two-sided</option>
+                  </Select>
+                  <Select
+                    aria-label={`Feature direction ${feature.feature_id}`}
+                    value={extrusionDraft?.direction || "positive"}
+                    onChange={(event) => setExtrusionDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], direction: event.target.value as SketchMathExtrudeParameters["direction"] } }))}
+                    width="120px"
+                  >
+                    <option value="positive">Positive</option>
+                    <option value="negative">Negative</option>
+                  </Select>
+                  {extrusionDraft?.extent === "two_sided" ? (
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      aria-label={`Feature second depth ${feature.feature_id}`}
+                      value={extrusionDraft.secondDepth}
+                      onChange={(event) => setExtrusionDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], secondDepth: event.target.value } }))}
+                      width="110px"
+                    />
+                  ) : null}
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => nextDepth != null && onUpdateDepth(feature, nextDepth)}
-                    isDisabled={nextDepth == null || nextDepth === feature.parameters.depth_mm || busy}
+                    onClick={() => nextExtrusionParameters && onUpdateExtrusion(feature, nextExtrusionParameters)}
+                    isDisabled={!nextExtrusionParameters || JSON.stringify(nextExtrusionParameters) === JSON.stringify(feature.parameters) || busy}
                   >
-                    Apply depth
+                    Apply extrusion
                   </Button>
                 </HStack>
               ) : null}
