@@ -332,7 +332,7 @@ test.describe("SketchMath workspace", () => {
 
     await expect(createFeatureButton).toBeEnabled();
     await expect(page.getByTestId("sketchmath-command-panel")).toHaveCount(0);
-    await expect(page.getByLabel("Extrusion depth")).toHaveValue("10");
+    await expect(page.getByLabel("Extrusion depth", { exact: true })).toHaveValue("10");
     await createFeatureButton.click();
     await expect(page.getByTestId("sketchmath-cad-feature-summary")).toContainText("Extrude preview ready: profile accepted with 1 hole");
     await expect(page.getByTestId("sketchmath-preview-controls")).toBeVisible();
@@ -729,10 +729,13 @@ test.describe("SketchMath workspace", () => {
     await clickSvgViewBoxPoint(page, 340, 230);
 
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
-    const widthBeforeReload = Number(await page.getByLabel("Rectangle width").inputValue());
-    const heightBeforeReload = Number(await page.getByLabel("Rectangle height").inputValue());
-    expect(Math.abs(widthBeforeReload - 160)).toBeLessThan(3);
-    expect(Math.abs(heightBeforeReload - 100)).toBeLessThan(3);
+    const dimensionPanel = page.getByTestId("sketchmath-workflow-dimensions");
+    const rectangleWidth = dimensionPanel.getByLabel("Rectangle width");
+    const rectangleHeight = dimensionPanel.getByLabel("Rectangle height");
+    await expect.poll(async () => Math.abs(Number(await rectangleWidth.inputValue()) - 160)).toBeLessThan(3);
+    await expect.poll(async () => Math.abs(Number(await rectangleHeight.inputValue()) - 100)).toBeLessThan(3);
+    const widthBeforeReload = Number(await rectangleWidth.inputValue());
+    const heightBeforeReload = Number(await rectangleHeight.inputValue());
     const rectanglePoints = page.locator('[data-testid^="entity-rect_"][data-entity-type="point_2d"] circle');
     await expect(rectanglePoints).toHaveCount(4);
     const coordinates = await rectanglePoints.evaluateAll((points) => points.map((point) => ({
@@ -1280,8 +1283,8 @@ test.describe("SketchMath workspace", () => {
     await expect(page.locator('[data-entity-type="profile_2d"]')).toHaveCount(3);
     await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(4);
 
-    const undo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Undo" });
-    const redo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Redo" });
+    const undo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Undo", exact: true });
+    const redo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Redo", exact: true });
     await undo.click();
     await expect(page.locator('[data-entity-type="profile_2d"]')).toHaveCount(2);
     await redo.click();
@@ -1388,8 +1391,8 @@ test.describe("SketchMath workspace", () => {
     await clickSvgViewBoxPoint(page, 350, 180);
     await expect(page.locator('[data-entity-type="circle_2d"]')).toHaveCount(1);
 
-    const undo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Undo" });
-    const redo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Redo" });
+    const undo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Undo", exact: true });
+    const redo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Redo", exact: true });
     for (let index = 0; index < 4; index += 1) await undo.click();
     await expect(page.locator('[data-entity-type="circle_2d"]')).toHaveCount(0);
     await expect(page.locator('[data-testid^="entity-line_"]')).toHaveCount(0);
