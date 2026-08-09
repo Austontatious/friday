@@ -100,6 +100,7 @@ class Profile2DEntity(_EntityBase):
     closed: bool = True
     holes: list[str] = Field(default_factory=list)
     source_line_ids: list[str] = Field(default_factory=list)
+    source_curve_ids: list[str] = Field(default_factory=list)
     source_circle_id: str | None = None
 
 

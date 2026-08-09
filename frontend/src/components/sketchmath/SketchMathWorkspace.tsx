@@ -67,6 +67,14 @@ import {
   buildConcentricCommand,
   buildTangentCommand,
   buildSetConstructionCommand,
+  buildDefineRegularPolygonCommand,
+  buildDefineSlotCommand,
+  buildSplitLineCommand,
+  buildTrimLineCommand,
+  buildExtendLineCommand,
+  buildOffsetCurveCommand,
+  buildCopyLinearCommand,
+  buildMirrorCommand,
   buildDetectProfilesCommand,
   buildMovePointCommand,
   buildSetLengthCommand,
@@ -102,6 +110,9 @@ type WorkspaceViewMode = "sketch" | "solid";
 type CircleDraft = { center: Point; current: Point };
 type ArcDraft = { points: Point[]; current: Point };
 type PolylineDraft = { points: Point[]; current: Point };
+type SlotDraft = { start: Point; current: Point };
+type PolygonDraft = { center: Point; current: Point };
+type SelectionBoxDraft = { start: Point; current: Point };
 type CadExportArtifact = {
   stepPath: string;
   filename: string;
@@ -193,6 +204,21 @@ const pointsMatch = (point: SketchMathEntity | undefined, coords: [number, numbe
   !!point && isPointEntity(point) && point.coords[0] === coords[0] && point.coords[1] === coords[1];
 
 const distanceBetween = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+
+const entityIntersectsBox = (entity: SketchMathEntity, start: Point, current: Point): boolean => {
+  const minX = Math.min(start.x, current.x);
+  const maxX = Math.max(start.x, current.x);
+  const minY = Math.min(start.y, current.y);
+  const maxY = Math.max(start.y, current.y);
+  const inside = (point: Point) => point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY;
+  if (isPointEntity(entity)) return inside({ x: entity.coords[0], y: entity.coords[1] });
+  if (isLineEntity(entity)) return inside({ x: entity.start[0], y: entity.start[1] }) && inside({ x: entity.end[0], y: entity.end[1] });
+  if (isCircleEntity(entity) || isArcEntity(entity)) {
+    return entity.center[0] - entity.radius >= minX && entity.center[0] + entity.radius <= maxX && entity.center[1] - entity.radius >= minY && entity.center[1] + entity.radius <= maxY;
+  }
+  if (isClosedProfileEntity(entity)) return entity.vertices.every(([x, y]) => inside({ x, y }));
+  return false;
+};
 
 const profileCenter = (profile: Extract<SketchMathEntity, { type: "profile_2d" }>): Point | null => {
   const vertices = profile.vertices.filter((vertex, index) => index === 0 || vertex[0] !== profile.vertices[0][0] || vertex[1] !== profile.vertices[0][1]);
@@ -401,6 +427,9 @@ const SketchMathWorkspace = () => {
   const [circleDraft, setCircleDraft] = useState<CircleDraft | null>(null);
   const [arcDraft, setArcDraft] = useState<ArcDraft | null>(null);
   const [polylineDraft, setPolylineDraft] = useState<PolylineDraft | null>(null);
+  const [slotDraft, setSlotDraft] = useState<SlotDraft | null>(null);
+  const [polygonDraft, setPolygonDraft] = useState<PolygonDraft | null>(null);
+  const [selectionBox, setSelectionBox] = useState<SelectionBoxDraft | null>(null);
   const [profileCandidates, setProfileCandidates] = useState<SketchMathProfileCandidate[]>([]);
   const [solverOutcome, setSolverOutcome] = useState<"Conflict" | "Solve failed" | null>(null);
   const [solverAnalysis, setSolverAnalysis] = useState<SketchMathSolverAnalysis | null>(null);
@@ -429,6 +458,10 @@ const SketchMathWorkspace = () => {
   const [holeDiameterValue, setHoleDiameterValue] = useState("8");
   const [circleRadiusValue, setCircleRadiusValue] = useState("10");
   const [circleDiameterValue, setCircleDiameterValue] = useState("20");
+  const [slotWidthValue, setSlotWidthValue] = useState("20");
+  const [polygonSidesValue, setPolygonSidesValue] = useState("6");
+  const [offsetValue, setOffsetValue] = useState("10");
+  const [patternCountValue, setPatternCountValue] = useState("3");
   const [selectedHoleDiameterDraft, setSelectedHoleDiameterDraft] = useState("");
   const [selectedHoleCenterXDraft, setSelectedHoleCenterXDraft] = useState("");
   const [selectedHoleCenterYDraft, setSelectedHoleCenterYDraft] = useState("");
@@ -1516,6 +1549,9 @@ const SketchMathWorkspace = () => {
     setCircleDraft(null);
     setArcDraft(null);
     setPolylineDraft(null);
+    setSlotDraft(null);
+    setPolygonDraft(null);
+    setSelectionBox(null);
     clearRectangleInteraction();
     setTranslationOutcome(null);
     setPendingCommandText("");
@@ -1734,6 +1770,51 @@ const SketchMathWorkspace = () => {
       })();
       return;
     }
+    if (tool === "slot") {
+      if (!slotDraft) {
+        setSlotDraft({ start: point, current: point });
+        clearErrorState();
+        return;
+      }
+      const width = Number(slotWidthValue);
+      if (!Number.isFinite(width) || width <= 0 || distanceBetween(slotDraft.start, point) <= 0.01) {
+        setUserError("Slot needs distinct centers and a positive width.");
+        return;
+      }
+      const baseId = `slot_${Date.now().toString(36)}`;
+      setSlotDraft(null);
+      void (async () => {
+        const result = await commitCommand(buildDefineSlotCommand(slotDraft.start, point, width, baseId));
+        if (result) {
+          setSelectedEntityIds([`profile_${baseId}`]);
+          setTool("select");
+        }
+      })();
+      return;
+    }
+    if (tool === "polygon") {
+      if (!polygonDraft) {
+        setPolygonDraft({ center: point, current: point });
+        clearErrorState();
+        return;
+      }
+      const sides = Number(polygonSidesValue);
+      const radius = Number(distanceBetween(polygonDraft.center, point).toFixed(2));
+      if (!Number.isInteger(sides) || sides < 3 || sides > 128 || radius <= 0) {
+        setUserError("Polygon needs 3–128 sides and a positive radius.");
+        return;
+      }
+      const baseId = `polygon_${Date.now().toString(36)}`;
+      setPolygonDraft(null);
+      void (async () => {
+        const result = await commitCommand(buildDefineRegularPolygonCommand(polygonDraft.center, radius, sides, baseId));
+        if (result) {
+          setSelectedEntityIds([`profile_${baseId}`]);
+          setTool("select");
+        }
+      })();
+      return;
+    }
     if (tool === "rectangle" || tool === "center_rectangle") {
       if (!rectangleDraft) {
         setRectangleDraft({ anchor: point, current: point });
@@ -1775,6 +1856,10 @@ const SketchMathWorkspace = () => {
       viewPanRef.current = { last: point };
       return;
     }
+    if (tool === "box_select" && event.button === 0) {
+      setSelectionBox({ start: point, current: point });
+      return;
+    }
     if ((tool !== "rectangle" && tool !== "center_rectangle") || event.button !== 0) {
       return;
     }
@@ -1812,6 +1897,10 @@ const SketchMathWorkspace = () => {
         void previewCommand(buildMovePointCommand(drag.entityId, resolvedPoint));
       }, 80);
     }
+    if (tool === "box_select" && selectionBox) {
+      setSelectionBox({ ...selectionBox, current: point });
+      return;
+    }
     if (tool === "circle" && circleDraft) {
       setCircleDraft({ ...circleDraft, current: point });
       return;
@@ -1822,6 +1911,14 @@ const SketchMathWorkspace = () => {
     }
     if (tool === "polyline" && polylineDraft) {
       setPolylineDraft({ ...polylineDraft, current: point });
+      return;
+    }
+    if (tool === "slot" && slotDraft) {
+      setSlotDraft({ ...slotDraft, current: point });
+      return;
+    }
+    if (tool === "polygon" && polygonDraft) {
+      setPolygonDraft({ ...polygonDraft, current: point });
       return;
     }
     if (tool !== "rectangle" && tool !== "center_rectangle") {
@@ -1852,6 +1949,17 @@ const SketchMathWorkspace = () => {
   const handleCanvasMouseUp = (point: Point, event: React.MouseEvent<SVGSVGElement>) => {
     if (viewPanRef.current) {
       viewPanRef.current = null;
+      return;
+    }
+    if (tool === "box_select" && selectionBox) {
+      const nextSelection = committedEntities
+        .filter((entity) => entityIntersectsBox(entity, selectionBox.start, point))
+        .map((entity) => entity.id);
+      setSelectedEntityIds(nextSelection);
+      setRectangleSelectionDetail(null);
+      setSelectionBox(null);
+      setTool("select");
+      clearErrorState();
       return;
     }
     if (pointDragRef.current) {
@@ -1909,6 +2017,18 @@ const SketchMathWorkspace = () => {
     }
     if (tool === "polyline") {
       setPolylineDraft(null);
+      clearErrorState();
+    }
+    if (tool === "slot") {
+      setSlotDraft(null);
+      clearErrorState();
+    }
+    if (tool === "polygon") {
+      setPolygonDraft(null);
+      clearErrorState();
+    }
+    if (tool === "box_select") {
+      setSelectionBox(null);
       clearErrorState();
     }
     if (tool === "pan") {
@@ -2597,6 +2717,9 @@ const SketchMathWorkspace = () => {
         setCircleDraft(null);
         setArcDraft(null);
         setPolylineDraft(null);
+        setSlotDraft(null);
+        setPolygonDraft(null);
+        setSelectionBox(null);
         setTool("select");
         clearErrorState();
         return;
@@ -2790,6 +2913,64 @@ const SketchMathWorkspace = () => {
     }
   };
 
+  const orderedSelectedLineIds = () => selectedEntityIds.filter((entityId) => {
+    const entity = committedEntities.find((candidate) => candidate.id === entityId);
+    return Boolean(entity && isLineEntity(entity));
+  });
+
+  const runSplitLine = async () => {
+    const [lineId] = orderedSelectedLineIds();
+    if (!lineId || orderedSelectedLineIds().length !== 1) return;
+    const result = await commitCommand(buildSplitLineCommand(lineId));
+    if (result) setSelectedEntityIds(result.changed_entity_ids);
+  };
+
+  const runTrimLine = async () => {
+    const lineIds = orderedSelectedLineIds();
+    if (lineIds.length !== 2) return;
+    const result = await commitCommand(buildTrimLineCommand(lineIds[0], lineIds[1]));
+    if (result) setSelectedEntityIds([lineIds[0]]);
+  };
+
+  const runExtendLine = async () => {
+    const lineIds = orderedSelectedLineIds();
+    if (lineIds.length !== 2) return;
+    const result = await commitCommand(buildExtendLineCommand(lineIds[0], lineIds[1]));
+    if (result) setSelectedEntityIds([lineIds[0]]);
+  };
+
+  const runOffsetCurve = async () => {
+    if (selectedEntities.length !== 1 || !["line_2d", "construction_line_2d", "circle_2d", "arc_2d"].includes(selectedEntities[0].type)) return;
+    const distance = Number(offsetValue);
+    if (!Number.isFinite(distance) || distance <= 0) {
+      setUserError("Offset distance must be positive.");
+      return;
+    }
+    const result = await commitCommand(buildOffsetCurveCommand(selectedEntities[0].id, distance));
+    if (result) setSelectedEntityIds(result.changed_entity_ids.slice(-1));
+  };
+
+  const runDuplicate = async () => {
+    if (selectedEntityIds.length === 0) return;
+    const result = await commitCommand(buildCopyLinearCommand(selectedEntityIds, { x: 10, y: 10 }, 1));
+    if (result) setSelectedEntityIds(result.changed_entity_ids);
+  };
+
+  const runLinearPattern = async () => {
+    const count = Number(patternCountValue);
+    if (selectedEntityIds.length === 0 || !Number.isInteger(count) || count < 1 || count > 32) {
+      setUserError("Pattern count must be an integer from 1 to 32.");
+      return;
+    }
+    const result = await commitCommand(buildCopyLinearCommand(selectedEntityIds, { x: 25, y: 0 }, count));
+    if (result) setSelectedEntityIds(result.changed_entity_ids);
+  };
+
+  const runMirrorSelection = async () => {
+    if (selectedEntityIds.length === 0) return;
+    await commitCommand(buildMirrorCommand(selectedEntityIds, 0));
+  };
+
   const handleToolChange = (nextTool: SketchMathMode) => {
     if (nextTool !== tool) {
       clearRectangleInteraction();
@@ -2798,6 +2979,9 @@ const SketchMathWorkspace = () => {
       setCircleDraft(null);
       setArcDraft(null);
       setPolylineDraft(null);
+      setSlotDraft(null);
+      setPolygonDraft(null);
+      setSelectionBox(null);
     }
     if (nextTool === "solve") {
       setTool(nextTool);
@@ -2864,6 +3048,12 @@ const SketchMathWorkspace = () => {
         ? "Click or drag from the rectangle center to a corner. Hold Shift for a centered square."
       : tool === "polyline"
         ? "Click each polyline vertex, then press Enter or use Finish polyline. Escape cancels the draft."
+      : tool === "slot"
+        ? slotDraft ? "Click the second slot center." : "Click the first slot center, then the second center."
+      : tool === "polygon"
+        ? polygonDraft ? "Click a polygon vertex to set its radius." : "Click the polygon center, then a vertex."
+      : tool === "box_select"
+        ? "Drag a box around complete sketch entities to select them together."
       : tool === "hole"
         ? "Select a profile, then click inside it to place a circular hole."
         : tool === "pan"
@@ -3001,6 +3191,9 @@ const SketchMathWorkspace = () => {
                   circleDraft={circleDraft}
                   arcDraft={arcDraft}
                   polylineDraft={polylineDraft}
+                  slotDraft={slotDraft ? { ...slotDraft, width: Number(slotWidthValue) || 20 } : null}
+                  polygonDraft={polygonDraft ? { ...polygonDraft, sides: Number(polygonSidesValue) || 6 } : null}
+                  selectionBox={selectionBox}
                   dragPreviewPoint={dragPreviewPoint}
                   holePlacementPreview={holePlacementPreview}
                   holePlacementActive={Boolean(holePlacement)}
@@ -3033,7 +3226,7 @@ const SketchMathWorkspace = () => {
               ) : null}
               <Box className="sketchmath-workflow-step" data-testid="sketchmath-tool-mode">
                 <Text className="sketchmath-step-label">Current mode</Text>
-                <Text fontWeight="600">{tool === "select" ? "Select" : tool === "rectangle" ? "Draw rectangle" : tool === "center_rectangle" ? "Center rectangle" : tool === "polyline" ? "Polyline" : tool === "hole" ? "Add hole" : tool === "pan" ? "Pan / view" : tool}</Text>
+                <Text fontWeight="600">{tool === "select" ? "Select" : tool === "rectangle" ? "Draw rectangle" : tool === "center_rectangle" ? "Center rectangle" : tool === "polyline" ? "Polyline" : tool === "slot" ? "Slot" : tool === "polygon" ? "Polygon" : tool === "box_select" ? "Box select" : tool === "hole" ? "Add hole" : tool === "pan" ? "Pan / view" : tool}</Text>
                 <Text fontSize="sm" opacity={0.8}>
                   {canvasHelperText}
                 </Text>
@@ -3123,12 +3316,27 @@ const SketchMathWorkspace = () => {
                   <Button size="sm" onClick={() => handleToolChange("polyline")} variant={tool === "polyline" ? "solid" : "outline"}>
                     Start polyline
                   </Button>
+                  <Button size="sm" onClick={() => handleToolChange("slot")} variant={tool === "slot" ? "solid" : "outline"}>
+                    Start slot
+                  </Button>
+                  <Button size="sm" onClick={() => handleToolChange("polygon")} variant={tool === "polygon" ? "solid" : "outline"}>
+                    Start polygon
+                  </Button>
+                  <Button size="sm" onClick={() => handleToolChange("box_select")} variant={tool === "box_select" ? "solid" : "outline"}>
+                    Box select
+                  </Button>
                   <Button size="sm" onClick={() => void commitPolyline()} isDisabled={!polylineDraft || polylineDraft.points.length < 2}>
                     Finish polyline
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => void handleClearSketch()}>
                     Clear sketch
                   </Button>
+                </HStack>
+                <HStack spacing={2} flexWrap="wrap" mt={2}>
+                  <Input type="number" aria-label="Slot width" value={slotWidthValue} onChange={(event) => setSlotWidthValue(event.target.value)} width="104px" />
+                  <Text fontSize="xs" opacity={0.75}>slot width mm</Text>
+                  <Input type="number" aria-label="Polygon sides" value={polygonSidesValue} onChange={(event) => setPolygonSidesValue(event.target.value)} width="90px" min={3} max={128} />
+                  <Text fontSize="xs" opacity={0.75}>polygon sides</Text>
                 </HStack>
               </Box>
 
@@ -3499,6 +3707,31 @@ const SketchMathWorkspace = () => {
                     </HStack>
                   </Box>
                 ) : null}
+              </Box>
+
+              <Box className="sketchmath-workflow-step" data-testid="sketchmath-editing-tools">
+                <Text className="sketchmath-step-label">Safe editing</Text>
+                <Text fontSize="sm" opacity={0.75}>Split uses one line; trim/extend use target then cutter selection order. Referenced profile curves fail without partial mutation.</Text>
+                <HStack spacing={2} flexWrap="wrap" mt={2}>
+                  <Button size="sm" onClick={() => void runSplitLine()} isDisabled={selectedLineEntities.length !== 1}>Split midpoint</Button>
+                  <Button size="sm" onClick={() => void runTrimLine()} isDisabled={selectedLineEntities.length !== 2}>Trim target</Button>
+                  <Button size="sm" onClick={() => void runExtendLine()} isDisabled={selectedLineEntities.length !== 2}>Extend target</Button>
+                  <Input type="number" aria-label="Offset distance" value={offsetValue} onChange={(event) => setOffsetValue(event.target.value)} width="92px" />
+                  <Button
+                    size="sm"
+                    onClick={() => void runOffsetCurve()}
+                    isDisabled={
+                      selectedEntities.length !== 1
+                      || !["line_2d", "construction_line_2d", "circle_2d", "arc_2d"].includes(selectedEntities[0].type)
+                    }
+                  >
+                    Offset
+                  </Button>
+                  <Button size="sm" onClick={() => void runDuplicate()} isDisabled={selectedEntityIds.length === 0}>Duplicate</Button>
+                  <Input type="number" aria-label="Pattern count" value={patternCountValue} onChange={(event) => setPatternCountValue(event.target.value)} width="78px" min={1} max={32} />
+                  <Button size="sm" onClick={() => void runLinearPattern()} isDisabled={selectedEntityIds.length === 0}>Linear pattern</Button>
+                  <Button size="sm" onClick={() => void runMirrorSelection()} isDisabled={selectedEntityIds.length === 0}>Mirror about X=0</Button>
+                </HStack>
               </Box>
 
               <Button size="sm" variant="ghost" onClick={() => setAdvancedOpen((value) => !value)}>

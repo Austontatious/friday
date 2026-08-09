@@ -8,6 +8,12 @@ from pydantic import ValidationError
 
 from sketchmath.geometry.arcs import arc_endpoints, center_arc_geometry, normalize_angle_degrees, three_point_arc_geometry
 from sketchmath.geometry.intersections import intersect_lines
+from sketchmath.geometry.editing import (
+    line_intersection_parameters,
+    offset_segment,
+    regular_polygon_vertices,
+    slot_boundary,
+)
 from sketchmath.geometry.tolerances import DEFAULT_TOLERANCE_POLICY
 from sketchmath.geometry.profiles import analyze_closed_polygon
 from sketchmath.geometry.projections import project_point_to_line
@@ -161,6 +167,12 @@ def apply_geometry_command(
         "make_concentric": _handle_make_concentric,
         "make_tangent": _handle_make_tangent,
         "set_construction": _handle_set_construction,
+        "define_regular_polygon": _handle_define_regular_polygon,
+        "define_slot": _handle_define_slot,
+        "split_line": _handle_split_line,
+        "trim_line": _handle_trim_line,
+        "extend_line": _handle_extend_line,
+        "offset_curve": _handle_offset_curve,
         "solve_constraints": _handle_solve_constraints,
         "analyze_constraints": _handle_analyze_constraints,
         "make_profile": _handle_make_profile,
@@ -293,6 +305,7 @@ def _handle_define_profile(command: GeometryCommand, state: SelectionContext) ->
         locked=bool(command.parameters.get("locked", False)),
         label=label,
         source_line_ids=[str(item) for item in command.parameters.get("source_line_ids", [])],
+        source_curve_ids=[str(item) for item in command.parameters.get("source_curve_ids", [])],
         source_circle_id=command.parameters.get("source_circle_id"),
     )
     state.replace_entity(profile)
@@ -919,6 +932,396 @@ def _handle_set_construction(command: GeometryCommand, state: SelectionContext) 
     return state, changed, None, None, {"construction": enabled}
 
 
+def _handle_define_regular_polygon(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    center = _point_tuple(_parameter(command, "center"))
+    unit = str(command.parameters.get("unit", state.units))
+    try:
+        radius = normalize_length(float(_parameter(command, "radius")), unit)
+        raw_sides = float(_parameter(command, "sides"))
+        if not raw_sides.is_integer():
+            raise ValueError("regular polygon sides must be an integer")
+        sides = int(raw_sides)
+        rotation_deg = math.degrees(normalize_angle(float(command.parameters.get("rotation", -90.0)), str(command.parameters.get("angle_unit", "deg"))))
+        vertices = regular_polygon_vertices(center, radius, sides, rotation_deg)
+    except (TypeError, ValueError) as exc:
+        raise SelectionResolutionError(
+            "Regular polygon geometry is invalid",
+            detail={"command_type": command.command_type, "error_code": "invalid_polygon_geometry", "reason": str(exc)},
+        ) from exc
+    base_id = str(command.parameters.get("name") or f"polygon_{command.command_id}")
+    point_ids = [f"{base_id}_p{index + 1}" for index in range(sides)]
+    line_ids = [f"{base_id}_e{index + 1}" for index in range(sides)]
+    changed: list[str] = []
+    for point_id, coords in zip(point_ids, vertices[:-1], strict=True):
+        state.replace_entity(Point2DEntity(id=point_id, coords=coords, label=point_id))
+        changed.append(point_id)
+    for index, line_id in enumerate(line_ids):
+        start_id = point_ids[index]
+        end_id = point_ids[(index + 1) % sides]
+        line = Line2DEntity(
+            id=line_id,
+            start=vertices[index],
+            end=vertices[index + 1],
+            start_point_id=start_id,
+            end_point_id=end_id,
+            label=line_id,
+        )
+        state.replace_entity(line)
+        changed.append(line_id)
+    analysis = analyze_closed_polygon(vertices)
+    profile_id = str(command.parameters.get("profile_id") or f"profile_{base_id}")
+    profile = Profile2DEntity(
+        id=profile_id,
+        vertices=analysis.vertices,
+        area=analysis.area,
+        winding=analysis.winding,
+        warnings=analysis.warnings,
+        closed=True,
+        source_line_ids=line_ids,
+        source_curve_ids=line_ids,
+        label=str(command.parameters.get("label") or f"{sides}-sided polygon"),
+    )
+    state.replace_entity(profile)
+    changed.append(profile.id)
+    return state, changed, analysis.area, "square_mm", {
+        "primitive": "regular_polygon",
+        "profile_id": profile.id,
+        "point_ids": point_ids,
+        "line_ids": line_ids,
+        "sides": sides,
+        "radius_mm": radius,
+    }
+
+
+def _handle_define_slot(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], float, str, dict[str, Any]]:
+    center_start = _point_tuple(_parameter(command, "start"))
+    center_end = _point_tuple(_parameter(command, "end"))
+    unit = str(command.parameters.get("unit", state.units))
+    try:
+        width = normalize_length(float(_parameter(command, "width")), unit)
+        boundary = slot_boundary(center_start, center_end, width)
+    except (TypeError, ValueError) as exc:
+        raise SelectionResolutionError(
+            "Slot geometry is invalid",
+            detail={"command_type": command.command_type, "error_code": "invalid_slot_geometry", "reason": str(exc)},
+        ) from exc
+    base_id = str(command.parameters.get("name") or f"slot_{command.command_id}")
+    center_ids = (f"{base_id}_center_start", f"{base_id}_center_end")
+    boundary_ids = (
+        f"{base_id}_start_positive",
+        f"{base_id}_end_positive",
+        f"{base_id}_end_negative",
+        f"{base_id}_start_negative",
+    )
+    boundary_points = (
+        boundary.start_positive,
+        boundary.end_positive,
+        boundary.end_negative,
+        boundary.start_negative,
+    )
+    changed: list[str] = []
+    for point_id, coords in zip(center_ids, (center_start, center_end), strict=True):
+        state.replace_entity(Point2DEntity(id=point_id, coords=coords, construction=True, label=point_id))
+        changed.append(point_id)
+    for point_id, coords in zip(boundary_ids, boundary_points, strict=True):
+        state.replace_entity(Point2DEntity(id=point_id, coords=coords, label=point_id))
+        changed.append(point_id)
+    positive_line_id = f"{base_id}_positive"
+    end_arc_id = f"{base_id}_end_arc"
+    negative_line_id = f"{base_id}_negative"
+    start_arc_id = f"{base_id}_start_arc"
+    state.replace_entity(
+        Line2DEntity(
+            id=positive_line_id,
+            start=boundary.start_positive,
+            end=boundary.end_positive,
+            start_point_id=boundary_ids[0],
+            end_point_id=boundary_ids[1],
+            label=positive_line_id,
+        )
+    )
+    state.replace_entity(
+        Arc2DEntity(
+            id=end_arc_id,
+            center=center_end,
+            radius=boundary.radius,
+            start_angle_deg=boundary.end_arc_start_angle_deg,
+            sweep_angle_deg=-180.0,
+            construction="center",
+            center_point_id=center_ids[1],
+            start_point_id=boundary_ids[1],
+            end_point_id=boundary_ids[2],
+            label=end_arc_id,
+        )
+    )
+    state.replace_entity(
+        Line2DEntity(
+            id=negative_line_id,
+            start=boundary.end_negative,
+            end=boundary.start_negative,
+            start_point_id=boundary_ids[2],
+            end_point_id=boundary_ids[3],
+            label=negative_line_id,
+        )
+    )
+    state.replace_entity(
+        Arc2DEntity(
+            id=start_arc_id,
+            center=center_start,
+            radius=boundary.radius,
+            start_angle_deg=boundary.start_arc_start_angle_deg,
+            sweep_angle_deg=-180.0,
+            construction="center",
+            center_point_id=center_ids[0],
+            start_point_id=boundary_ids[3],
+            end_point_id=boundary_ids[0],
+            label=start_arc_id,
+        )
+    )
+    curve_ids = [positive_line_id, end_arc_id, negative_line_id, start_arc_id]
+    changed.extend(curve_ids)
+    vertices = _curve_profile_vertices([state.get_entity(curve_id) for curve_id in curve_ids])
+    analysis = analyze_closed_polygon(vertices)
+    profile_id = str(command.parameters.get("profile_id") or f"profile_{base_id}")
+    profile = Profile2DEntity(
+        id=profile_id,
+        vertices=analysis.vertices,
+        area=analysis.area,
+        winding=analysis.winding,
+        warnings=analysis.warnings,
+        closed=True,
+        source_line_ids=[positive_line_id, negative_line_id],
+        source_curve_ids=curve_ids,
+        label=str(command.parameters.get("label") or "Slot profile"),
+    )
+    state.replace_entity(profile)
+    changed.append(profile.id)
+    return state, changed, analysis.area, "square_mm", {
+        "primitive": "slot",
+        "profile_id": profile.id,
+        "center_point_ids": list(center_ids),
+        "boundary_point_ids": list(boundary_ids),
+        "curve_ids": curve_ids,
+        "width_mm": width,
+    }
+
+
+def _ensure_safe_curve_edit(state: SelectionContext, entity_id: str, command_type: str) -> None:
+    dependencies: list[dict[str, str]] = []
+    for profile in state.items:
+        if isinstance(profile, Profile2DEntity) and entity_id in set(profile.source_curve_ids or profile.source_line_ids):
+            dependencies.append({"kind": "profile", "id": profile.id})
+    for constraint in state.constraints:
+        if entity_id in _constraint_reference_ids(constraint):
+            dependencies.append({"kind": "constraint", "id": constraint.id})
+    if dependencies:
+        raise SelectionResolutionError(
+            "Referenced curve cannot be edited without topology repair",
+            detail={
+                "command_type": command_type,
+                "entity_id": entity_id,
+                "error_code": "unsafe_referenced_curve_edit",
+                "dependencies": dependencies,
+                "retryable": False,
+            },
+        )
+
+
+def _line_with_endpoint(
+    line: Line2DEntity | ConstructionLine2DEntity,
+    *,
+    endpoint: str,
+    point: Point2D,
+    point_id: str,
+) -> Line2DEntity | ConstructionLine2DEntity:
+    payload = line.model_dump()
+    if endpoint == "start":
+        payload["start"] = point
+        payload["start_point_id"] = point_id
+    else:
+        payload["end"] = point
+        payload["end_point_id"] = point_id
+    return type(line)(**payload)
+
+
+def _resolve_editable_line(state: SelectionContext, entity_id: str, role: str) -> Line2DEntity | ConstructionLine2DEntity:
+    entity = _resolve_line_like(state, entity_id, role)
+    if isinstance(entity, Axis2DEntity):
+        raise WrongEntityTypeError(
+            "Line editing does not mutate axis entities",
+            detail={"entity_id": entity.id, "role": role, "actual": entity.type},
+        )
+    return entity
+
+
+def _handle_split_line(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    if len(command.selection) != 1:
+        raise SelectionResolutionError("split_line requires one selected line", detail={"selection": command.selection})
+    line = _resolve_editable_line(state, command.selection[0], "line")
+    _ensure_mutable(state, [line.id], command.command_type)
+    _ensure_safe_curve_edit(state, line.id, command.command_type)
+    start, end = _line_points(line)
+    try:
+        parameter = float(command.parameters.get("parameter", 0.5))
+    except (TypeError, ValueError) as exc:
+        raise SelectionResolutionError("split parameter must be numeric", detail={"parameter": command.parameters.get("parameter")}) from exc
+    if not DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm < parameter < 1.0 - DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm:
+        raise SelectionResolutionError(
+            "split point must lie strictly inside the line",
+            detail={"error_code": "split_outside_line", "parameter": parameter},
+        )
+    point = add(start, scale(subtract(end, start), parameter))
+    point_id = str(command.parameters.get("point_id") or f"split_{command.command_id}_point")
+    new_line_id = str(command.parameters.get("line_id") or f"split_{command.command_id}_line")
+    state.replace_entity(Point2DEntity(id=point_id, coords=point, label=point_id))
+    state.replace_entity(_line_with_endpoint(line, endpoint="end", point=point, point_id=point_id))
+    state.replace_entity(
+        type(line)(
+            **{
+                **line.model_dump(),
+                "id": new_line_id,
+                "start": point,
+                "start_point_id": point_id,
+                "label": str(command.parameters.get("label") or new_line_id),
+            }
+        )
+    )
+    return state, [line.id, point_id, new_line_id], None, None, {
+        "source_line_id": line.id,
+        "result_line_ids": [line.id, new_line_id],
+        "split_point_id": point_id,
+        "parameter": parameter,
+    }
+
+
+def _line_edit_intersection(
+    command: GeometryCommand,
+    state: SelectionContext,
+) -> tuple[Line2DEntity | ConstructionLine2DEntity, Line2DEntity | ConstructionLine2DEntity, Any]:
+    if len(command.selection) != 2 or len(set(command.selection)) != 2:
+        raise SelectionResolutionError(f"{command.command_type} requires distinct target and cutter lines", detail={"selection": command.selection})
+    target = _resolve_editable_line(state, command.selection[0], "target")
+    cutter = _resolve_editable_line(state, command.selection[1], "cutter")
+    _ensure_mutable(state, [target.id], command.command_type)
+    _ensure_safe_curve_edit(state, target.id, command.command_type)
+    try:
+        intersection = line_intersection_parameters(*_line_points(target), *_line_points(cutter))
+    except ValueError as exc:
+        raise SelectionResolutionError(
+            "Line edit requires a unique intersection",
+            detail={"error_code": "line_edit_no_unique_intersection", "reason": str(exc)},
+        ) from exc
+    tolerance = 1e-9
+    if not -tolerance <= intersection.second_parameter <= 1.0 + tolerance:
+        raise SelectionResolutionError(
+            "The cutter does not intersect within its finite segment",
+            detail={"error_code": "cutter_misses_segment", "cutter_parameter": intersection.second_parameter},
+        )
+    return target, cutter, intersection
+
+
+def _handle_trim_line(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    target, cutter, intersection = _line_edit_intersection(command, state)
+    tolerance = 1e-9
+    if not tolerance < intersection.first_parameter < 1.0 - tolerance:
+        raise SelectionResolutionError(
+            "Trim intersection must lie inside the target segment",
+            detail={"error_code": "trim_intersection_outside_target", "target_parameter": intersection.first_parameter},
+        )
+    keep = str(command.parameters.get("keep", "start"))
+    if keep not in {"start", "end"}:
+        raise SelectionResolutionError("trim keep must be start or end", detail={"keep": keep})
+    replaced_endpoint = "end" if keep == "start" else "start"
+    point_id = str(command.parameters.get("point_id") or f"trim_{command.command_id}_point")
+    state.replace_entity(Point2DEntity(id=point_id, coords=intersection.point, label=point_id))
+    state.replace_entity(_line_with_endpoint(target, endpoint=replaced_endpoint, point=intersection.point, point_id=point_id))
+    return state, [target.id, point_id], None, None, {
+        "source_line_id": target.id,
+        "cutter_line_id": cutter.id,
+        "trim_point_id": point_id,
+        "kept_endpoint": keep,
+    }
+
+
+def _handle_extend_line(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    target, cutter, intersection = _line_edit_intersection(command, state)
+    tolerance = 1e-9
+    if -tolerance <= intersection.first_parameter <= 1.0 + tolerance:
+        raise SelectionResolutionError(
+            "Extend intersection must lie outside the target segment",
+            detail={"error_code": "extend_intersection_inside_target", "target_parameter": intersection.first_parameter},
+        )
+    endpoint = "start" if intersection.first_parameter < 0.0 else "end"
+    point_id = str(command.parameters.get("point_id") or f"extend_{command.command_id}_point")
+    state.replace_entity(Point2DEntity(id=point_id, coords=intersection.point, label=point_id))
+    state.replace_entity(_line_with_endpoint(target, endpoint=endpoint, point=intersection.point, point_id=point_id))
+    return state, [target.id, point_id], None, None, {
+        "source_line_id": target.id,
+        "cutter_line_id": cutter.id,
+        "extend_point_id": point_id,
+        "extended_endpoint": endpoint,
+    }
+
+
+def _handle_offset_curve(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
+    if len(command.selection) != 1:
+        raise SelectionResolutionError("offset_curve requires one selected line, circle, or arc", detail={"selection": command.selection})
+    entity = state.get_entity(command.selection[0])
+    unit = str(command.parameters.get("unit", state.units))
+    try:
+        offset = normalize_length(float(_parameter(command, "distance")), unit)
+    except (TypeError, ValueError) as exc:
+        raise SelectionResolutionError("Offset distance is invalid", detail={"distance": command.parameters.get("distance"), "unit": unit}) from exc
+    side = str(command.parameters.get("side", "left"))
+    if side not in {"left", "right"}:
+        raise SelectionResolutionError("Offset side must be left or right", detail={"side": side})
+    signed_offset = abs(offset) if side == "left" else -abs(offset)
+    copy_id = str(command.parameters.get("name") or f"offset_{command.command_id}_{entity.id}")
+    changed: list[str] = []
+    if isinstance(entity, (Line2DEntity, ConstructionLine2DEntity)):
+        try:
+            start, end = offset_segment(*_line_points(entity), signed_offset)
+        except ValueError as exc:
+            raise SelectionResolutionError("Line offset is invalid", detail={"error_code": "invalid_line_offset", "reason": str(exc)}) from exc
+        start_id = f"{copy_id}_start"
+        end_id = f"{copy_id}_end"
+        state.replace_entity(Point2DEntity(id=start_id, coords=start, label=start_id))
+        state.replace_entity(Point2DEntity(id=end_id, coords=end, label=end_id))
+        state.replace_entity(type(entity)(**{**entity.model_dump(), "id": copy_id, "start": start, "end": end, "start_point_id": start_id, "end_point_id": end_id, "label": copy_id}))
+        changed.extend([start_id, end_id, copy_id])
+    elif isinstance(entity, Circle2DEntity):
+        radius = entity.radius + signed_offset
+        if radius <= DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm:
+            raise SelectionResolutionError("Circle offset collapses the radius", detail={"error_code": "offset_radius_nonpositive", "radius": radius})
+        state.replace_entity(Circle2DEntity(**{**entity.model_dump(), "id": copy_id, "radius": radius, "center_point_id": None, "label": copy_id}))
+        changed.append(copy_id)
+    elif isinstance(entity, Arc2DEntity):
+        radius = entity.radius + signed_offset
+        if radius <= DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm:
+            raise SelectionResolutionError("Arc offset collapses the radius", detail={"error_code": "offset_radius_nonpositive", "radius": radius})
+        state.replace_entity(
+            Arc2DEntity(
+                **{
+                    **entity.model_dump(),
+                    "id": copy_id,
+                    "radius": radius,
+                    "center_point_id": None,
+                    "start_point_id": None,
+                    "through_point_id": None,
+                    "end_point_id": None,
+                    "label": copy_id,
+                }
+            )
+        )
+        changed.append(copy_id)
+    else:
+        raise WrongEntityTypeError(
+            "Offset supports lines, circles, and arcs",
+            detail={"entity_id": entity.id, "actual": entity.type},
+        )
+    return state, changed, None, None, {"source_entity_id": entity.id, "offset_entity_id": copy_id, "distance_mm": signed_offset}
+
+
 def _handle_move_point(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
     if len(command.selection) != 1:
         raise SelectionResolutionError("move_point requires one point", detail={"selection": command.selection})
@@ -1473,6 +1876,7 @@ def _handle_make_profile(command: GeometryCommand, state: SelectionContext) -> t
     entities = [state.get_entity(entity_id) for entity_id in command.selection]
     vertices = _profile_vertices(entities)
     analysis = analyze_closed_polygon(vertices)
+    source_line_ids = [entity.id for entity in entities if isinstance(entity, Line2DEntity)]
     profile = Profile2DEntity(
         id=str(_parameter(command, "name", default=f"profile_{command.command_id}")),
         vertices=analysis.vertices,
@@ -1480,7 +1884,7 @@ def _handle_make_profile(command: GeometryCommand, state: SelectionContext) -> t
         winding=analysis.winding,  # type: ignore[arg-type]
         warnings=analysis.warnings,
         closed=analysis.closed,
-        source_line_ids=[entity.id for entity in entities if isinstance(entity, Line2DEntity)],
+        source_line_ids=source_line_ids,
     )
     state.replace_entity(profile)
     return state, [profile.id], analysis.area, "square_mm", {"area": analysis.area, "winding": analysis.winding, "warnings": analysis.warnings}
@@ -1684,12 +2088,13 @@ def _handle_extrude_profile(command: GeometryCommand, state: SelectionContext) -
 def _handle_translate(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
     delta = _vector_tuple(_parameter(command, "vector"))
     changed: list[str] = []
-    for entity_id in command.selection:
+    targets = _expanded_transform_targets(state, command.selection)
+    for entity_id in targets:
         entity = state.get_entity(entity_id)
         _ensure_mutable(state, [entity.id], command.command_type)
         state.replace_entity(_translate_entity(entity, delta))
         changed.append(entity.id)
-    return state, changed, None, None, {}
+    return state, changed, None, None, {"expanded_selection": targets}
 
 
 def _handle_rotate(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
@@ -1697,23 +2102,25 @@ def _handle_rotate(command: GeometryCommand, state: SelectionContext) -> tuple[S
     angle = float(_parameter(command, "angle"))
     angle_unit = str(_parameter(command, "angle_unit", default="deg"))
     changed: list[str] = []
-    for entity_id in command.selection:
+    targets = _expanded_transform_targets(state, command.selection)
+    for entity_id in targets:
         entity = state.get_entity(entity_id)
         _ensure_mutable(state, [entity.id], command.command_type)
         state.replace_entity(_rotate_entity(entity, angle, origin, angle_unit))
         changed.append(entity.id)
-    return state, changed, None, None, {}
+    return state, changed, None, None, {"expanded_selection": targets}
 
 
 def _handle_mirror(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
     axis_x = float(_parameter(command, "axis_x", default=0.0))
     changed: list[str] = []
-    for entity_id in command.selection:
+    targets = _expanded_transform_targets(state, command.selection)
+    for entity_id in targets:
         entity = state.get_entity(entity_id)
         _ensure_mutable(state, [entity.id], command.command_type)
         state.replace_entity(_mirror_entity(entity, axis_x))
         changed.append(entity.id)
-    return state, changed, None, None, {}
+    return state, changed, None, None, {"expanded_selection": targets}
 
 
 def _handle_copy_linear(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
@@ -1723,14 +2130,16 @@ def _handle_copy_linear(command: GeometryCommand, state: SelectionContext) -> tu
         raise SelectionResolutionError("copy_linear count must be at least 1", detail={"command_type": command.command_type, "count": count})
     prefix = str(_parameter(command, "id_prefix", default="copy"))
     changed: list[str] = []
+    source_ids = _expanded_copy_sources(state, command.selection)
     for index in range(1, count + 1):
         offset = scale(delta, float(index))
-        for entity_id in command.selection:
+        id_map = {entity_id: f"{prefix}_{command.command_id}_{index}_{entity_id}" for entity_id in source_ids}
+        ordered_ids = sorted(source_ids, key=lambda entity_id: 0 if isinstance(state.get_entity(entity_id), Point2DEntity) else 1)
+        for entity_id in ordered_ids:
             entity = state.get_entity(entity_id)
-            copy_id = f"{prefix}_{command.command_id}_{index}_{entity.id}"
-            state.replace_entity(_copy_entity(entity, offset, copy_id))
-            changed.append(copy_id)
-    return state, changed, None, None, {}
+            state.replace_entity(_copy_entity_with_references(entity, offset, id_map[entity_id], id_map))
+            changed.append(id_map[entity_id])
+    return state, changed, None, None, {"source_entity_ids": source_ids, "instance_count": count}
 
 
 def _handle_intersect_lines(command: GeometryCommand, state: SelectionContext) -> tuple[SelectionContext, list[str], None, None, dict[str, Any]]:
@@ -2292,6 +2701,47 @@ def _profile_vertices(entities: list[SelectionEntity]) -> list[Point2D]:
     return vertices
 
 
+def _curve_profile_vertices(entities: list[SelectionEntity]) -> list[Point2D]:
+    if not entities:
+        raise SelectionResolutionError("Profile requires at least one source curve", detail={"selection": []})
+    vertices: list[Point2D] = []
+    tolerance = max(DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm, 1e-7)
+    for entity in entities:
+        if isinstance(entity, (Line2DEntity, ConstructionLine2DEntity)):
+            curve_points = list(_line_points(entity))
+        elif isinstance(entity, Arc2DEntity):
+            segment_count = max(8, int(math.ceil(abs(entity.sweep_angle_deg) / 10.0)))
+            curve_points = []
+            for index in range(segment_count + 1):
+                angle = math.radians(entity.start_angle_deg + entity.sweep_angle_deg * index / segment_count)
+                curve_points.append(
+                    (
+                        entity.center[0] + entity.radius * math.cos(angle),
+                        entity.center[1] + entity.radius * math.sin(angle),
+                    )
+                )
+        else:
+            raise SelectionResolutionError(
+                "Profile source curves must be lines or arcs",
+                detail={"entity_id": entity.id, "actual": entity.type},
+            )
+        if not vertices:
+            vertices.extend(curve_points)
+        elif distance(vertices[-1], curve_points[0]) <= tolerance:
+            vertices.extend(curve_points[1:])
+        elif distance(vertices[-1], curve_points[-1]) <= tolerance:
+            vertices.extend(reversed(curve_points[:-1]))
+        else:
+            raise SelectionResolutionError(
+                "Profile source curves are not continuous",
+                detail={"entity_id": entity.id, "previous_end": vertices[-1]},
+            )
+    if distance(vertices[0], vertices[-1]) > tolerance:
+        raise SelectionResolutionError("Profile source curves are open", detail={"first": vertices[0], "last": vertices[-1]})
+    vertices[-1] = vertices[0]
+    return vertices
+
+
 def _sync_linked_geometry(state: SelectionContext) -> None:
     points = {item.id: item for item in state.items if isinstance(item, Point2DEntity)}
     for entity in list(state.items):
@@ -2353,7 +2803,12 @@ def _sync_linked_geometry(state: SelectionContext) -> None:
             )
     entity_map = state.entity_map()
     for entity in list(state.items):
-        if isinstance(entity, Profile2DEntity) and entity.source_line_ids:
+        if isinstance(entity, Profile2DEntity) and entity.source_curve_ids:
+            source_curves = [entity_map.get(curve_id) for curve_id in entity.source_curve_ids]
+            if all(isinstance(curve, (Line2DEntity, ConstructionLine2DEntity, Arc2DEntity)) for curve in source_curves):
+                analysis = analyze_closed_polygon(_curve_profile_vertices(source_curves))  # type: ignore[arg-type]
+                state.replace_entity(Profile2DEntity(**{**entity.model_dump(), "vertices": analysis.vertices, "area": analysis.area, "winding": analysis.winding, "warnings": analysis.warnings}))
+        elif isinstance(entity, Profile2DEntity) and entity.source_line_ids:
             source_lines = [entity_map.get(line_id) for line_id in entity.source_line_ids]
             if all(isinstance(line, Line2DEntity) for line in source_lines):
                 analysis = analyze_closed_polygon(_profile_vertices(source_lines))  # type: ignore[arg-type]
@@ -2436,29 +2891,104 @@ def _mirror_entity(entity: SelectionEntity, axis_x: float) -> SelectionEntity:
     raise SketchMathError(f"Unsupported entity for mirror: {entity.type}")
 
 
-def _copy_entity(entity: SelectionEntity, delta: Point2D, copy_id: str) -> SelectionEntity:
+def _expanded_transform_targets(state: SelectionContext, selection: list[str]) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def visit(entity_id: str) -> None:
+        if entity_id in seen:
+            return
+        entity = state.get_entity(entity_id)
+        seen.add(entity_id)
+        ordered.append(entity_id)
+        if isinstance(entity, (Line2DEntity, ConstructionLine2DEntity)):
+            for point_id in (entity.start_point_id, entity.end_point_id):
+                if point_id:
+                    visit(point_id)
+        elif isinstance(entity, Circle2DEntity) and entity.center_point_id:
+            visit(entity.center_point_id)
+        elif isinstance(entity, Arc2DEntity):
+            for point_id in (entity.center_point_id, entity.start_point_id, entity.through_point_id, entity.end_point_id):
+                if point_id:
+                    visit(point_id)
+        elif isinstance(entity, Profile2DEntity):
+            for curve_id in entity.source_curve_ids or entity.source_line_ids:
+                visit(curve_id)
+            if entity.source_circle_id:
+                visit(entity.source_circle_id)
+
+    for selected_id in selection:
+        visit(selected_id)
+    return ordered
+
+
+def _expanded_copy_sources(state: SelectionContext, selection: list[str]) -> list[str]:
+    return _expanded_transform_targets(state, selection)
+
+
+def _copy_entity_with_references(
+    entity: SelectionEntity,
+    delta: Point2D,
+    copy_id: str,
+    id_map: dict[str, str],
+) -> SelectionEntity:
     if isinstance(entity, Point2DEntity):
         return Point2DEntity(**{**entity.model_dump(), "id": copy_id, "coords": translate_point(entity.coords, delta)})
     if isinstance(entity, Line2DEntity):
-        return Line2DEntity(**{**entity.model_dump(), "id": copy_id, "start": translate_point(entity.start, delta), "end": translate_point(entity.end, delta)})
+        return Line2DEntity(
+            **{
+                **entity.model_dump(),
+                "id": copy_id,
+                "start": translate_point(entity.start, delta),
+                "end": translate_point(entity.end, delta),
+                "start_point_id": id_map.get(entity.start_point_id or ""),
+                "end_point_id": id_map.get(entity.end_point_id or ""),
+            }
+        )
     if isinstance(entity, ConstructionLine2DEntity):
-        return ConstructionLine2DEntity(**{**entity.model_dump(), "id": copy_id, "start": translate_point(entity.start, delta), "end": translate_point(entity.end, delta)})
+        return ConstructionLine2DEntity(
+            **{
+                **entity.model_dump(),
+                "id": copy_id,
+                "start": translate_point(entity.start, delta),
+                "end": translate_point(entity.end, delta),
+                "start_point_id": id_map.get(entity.start_point_id or ""),
+                "end_point_id": id_map.get(entity.end_point_id or ""),
+            }
+        )
     if isinstance(entity, Axis2DEntity):
         return Axis2DEntity(**{**entity.model_dump(), "id": copy_id, "origin": translate_point(entity.origin, delta)})
     if isinstance(entity, Profile2DEntity):
-        return Profile2DEntity(**{**entity.model_dump(), "id": copy_id, "vertices": [translate_point(vertex, delta) for vertex in entity.vertices]})
+        return Profile2DEntity(
+            **{
+                **entity.model_dump(),
+                "id": copy_id,
+                "vertices": [translate_point(vertex, delta) for vertex in entity.vertices],
+                "holes": [id_map[hole_id] for hole_id in entity.holes if hole_id in id_map],
+                "source_line_ids": [id_map[line_id] for line_id in entity.source_line_ids if line_id in id_map],
+                "source_curve_ids": [id_map[curve_id] for curve_id in entity.source_curve_ids if curve_id in id_map],
+                "source_circle_id": id_map.get(entity.source_circle_id or ""),
+            }
+        )
     if isinstance(entity, Circle2DEntity):
-        return Circle2DEntity(**{**entity.model_dump(), "id": copy_id, "center": translate_point(entity.center, delta), "center_point_id": None})
+        return Circle2DEntity(
+            **{
+                **entity.model_dump(),
+                "id": copy_id,
+                "center": translate_point(entity.center, delta),
+                "center_point_id": id_map.get(entity.center_point_id or ""),
+            }
+        )
     if isinstance(entity, Arc2DEntity):
         return Arc2DEntity(
             **{
                 **entity.model_dump(),
                 "id": copy_id,
                 "center": translate_point(entity.center, delta),
-                "center_point_id": None,
-                "start_point_id": None,
-                "through_point_id": None,
-                "end_point_id": None,
+                "center_point_id": id_map.get(entity.center_point_id or ""),
+                "start_point_id": id_map.get(entity.start_point_id or ""),
+                "through_point_id": id_map.get(entity.through_point_id or ""),
+                "end_point_id": id_map.get(entity.end_point_id or ""),
             }
         )
     raise SketchMathError(f"Unsupported entity for copy_linear: {entity.type}")

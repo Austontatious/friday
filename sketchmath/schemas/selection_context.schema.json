@@ -1388,6 +1388,13 @@
           "default": null,
           "title": "Source Circle Id"
         },
+        "source_curve_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Curve Ids",
+          "type": "array"
+        },
         "source_line_ids": {
           "items": {
             "type": "string"

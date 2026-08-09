@@ -20,6 +20,9 @@ type SketchCanvas2DProps = {
   circleDraft?: { center: Point; current: Point } | null;
   arcDraft?: { points: Point[]; current: Point } | null;
   polylineDraft?: { points: Point[]; current: Point } | null;
+  slotDraft?: { start: Point; current: Point; width: number } | null;
+  polygonDraft?: { center: Point; current: Point; sides: number } | null;
+  selectionBox?: { start: Point; current: Point } | null;
   dragPreviewPoint: { id: string; point: Point } | null;
   holePlacementPreview?: { center: Point; diameter: number } | null;
   holePlacementActive?: boolean;
@@ -48,6 +51,9 @@ const SketchCanvas2D = ({
   circleDraft,
   arcDraft,
   polylineDraft,
+  slotDraft,
+  polygonDraft,
+  selectionBox,
   dragPreviewPoint,
   holePlacementPreview,
   holePlacementActive = false,
@@ -141,6 +147,35 @@ const SketchCanvas2D = ({
           fill="none"
           className="sketchmath-draft-rectangle"
           data-testid="sketchmath-polyline-draft"
+        />
+      ) : null}
+      {slotDraft ? (
+        <g data-testid="sketchmath-slot-draft" className="sketchmath-draft-rectangle">
+          <line x1={slotDraft.start.x} y1={slotDraft.start.y} x2={slotDraft.current.x} y2={slotDraft.current.y} strokeWidth={slotDraft.width} strokeLinecap="round" />
+        </g>
+      ) : null}
+      {polygonDraft ? (
+        <polygon
+          points={Array.from({ length: Math.max(3, polygonDraft.sides) }, (_, index) => {
+            const radius = Math.hypot(polygonDraft.current.x - polygonDraft.center.x, polygonDraft.current.y - polygonDraft.center.y);
+            const startAngle = Math.atan2(polygonDraft.current.y - polygonDraft.center.y, polygonDraft.current.x - polygonDraft.center.x);
+            const angle = startAngle + (2 * Math.PI * index) / Math.max(3, polygonDraft.sides);
+            return `${polygonDraft.center.x + radius * Math.cos(angle)},${polygonDraft.center.y + radius * Math.sin(angle)}`;
+          }).join(" ")}
+          fill="none"
+          className="sketchmath-draft-rectangle"
+          data-testid="sketchmath-polygon-draft"
+        />
+      ) : null}
+      {selectionBox ? (
+        <rect
+          x={Math.min(selectionBox.start.x, selectionBox.current.x)}
+          y={Math.min(selectionBox.start.y, selectionBox.current.y)}
+          width={Math.abs(selectionBox.current.x - selectionBox.start.x)}
+          height={Math.abs(selectionBox.current.y - selectionBox.start.y)}
+          fill="none"
+          className="sketchmath-draft-rectangle"
+          data-testid="sketchmath-selection-box"
         />
       ) : null}
       {dragPreviewPoint ? <circle cx={dragPreviewPoint.point.x} cy={dragPreviewPoint.point.y} r={7} className="sketchmath-draft-point" data-testid={`sketchmath-drag-${dragPreviewPoint.id}`} /> : null}

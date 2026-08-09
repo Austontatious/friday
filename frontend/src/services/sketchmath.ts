@@ -8,6 +8,9 @@ export type SketchMathMode =
   | "line"
   | "rectangle"
   | "center_rectangle"
+  | "slot"
+  | "polygon"
+  | "box_select"
   | "polyline"
   | "hole"
   | "pan"
@@ -82,6 +85,7 @@ export type SketchMathProfileEntity = {
   locked?: boolean;
   label?: string | null;
   source_line_ids?: string[];
+  source_curve_ids?: string[];
   source_circle_id?: string | null;
 };
 
@@ -182,6 +186,12 @@ export const SKETCHMATH_COMMAND_TYPES = [
   "make_concentric",
   "make_tangent",
   "set_construction",
+  "define_regular_polygon",
+  "define_slot",
+  "split_line",
+  "trim_line",
+  "extend_line",
+  "offset_curve",
   "solve_constraints",
   "analyze_constraints",
   "move_point",
@@ -207,7 +217,7 @@ export const SKETCHMATH_COMMAND_TYPES = [
 export type SketchMathCommandType = typeof SKETCHMATH_COMMAND_TYPES[number];
 
 export type SketchMathCommand = {
-  version: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6" | "0.7";
+  version: "0.1" | "0.2" | "0.3" | "0.4" | "0.5" | "0.6" | "0.7" | "0.8";
   command_id: string;
   mode?: "preview" | "commit";
   command_type: SketchMathCommandType;

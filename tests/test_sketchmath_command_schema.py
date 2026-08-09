@@ -88,6 +88,8 @@ def test_geometry_command_schema_matches_runtime_command_contract() -> None:
     assert "0.6" in schema["properties"]["version"]["enum"]
     assert "set_construction" in command_types
     assert "0.7" in schema["properties"]["version"]["enum"]
+    assert {"define_regular_polygon", "define_slot", "split_line", "trim_line", "extend_line", "offset_curve"} <= command_types
+    assert "0.8" in schema["properties"]["version"]["enum"]
 
 
 def test_checked_in_sketchmath_schemas_match_canonical_models() -> None:

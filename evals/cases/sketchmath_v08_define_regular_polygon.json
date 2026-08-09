@@ -1,0 +1,30 @@
+{
+  "name": "sketchmath_v08_define_regular_polygon",
+  "input": {
+    "command": {
+      "version": "0.8",
+      "command_id": "cmd_eval_polygon",
+      "mode": "commit",
+      "command_type": "define_regular_polygon",
+      "selection": [],
+      "parameters": {"name": "hex", "center": [0, 0], "radius": 10, "sides": 6, "unit": "mm"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_polygon",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "unit": "square_mm",
+    "changed_entity_ids": [
+      "hex_p1", "hex_p2", "hex_p3", "hex_p4", "hex_p5", "hex_p6",
+      "hex_e1", "hex_e2", "hex_e3", "hex_e4", "hex_e5", "hex_e6", "profile_hex"
+    ],
+    "metadata": {"primitive": "regular_polygon", "profile_id": "profile_hex", "sides": 6, "radius_mm": 10.0}
+  }
+}

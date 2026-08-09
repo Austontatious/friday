@@ -630,7 +630,7 @@ class _System:
                     continue
                 self.unmodeled_entity_ids.append(entity.id)
             elif isinstance(entity, Profile2DEntity):
-                if entity.source_line_ids or entity.source_circle_id:
+                if entity.source_curve_ids or entity.source_line_ids or entity.source_circle_id:
                     continue
                 self.unmodeled_entity_ids.append(entity.id)
             else:

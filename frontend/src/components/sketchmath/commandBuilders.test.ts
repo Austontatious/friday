@@ -12,6 +12,13 @@ import {
   buildConcentricCommand,
   buildTangentCommand,
   buildSetConstructionCommand,
+  buildDefineRegularPolygonCommand,
+  buildDefineSlotCommand,
+  buildSplitLineCommand,
+  buildTrimLineCommand,
+  buildExtendLineCommand,
+  buildOffsetCurveCommand,
+  buildCopyLinearCommand,
   buildSetDiameterCommand,
   buildSetHorizontalDistanceCommand,
   buildSetLengthCommand,
@@ -118,6 +125,24 @@ describe("SketchMath command builders", () => {
       selection: ["point", "line"],
       parameters: { enabled: true },
     });
+  });
+
+  it("generates v0.8 Gate B primitive and safe-edit commands", () => {
+    expect(buildDefineRegularPolygonCommand({ x: 10, y: 20 }, 8, 6, "hex")).toMatchObject({
+      version: "0.8",
+      command_type: "define_regular_polygon",
+      parameters: { center: [10, 20], radius: 8, sides: 6, name: "hex" },
+    });
+    expect(buildDefineSlotCommand({ x: 0, y: 0 }, { x: 20, y: 0 }, 8, "slot")).toMatchObject({
+      version: "0.8",
+      command_type: "define_slot",
+      parameters: { start: [0, 0], end: [20, 0], width: 8 },
+    });
+    expect(buildSplitLineCommand("line")).toMatchObject({ version: "0.8", command_type: "split_line", selection: ["line"] });
+    expect(buildTrimLineCommand("target", "cutter")).toMatchObject({ version: "0.8", command_type: "trim_line", selection: ["target", "cutter"] });
+    expect(buildExtendLineCommand("target", "cutter")).toMatchObject({ version: "0.8", command_type: "extend_line" });
+    expect(buildOffsetCurveCommand("arc", 4)).toMatchObject({ version: "0.8", command_type: "offset_curve", parameters: { distance: 4 } });
+    expect(buildCopyLinearCommand(["profile"], { x: 25, y: 0 }, 3)).toMatchObject({ command_type: "copy_linear", parameters: { vector: [25, 0], count: 3 } });
   });
 
   it("generates a typed delete command for the full selected set", () => {

@@ -1,0 +1,31 @@
+{
+  "name": "sketchmath_v08_define_slot",
+  "input": {
+    "command": {
+      "version": "0.8",
+      "command_id": "cmd_eval_slot",
+      "mode": "commit",
+      "command_type": "define_slot",
+      "selection": [],
+      "parameters": {"name": "slot", "start": [0, 0], "end": [20, 0], "width": 8, "unit": "mm"}
+    },
+    "selection_context": {
+      "selection_set_id": "sel_eval_slot",
+      "units": "mm",
+      "frame": "canvas_2d",
+      "items": [],
+      "constraints": [],
+      "named_references": {}
+    }
+  },
+  "expected": {
+    "status": "committed",
+    "unit": "square_mm",
+    "changed_entity_ids": [
+      "slot_center_start", "slot_center_end",
+      "slot_start_positive", "slot_end_positive", "slot_end_negative", "slot_start_negative",
+      "slot_positive", "slot_end_arc", "slot_negative", "slot_start_arc", "profile_slot"
+    ],
+    "metadata": {"primitive": "slot", "profile_id": "profile_slot", "width_mm": 8.0}
+  }
+}

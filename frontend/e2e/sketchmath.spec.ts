@@ -58,6 +58,41 @@ const clickSvgViewBoxPoint = async (page: Page, x: number, y: number) => {
   await page.mouse.click(point.x, point.y);
 };
 
+const dragCanvasViewBoxBox = async (page: Page, start: { x: number; y: number }, end: { x: number; y: number }) => {
+  const canvas = page.getByTestId("sketchmath-canvas");
+  const points = await canvas.evaluate((element, coords) => {
+    const svg = element as SVGSVGElement;
+    const svgBox = svg.getBoundingClientRect();
+    const viewBox = svg.viewBox.baseVal;
+    const scale = Math.min(svgBox.width / viewBox.width, svgBox.height / viewBox.height);
+    const contentLeft = svgBox.left + (svgBox.width - viewBox.width * scale) / 2;
+    const contentTop = svgBox.top + (svgBox.height - viewBox.height * scale) / 2;
+    const mapPoint = (point: { x: number; y: number }) => ({
+      x: contentLeft + (point.x - viewBox.x) * scale,
+      y: contentTop + (point.y - viewBox.y) * scale,
+    });
+    return { start: mapPoint(coords.start), end: mapPoint(coords.end) };
+  }, { start, end });
+  await canvas.dispatchEvent("mousedown", {
+    button: 0,
+    buttons: 1,
+    clientX: points.start.x,
+    clientY: points.start.y,
+  });
+  await expect(page.getByTestId("sketchmath-selection-box")).toHaveCount(1);
+  await canvas.dispatchEvent("mousemove", {
+    buttons: 1,
+    clientX: points.end.x,
+    clientY: points.end.y,
+  });
+  await expect(page.getByTestId("sketchmath-selection-box")).toBeVisible();
+  await canvas.dispatchEvent("mouseup", {
+    button: 0,
+    clientX: points.end.x,
+    clientY: points.end.y,
+  });
+};
+
 const dispatchCanvasViewBoxPoint = async (page: Page, x: number, y: number) => {
   await page.getByTestId("sketchmath-canvas").evaluate((element, coords) => {
     const svg = element as SVGSVGElement;
@@ -161,7 +196,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-workspace")).toBeVisible();
     await expect(page.getByTestId("sketchmath-canvas")).toBeVisible();
     await expect(page.getByTestId("sketchmath-workbench-panel")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Select" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Select", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Line", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Circle" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Dimension" }).first()).toBeVisible();
@@ -199,7 +234,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.locator('[data-testid^="entity-line_"]').nth(1)).toBeAttached();
     await expect(page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Extrude" })).toBeDisabled();
 
-    await page.getByRole("button", { name: "Select" }).click();
+    await page.getByRole("button", { name: "Select", exact: true }).click();
     await clickSvgPrimitiveCenter(page, '[data-testid^="entity-line_"] line.sketchmath-line', { shift: true, first: true });
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 2 lines");
     await clickWorkbenchButton(page, "Parallel");
@@ -454,7 +489,7 @@ test.describe("SketchMath workspace", () => {
       await dispatchCanvasViewBoxPoint(page, end[0], end[1]);
       await expect(page.locator('[data-testid^="entity-line_"]')).toHaveCount(index + 1);
     }
-    await page.getByRole("button", { name: "Select" }).click();
+    await page.getByRole("button", { name: "Select", exact: true }).click();
     await makePointsCoincident(page, 1, 2);
     await makePointsCoincident(page, 3, 4);
     await makePointsCoincident(page, 5, 6);
@@ -492,7 +527,7 @@ test.describe("SketchMath workspace", () => {
     await dispatchCanvasViewBoxPoint(page, 340, 100);
     await dispatchCanvasViewBoxPoint(page, 370, 220);
     await expect(page.locator('[data-testid^="entity-line_"]')).toHaveCount(2);
-    await page.getByRole("button", { name: "Select" }).click();
+    await page.getByRole("button", { name: "Select", exact: true }).click();
     await clickSvgPrimitiveCenter(page, '[data-testid^="entity-line_"] line.sketchmath-line');
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 line");
     await clickWorkbenchButton(page, "Vertical");
@@ -500,7 +535,7 @@ test.describe("SketchMath workspace", () => {
     const secondLine = page.locator('[data-testid^="entity-line_"]').nth(1).locator("line.sketchmath-line");
     await expect.poll(async () => await secondLine.getAttribute("x1") === await secondLine.getAttribute("x2")).toBe(true);
 
-    await page.getByRole("button", { name: "Select" }).click();
+    await page.getByRole("button", { name: "Select", exact: true }).click();
     await points.nth(1).dispatchEvent("click");
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 point");
     await points.nth(2).dispatchEvent("click", { shiftKey: true });
@@ -575,7 +610,7 @@ test.describe("SketchMath workspace", () => {
     await page.screenshot({ path: screenshotPath("sketchmath-canonical-arcs.png"), fullPage: true });
   });
 
-  test("fully constrains mixed line and circle geometry through drag, dimension, history, and reload", async ({ page }) => {
+  test("fully constrains mixed line, circle, arc, and construction geometry with conflict recovery and reload", async ({ page }) => {
     await openSketchMath(page);
 
     await page.getByRole("button", { name: "Line" }).first().click();
@@ -585,36 +620,84 @@ test.describe("SketchMath workspace", () => {
     await clickSvgViewBoxPoint(page, 380, 190);
     await clickSvgViewBoxPoint(page, 410, 190);
 
+    await page.getByRole("button", { name: "Arc", exact: true }).click();
+    await dispatchCanvasViewBoxPoint(page, 520, 220);
+    await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the arc start point");
+    await dispatchCanvasViewBoxPoint(page, 560, 220);
+    await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the arc end point");
+    await dispatchCanvasViewBoxPoint(page, 520, 260);
+    await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(1);
+
+    const lineCountBeforeConstruction = await page.locator('[data-testid^="entity-line_"]').count();
+    await page.getByRole("button", { name: "Line", exact: true }).click();
+    await dispatchCanvasViewBoxPoint(page, 500, 340);
+    await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the line end point");
+    await dispatchCanvasViewBoxPoint(page, 650, 340);
+    await expect(page.locator('[data-testid^="entity-line_"]')).toHaveCount(lineCountBeforeConstruction + 1);
+    const constructionLine = page.locator('[data-testid^="entity-line_"]').last();
+    const constructionLineId = await constructionLine.getAttribute("data-entity-id");
+    await constructionLine.dispatchEvent("click");
+    await clickWorkbenchButton(page, "Show Advanced Constraints");
+    const constraintPanel = page.getByTestId("sketchmath-advanced-constraints");
+    await constraintPanel.getByRole("button", { name: "Make construction" }).click();
+    await expect(page.locator(`[data-entity-id="${constructionLineId}"] line.sketchmath-construction-line`)).toHaveCount(1);
+
     const points = page.locator('[data-entity-type="point_2d"]');
     const circle = page.locator('[data-entity-type="circle_2d"]').last();
-    await expect(points).toHaveCount(3);
+    await expect(points).toHaveCount(8);
     await expect(circle).toBeVisible();
     await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
     await expect(page.getByTestId("sketchmath-solver-status-detail")).toContainText("can still move");
 
+    await circle.dispatchEvent("click");
     await page.getByLabel("Circle radius").fill("24");
     await clickWorkbenchButton(page, "Apply radius");
     await expect(circle).toHaveAttribute("r", "24");
 
-    await page.getByRole("button", { name: "Select" }).click();
-    await points.nth(0).dispatchEvent("click");
-    await clickWorkbenchButton(page, "Show Advanced Constraints");
-    const constraintPanel = page.getByTestId("sketchmath-advanced-constraints");
-    await expect(constraintPanel.getByRole("button", { name: "Fixed", exact: true })).toBeEnabled();
-    await constraintPanel.getByRole("button", { name: "Fixed", exact: true }).click();
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+    const historyLength = async () => {
+      const response = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+      const snapshot = await response.json() as { history_length: number };
+      return snapshot.history_length;
+    };
+    await page.getByRole("button", { name: "Select", exact: true }).click();
+    const fixPoint = async (pointIndex: number) => {
+      await points.nth(pointIndex).dispatchEvent("click");
+      const historyLengthBeforeFix = await historyLength();
+      await expect(constraintPanel.getByRole("button", { name: "Fixed", exact: true })).toBeEnabled();
+      await constraintPanel.getByRole("button", { name: "Fixed", exact: true }).click();
+      await expect.poll(historyLength).toBe(historyLengthBeforeFix + 1);
+    };
+    await fixPoint(0);
 
-    await points.nth(1).dispatchEvent("click");
-    await constraintPanel.getByRole("button", { name: "Fixed", exact: true }).click();
+    await fixPoint(1);
     await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
 
     const initialCenterX = Number(await points.nth(2).locator("circle").getAttribute("cx"));
     await dispatchPointDragToViewBoxPoint(points.nth(2), 420, 230);
     await expect.poll(async () => Math.abs(Number(await points.nth(2).locator("circle").getAttribute("cx")) - initialCenterX)).toBeGreaterThan(20);
     await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
-    await points.nth(2).dispatchEvent("click");
-    await constraintPanel.getByRole("button", { name: "Fixed", exact: true }).click();
+    await fixPoint(2);
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Under-constrained");
+    for (let pointIndex = 3; pointIndex < 8; pointIndex += 1) {
+      await fixPoint(pointIndex);
+    }
     await expect(page.getByTestId("sketchmath-status")).toContainText("Fully constrained", { timeout: 20000 });
     await expect(page.getByTestId("sketchmath-solver-status-detail")).toContainText("All modeled movement is constrained");
+
+    const beforeConflictResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const beforeConflict = await beforeConflictResponse.json() as { history_length: number };
+    const browserErrorCountBeforeConflict = browserErrors.length;
+    await dispatchPointDragToViewBoxPoint(points.nth(2), 470, 260);
+    await expect(page.getByTestId("sketchmath-user-error")).toContainText("Drag conflicts with fixed point constraint");
+    await expect.poll(() => browserErrors.length).toBe(browserErrorCountBeforeConflict + 1);
+    expect(browserErrors[browserErrorCountBeforeConflict]).toContain("409 (Conflict)");
+    browserErrors.splice(browserErrorCountBeforeConflict, 1);
+    const afterConflictResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const afterConflict = await afterConflictResponse.json() as { history_length: number };
+    expect(afterConflict.history_length).toBe(beforeConflict.history_length);
+    await expect(page.getByTestId("sketchmath-status")).toContainText("Fully constrained");
 
     await circle.dispatchEvent("click");
     await page.getByLabel("Circle diameter").fill("60");
@@ -641,6 +724,8 @@ test.describe("SketchMath workspace", () => {
     await page.reload();
     await expect(page.getByText("SketchMath").first()).toBeVisible();
     await expect(page.getByTestId("sketchmath-status")).toContainText("Fully constrained", { timeout: 20000 });
+    await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(1);
+    await expect(page.locator(`[data-entity-id="${constructionLineId}"] line.sketchmath-construction-line`)).toHaveCount(1);
     const geometryAfterReload = await page.locator('[data-entity-type="point_2d"] circle, [data-entity-type="circle_2d"]').evaluateAll((entities) =>
       entities.map((entity) => ({
         testId: entity.closest("[data-testid]")?.getAttribute("data-testid"),
@@ -676,6 +761,158 @@ test.describe("SketchMath workspace", () => {
     await clickWorkbenchButton(page, "Show Advanced Constraints");
     await page.getByTestId("sketchmath-advanced-constraints").getByRole("button", { name: "Make regular" }).click();
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 line");
+  });
+
+  test("creates mixed Gate B geometry, diagnoses an unsafe edit, recovers, and reloads durable history", async ({ page }) => {
+    await openSketchMath(page);
+
+    await page.getByRole("button", { name: "Polygon", exact: true }).click();
+    await clickSvgViewBoxPoint(page, 250, 220);
+    await expect(page.getByTestId("sketchmath-polygon-draft")).toBeAttached();
+    await clickSvgViewBoxPoint(page, 310, 220);
+    await expect(page.locator('[data-entity-type="profile_2d"]')).toHaveCount(1);
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+
+    await page.getByRole("button", { name: "Slot", exact: true }).click();
+    await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the first slot center");
+    await dispatchCanvasViewBoxPoint(page, 480, 260);
+    await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the second slot center");
+    await dispatchCanvasViewBoxPoint(page, 650, 260);
+    await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(2);
+    await expect(page.locator('[data-entity-type="profile_2d"]')).toHaveCount(2);
+    await expect(page.getByTestId("sketchmath-workflow-extrude")).toContainText("Ready for CAD feature");
+
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+    type GateBSnapshot = {
+      history_length: number;
+      history: Array<{ command: { command_type: string; parameters: Record<string, unknown> } }>;
+      selection_context: { items: Array<{ id: string; type: string; source_curve_ids?: string[] }> };
+    };
+    const beforeRefusalResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const beforeRefusal = await beforeRefusalResponse.json() as GateBSnapshot;
+    const slotProfile = beforeRefusal.selection_context.items.find(
+      (entity) => entity.type === "profile_2d" && entity.source_curve_ids?.some((id) => id.includes("slot_")),
+    );
+    expect(slotProfile?.source_curve_ids).toHaveLength(4);
+    const slotSourceLineId = slotProfile?.source_curve_ids?.find((id) =>
+      beforeRefusal.selection_context.items.some((entity) => entity.id === id && entity.type === "line_2d"),
+    );
+    expect(slotSourceLineId).toBeTruthy();
+    const idsBeforeRefusal = beforeRefusal.selection_context.items.map((entity) => entity.id).sort();
+
+    const browserErrorCountBeforeRefusal = browserErrors.length;
+    await page.locator(`[data-entity-id="${slotSourceLineId}"]`).dispatchEvent("click");
+    await page.getByTestId("sketchmath-editing-tools").getByRole("button", { name: "Split midpoint" }).click();
+    await expect(page.getByTestId("sketchmath-user-error")).toContainText("Referenced curve cannot be edited without topology repair");
+    await expect.poll(() => browserErrors.length).toBe(browserErrorCountBeforeRefusal + 1);
+    expect(browserErrors[browserErrorCountBeforeRefusal]).toContain("422 (Unprocessable Entity)");
+    browserErrors.splice(browserErrorCountBeforeRefusal, 1);
+    const afterRefusalResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const afterRefusal = await afterRefusalResponse.json() as GateBSnapshot;
+    expect(afterRefusal.history_length).toBe(beforeRefusal.history_length);
+    expect(afterRefusal.selection_context.items.map((entity) => entity.id).sort()).toEqual(idsBeforeRefusal);
+
+    await page.locator(`[data-entity-id="${slotProfile?.id}"]`).dispatchEvent("click");
+
+    await page.getByTestId("sketchmath-editing-tools").getByRole("button", { name: "Duplicate" }).click();
+    await expect(page.locator('[data-entity-type="profile_2d"]')).toHaveCount(3);
+    await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(4);
+
+    const undo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Undo" });
+    const redo = page.getByTestId("sketchmath-workbench-panel").getByRole("button", { name: "Redo" });
+    await undo.click();
+    await expect(page.locator('[data-entity-type="profile_2d"]')).toHaveCount(2);
+    await redo.click();
+    await expect(page.locator('[data-entity-type="profile_2d"]')).toHaveCount(3);
+
+    await page.getByRole("button", { name: "Circle" }).click();
+    await dispatchCanvasViewBoxPoint(page, 760, 160);
+    await dispatchCanvasViewBoxPoint(page, 790, 160);
+    const circle = page.locator('[data-entity-type="circle_2d"]').last();
+    await expect(circle).toBeVisible();
+    await page.getByLabel("Offset distance").fill("5");
+    await page.getByTestId("sketchmath-editing-tools").getByRole("button", { name: "Offset" }).click();
+    await expect(page.locator('[data-entity-type="circle_2d"]')).toHaveCount(2);
+
+    await page.getByRole("button", { name: "Line", exact: true }).click();
+    await dispatchCanvasViewBoxPoint(page, 120, 360);
+    await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the line end point");
+    await dispatchCanvasViewBoxPoint(page, 300, 360);
+    await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the line start point");
+    const constructionLine = page.locator('[data-testid^="entity-line_"]').last();
+    const constructionLineId = await constructionLine.getAttribute("data-entity-id");
+    await constructionLine.dispatchEvent("click");
+    await clickWorkbenchButton(page, "Show Advanced Constraints");
+    await page.getByTestId("sketchmath-advanced-constraints").getByRole("button", { name: "Make construction" }).click();
+    await expect(page.locator(`[data-entity-id="${constructionLineId}"] line.sketchmath-construction-line`)).toHaveCount(1);
+
+    const beforeSplitLineResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const beforeSplitLine = await beforeSplitLineResponse.json() as GateBSnapshot;
+    const entityIdsBeforeSplitLine = new Set(beforeSplitLine.selection_context.items.map((entity) => entity.id));
+    await page.getByRole("button", { name: "Line", exact: true }).click();
+    await dispatchCanvasViewBoxPoint(page, 150, 430);
+    await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the line end point");
+    await dispatchCanvasViewBoxPoint(page, 350, 430);
+    await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the line start point");
+    let sourceLineId: string | undefined;
+    await expect.poll(async () => {
+      const response = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+      const snapshot = await response.json() as GateBSnapshot;
+      sourceLineId = snapshot.selection_context.items.find(
+        (entity) => entity.type === "line_2d" && !entityIdsBeforeSplitLine.has(entity.id),
+      )?.id;
+      return Boolean(sourceLineId);
+    }).toBe(true);
+    const sourceLine = page.locator(`[data-entity-id="${sourceLineId}"]`);
+    await expect(sourceLine).toBeAttached();
+    await sourceLine.dispatchEvent("click");
+    await page.getByTestId("sketchmath-editing-tools").getByRole("button", { name: "Split midpoint" }).click();
+    await expect(page.locator('[data-testid^="entity-split_"][data-entity-type="line_2d"]')).toHaveCount(1);
+    await expect(page.getByTestId("sketchmath-user-error")).toHaveCount(0);
+
+    await page.locator(`[data-entity-id="${slotProfile?.id}"]`).dispatchEvent("click");
+    await page.getByLabel("Pattern count").fill("2");
+    await page.getByTestId("sketchmath-editing-tools").getByRole("button", { name: "Linear pattern" }).click();
+    await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(8);
+    await page.locator(`[data-entity-id="${slotProfile?.id}"]`).dispatchEvent("click");
+    await page.getByTestId("sketchmath-editing-tools").getByRole("button", { name: "Mirror about X=0" }).click();
+    await expect.poll(async () => {
+      const response = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+      const snapshot = await response.json() as GateBSnapshot;
+      return snapshot.history.at(-1)?.command.command_type;
+    }).toBe("mirror");
+
+    await page.getByRole("button", { name: "Box select", exact: true }).first().click();
+    await dragCanvasViewBoxBox(page, { x: 90, y: 330 }, { x: 380, y: 460 });
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText(/Selected: [2-9]/);
+
+    const beforeReloadResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const beforeReload = await beforeReloadResponse.json() as GateBSnapshot;
+    const idsBeforeReload = beforeReload.selection_context.items.map((entity) => entity.id).sort();
+    const entityTypes = new Set(beforeReload.selection_context.items.map((entity) => entity.type));
+    for (const entityType of ["line_2d", "construction_line_2d", "circle_2d", "arc_2d", "profile_2d"]) {
+      expect(entityTypes.has(entityType)).toBe(true);
+    }
+    const commandTypes = beforeReload.history.map((entry) => entry.command.command_type);
+    expect(commandTypes).toEqual(expect.arrayContaining([
+      "define_regular_polygon",
+      "define_slot",
+      "copy_linear",
+      "mirror",
+      "offset_curve",
+      "set_construction",
+      "split_line",
+    ]));
+
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    const afterReloadResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
+    const afterReload = await afterReloadResponse.json() as GateBSnapshot;
+    expect(afterReload.selection_context.items.map((entity) => entity.id).sort()).toEqual(idsBeforeReload);
+    expect(afterReload.history_length).toBe(beforeReload.history_length);
+    await expect(page.locator(`[data-entity-id="${constructionLineId}"] line.sketchmath-construction-line`)).toHaveCount(1);
+    await page.screenshot({ path: screenshotPath("sketchmath-gate-b-durable-editing.png"), fullPage: true });
   });
 
   test("keeps multi-step undo and redo backend-authoritative across a branch edit", async ({ page }) => {

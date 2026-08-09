@@ -918,6 +918,12 @@
             "make_concentric",
             "make_tangent",
             "set_construction",
+            "define_regular_polygon",
+            "define_slot",
+            "split_line",
+            "trim_line",
+            "extend_line",
+            "offset_curve",
             "solve_constraints",
             "analyze_constraints",
             "move_point",
@@ -972,7 +978,8 @@
             "0.4",
             "0.5",
             "0.6",
-            "0.7"
+            "0.7",
+            "0.8"
           ],
           "title": "Version",
           "type": "string"
@@ -1491,6 +1498,13 @@
           ],
           "default": null,
           "title": "Source Circle Id"
+        },
+        "source_curve_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Curve Ids",
+          "type": "array"
         },
         "source_line_ids": {
           "items": {

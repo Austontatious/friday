@@ -73,6 +73,36 @@ export const buildSetConstructionCommand = (selection: string[], enabled: boolea
   version: "0.7",
 });
 
+const gateBEditingCommand = (
+  commandType: SketchMathCommandType,
+  selection: string[],
+  parameters: Record<string, unknown>,
+): SketchMathCommand => ({
+  ...baseCommand(commandType, selection, parameters),
+  version: "0.8",
+});
+
+export const buildDefineRegularPolygonCommand = (center: Point, radius: number, sides: number, name: string): SketchMathCommand =>
+  gateBEditingCommand("define_regular_polygon", [], { center: [center.x, center.y], radius, sides, name, unit: "mm" });
+
+export const buildDefineSlotCommand = (start: Point, end: Point, width: number, name: string): SketchMathCommand =>
+  gateBEditingCommand("define_slot", [], { start: [start.x, start.y], end: [end.x, end.y], width, name, unit: "mm" });
+
+export const buildSplitLineCommand = (lineId: string, parameter: number = 0.5): SketchMathCommand =>
+  gateBEditingCommand("split_line", [lineId], { parameter });
+
+export const buildTrimLineCommand = (targetId: string, cutterId: string, keep: "start" | "end" = "start"): SketchMathCommand =>
+  gateBEditingCommand("trim_line", [targetId, cutterId], { keep });
+
+export const buildExtendLineCommand = (targetId: string, cutterId: string): SketchMathCommand =>
+  gateBEditingCommand("extend_line", [targetId, cutterId], {});
+
+export const buildOffsetCurveCommand = (entityId: string, distance: number, side: "left" | "right" = "left"): SketchMathCommand =>
+  gateBEditingCommand("offset_curve", [entityId], { distance, side, unit: "mm" });
+
+export const buildCopyLinearCommand = (selection: string[], vector: Point, count: number): SketchMathCommand =>
+  baseCommand("copy_linear", selection, { vector: [Number(vector.x.toFixed(2)), Number(vector.y.toFixed(2))], count });
+
 export const buildDetectProfilesCommand = (): SketchMathCommand =>
   baseCommand("detect_profiles", [], {});
 
