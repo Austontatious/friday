@@ -184,6 +184,7 @@ class CompanionConfig:
 @dataclass(frozen=True)
 class SketchMathConfig:
     enabled: bool
+    document_v1_enabled: bool
     session_dir: str
     cad_export_dir: str
     freecad_cmd: str
@@ -201,6 +202,7 @@ class SketchMathConfig:
         )
         return cls(
             enabled=_env_bool("FRIDAY_SKETCHMATH_ENABLED", default=False),
+            document_v1_enabled=_env_bool("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", default=False),
             session_dir=session_dir,
             cad_export_dir=cad_export_dir,
             freecad_cmd=_env_str("FRIDAY_SKETCHMATH_FREECAD_CMD", default=""),

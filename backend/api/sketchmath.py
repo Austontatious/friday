@@ -53,6 +53,19 @@ def _require_enabled() -> None:
         )
 
 
+def _require_document_v1() -> None:
+    if not SketchMathConfig.from_env().document_v1_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=_error_payload(
+                "sketchmath_document_v1_disabled",
+                "SketchMath feature history is disabled",
+                "Set FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED=1",
+                False,
+            ),
+        )
+
+
 def _cad_export_root() -> Path:
     root = Path(SketchMathConfig.from_env().cad_export_dir)
     if not root.is_absolute():
@@ -149,6 +162,52 @@ def commit_command(session_id: str, payload: Dict[str, Any]):
         )
     try:
         return _store().run_command(session_id, command, mode="commit")
+    except SketchMathError as exc:
+        _raise_http(exc)
+
+
+@router.post("/sketchmath/sessions/{session_id}/features/preview", summary="Preview a SketchMath feature operation")
+def preview_feature(session_id: str, payload: Dict[str, Any]):
+    _require_enabled()
+    _require_document_v1()
+    command = payload.get("command") if isinstance(payload, dict) else None
+    if not isinstance(command, dict):
+        raise HTTPException(status_code=400, detail=_error_payload("bad_request", "Missing feature command", "Provide a 'command' object", False))
+    try:
+        return _store().run_feature_command(session_id, command, mode="preview")
+    except SketchMathError as exc:
+        _raise_http(exc)
+
+
+@router.post("/sketchmath/sessions/{session_id}/features/commit", summary="Commit a SketchMath feature operation")
+def commit_feature(session_id: str, payload: Dict[str, Any]):
+    _require_enabled()
+    _require_document_v1()
+    command = payload.get("command") if isinstance(payload, dict) else None
+    if not isinstance(command, dict):
+        raise HTTPException(status_code=400, detail=_error_payload("bad_request", "Missing feature command", "Provide a 'command' object", False))
+    try:
+        return _store().run_feature_command(session_id, command, mode="commit")
+    except SketchMathError as exc:
+        _raise_http(exc)
+
+
+@router.post("/sketchmath/sessions/{session_id}/features/revert", summary="Revert the last SketchMath feature operation")
+def revert_feature(session_id: str):
+    _require_enabled()
+    _require_document_v1()
+    try:
+        return _store().revert_feature(session_id)
+    except SketchMathError as exc:
+        _raise_http(exc)
+
+
+@router.post("/sketchmath/sessions/{session_id}/features/redo", summary="Redo the next SketchMath feature operation")
+def redo_feature(session_id: str):
+    _require_enabled()
+    _require_document_v1()
+    try:
+        return _store().redo_feature(session_id)
     except SketchMathError as exc:
         _raise_http(exc)
 

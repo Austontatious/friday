@@ -124,6 +124,49 @@ def _command(command_type: str, command_id: str, *, mode: str = "preview", selec
     }
 
 
+def _feature_command(
+    operation_type: str,
+    operation_id: str,
+    revision: int,
+    *,
+    feature: dict[str, object] | None = None,
+    target_id: str | None = None,
+    mode: str = "preview",
+) -> dict[str, object]:
+    parameters: dict[str, object] = {}
+    if feature is not None:
+        parameters["feature"] = feature
+    return {
+        "version": "1.0",
+        "operation_id": operation_id,
+        "mode": mode,
+        "base_revision": revision,
+        "operation_type": operation_type,
+        "target_id": target_id,
+        "parameters": parameters,
+    }
+
+
+def _extrude_feature(depth: float = 10.0) -> dict[str, object]:
+    return {
+        "feature_id": "feature_plate",
+        "feature_type": "extrude",
+        "name": "Plate",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": "profile_box",
+        "source_region_id": "region_plate",
+        "dependencies": [],
+        "parameters": {
+            "depth_mm": depth,
+            "extent": "one_sided",
+            "direction": "positive",
+            "operation": "new_body",
+        },
+        "suppressed": False,
+    }
+
+
 def _topology_loop(prefix: str, minimum: float, maximum: float) -> list[dict[str, object]]:
     return [
         {"id": f"{prefix}_bottom", "type": "line_2d", "start": [minimum, minimum], "end": [maximum, minimum]},
@@ -692,6 +735,117 @@ def test_sketchmath_feature_flag_defaults_to_disabled(monkeypatch):
 
     assert response.status_code == 503
     assert response.json()["detail"]["error"]["code"] == "sketchmath_disabled"
+    client.close()
+
+
+def test_sketchmath_document_v1_defaults_off_and_gates_feature_routes(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "0")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": _selection_context()})
+
+    assert created.status_code == 200
+    assert "document" not in created.json()
+    response = client.post(
+        f"/api/sketchmath/sessions/{created.json()['session_id']}/features/preview",
+        json={"command": _feature_command("rebuild", "rebuild_disabled", 0)},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "sketchmath_document_v1_disabled"
+    client.close()
+
+
+def test_sketchmath_feature_history_preview_commit_reload_conflict_and_undo_redo(monkeypatch, tmp_path):
+    from backend.sketchmath.service import SESSION_STORE
+
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    selection = _profile_selection_context_with_hole()
+    selection["items"][0]["holes"] = ["profile_inner"]
+    selection["items"][0]["source_region_id"] = "region_plate"
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": selection})
+
+    assert created.status_code == 200
+    session_id = created.json()["session_id"]
+    assert created.json()["document"]["revision"] == 0
+    assert created.json()["document"]["sketches"][0]["state"]["items"][0]["id"] == "profile_box"
+
+    add = _feature_command("add_feature", "add_plate", 0, feature=_extrude_feature(), mode="commit")
+    preview = client.post(f"/api/sketchmath/sessions/{session_id}/features/preview", json={"command": add})
+    assert preview.status_code == 200
+    assert preview.json()["result"]["status"] == "preview"
+    assert preview.json()["result"]["after"]["revision"] == 1
+    assert preview.json()["document"]["revision"] == 0
+    assert preview.json()["feature_history_length"] == 0
+
+    committed = client.post(f"/api/sketchmath/sessions/{session_id}/features/commit", json={"command": add})
+    assert committed.status_code == 200
+    committed_payload = committed.json()
+    assert committed_payload["document"]["revision"] == 1
+    assert committed_payload["history_length"] == 0
+    assert committed_payload["feature_history_length"] == 1
+    assert committed_payload["document"]["bodies"][0]["feature_ids"] == ["feature_plate"]
+    measurements = committed_payload["document"]["last_rebuild"]["records"][0]["measurements"]
+    assert measurements["net_profile_area_mm2"] == 128.0
+    assert measurements["volume_delta_mm3"] == 1280.0
+
+    SESSION_STORE._sessions.pop(session_id, None)
+    reloaded = client.get(f"/api/sketchmath/sessions/{session_id}")
+    assert reloaded.status_code == 200
+    assert reloaded.json()["document"]["features"][0]["feature_id"] == "feature_plate"
+    assert reloaded.json()["feature_history_length"] == 1
+
+    stale = _feature_command(
+        "replace_feature",
+        "replace_stale",
+        0,
+        feature=_extrude_feature(25.0),
+        target_id="feature_plate",
+        mode="commit",
+    )
+    conflict = client.post(f"/api/sketchmath/sessions/{session_id}/features/commit", json={"command": stale})
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["error"]["code"] == "revision_conflict"
+    assert conflict.json()["detail"]["error"]["detail"]["current_revision"] == 1
+
+    replacement = {**stale, "operation_id": "replace_depth", "base_revision": 1}
+    replaced = client.post(f"/api/sketchmath/sessions/{session_id}/features/commit", json={"command": replacement})
+    assert replaced.status_code == 200
+    assert replaced.json()["document"]["revision"] == 2
+    assert replaced.json()["document"]["features"][0]["parameters"]["depth_mm"] == 25.0
+    replacement_signature = replaced.json()["document"]["last_rebuild"]["records"][0]["output_signature"]
+
+    reverted = client.post(f"/api/sketchmath/sessions/{session_id}/features/revert")
+    assert reverted.status_code == 200
+    assert reverted.json()["document"]["revision"] == 3
+    assert reverted.json()["document"]["features"][0]["parameters"]["depth_mm"] == 10.0
+    assert reverted.json()["can_feature_redo"] is True
+
+    redone = client.post(f"/api/sketchmath/sessions/{session_id}/features/redo")
+    assert redone.status_code == 200
+    assert redone.json()["document"]["revision"] == 4
+    assert redone.json()["document"]["features"][0]["parameters"]["depth_mm"] == 25.0
+    assert redone.json()["document"]["last_rebuild"]["records"][0]["output_signature"] == replacement_signature
+    client.close()
+
+
+def test_geometry_commit_syncs_document_sketch_and_revision(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": _selection_context()})
+    session_id = created.json()["session_id"]
+    command = _command("define_point", "point_document_sync", mode="commit", parameters={"name": "origin", "coords": [0, 0]})
+
+    response = client.post(f"/api/sketchmath/sessions/{session_id}/commands/commit", json={"command": command})
+
+    assert response.status_code == 200
+    assert response.json()["document"]["revision"] == 1
+    assert response.json()["document"]["sketches"][0]["state"] == response.json()["selection_context"]
     client.close()
 
 

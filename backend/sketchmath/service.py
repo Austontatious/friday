@@ -27,7 +27,13 @@ from sketchmath.executor.errors import (
     UnsupportedCommandError,
     UnsupportedCadFormatError,
     WrongEntityTypeError,
+    FeatureRebuildError,
+    RevisionConflictError,
 )
+from sketchmath.features.executor import apply_feature_command
+from sketchmath.features.rebuild import rebuild_document
+from sketchmath.models.document import SketchMathDocument, SketchRecord, wrap_legacy_selection_context
+from sketchmath.models.feature_command import FeatureCommand
 from sketchmath.models.geometry_command import GeometryCommand
 from sketchmath.models.operation_result import OperationResult
 from sketchmath.models.selection_context import SelectionContext
@@ -182,7 +188,7 @@ def _error_status(exc: SketchMathError) -> int:
         return 503
     if isinstance(exc, CadExportError):
         return 502
-    if isinstance(exc, (LockedEntityMutationError, SolverError, ClarificationRequiredError)):
+    if isinstance(exc, (LockedEntityMutationError, SolverError, ClarificationRequiredError, FeatureRebuildError, RevisionConflictError)):
         return 409
     return 400
 
@@ -212,10 +218,36 @@ def _now_iso() -> str:
 
 
 @dataclass
+class _FeatureOperationRecord:
+    command: FeatureCommand
+    before: SketchMathDocument
+    after: SketchMathDocument
+
+
+def _serialize_feature_record(record: _FeatureOperationRecord) -> dict[str, Any]:
+    return {
+        "command": record.command.model_dump(mode="json"),
+        "before": record.before.model_dump(mode="json"),
+        "after": record.after.model_dump(mode="json"),
+    }
+
+
+def _feature_record_from_payload(payload: dict[str, Any]) -> _FeatureOperationRecord:
+    return _FeatureOperationRecord(
+        command=FeatureCommand.model_validate(payload["command"]),
+        before=SketchMathDocument.model_validate(payload["before"]),
+        after=SketchMathDocument.model_validate(payload["after"]),
+    )
+
+
+@dataclass
 class _StoredSession:
     session: GeometrySession
     initial_state: SelectionContext
     metadata: dict[str, Any] = field(default_factory=dict)
+    document: SketchMathDocument | None = None
+    feature_history: list[_FeatureOperationRecord] = field(default_factory=list)
+    feature_redo_history: list[_FeatureOperationRecord] = field(default_factory=list)
 
 
 @dataclass
@@ -240,9 +272,29 @@ class SketchMathSessionStore:
     def _session_path(self, session_id: str) -> Path:
         return self._root() / f"{session_id}.json"
 
+    @staticmethod
+    def _primary_sketch(document: SketchMathDocument) -> SketchRecord:
+        if len(document.sketches) != 1:
+            raise CommandValidationError(
+                "The compatibility session adapter requires exactly one sketch",
+                detail={"document_id": document.document_id, "sketch_count": len(document.sketches)},
+            )
+        return document.sketches[0]
+
+    def _sync_document_sketch(self, stored: _StoredSession, state: SelectionContext, *, increment_revision: bool) -> None:
+        if stored.document is None:
+            return
+        document = stored.document.model_copy(deep=True)
+        primary = self._primary_sketch(document)
+        document.sketches[0] = primary.model_copy(update={"state": state.model_copy(deep=True)})
+        if increment_revision:
+            document.revision += 1
+        document.last_rebuild = rebuild_document(document)
+        stored.document = document
+
     def _build_snapshot(self, session_id: str, stored: _StoredSession) -> dict[str, Any]:
         session = stored.session
-        return {
+        snapshot = {
             "session_id": session_id,
             "selection_context": session.state.model_dump(mode="json"),
             "session_metadata": {
@@ -256,6 +308,17 @@ class SketchMathSessionStore:
             "can_undo": session.history.cursor > 0,
             "can_redo": bool(session.history.redo_records),
         }
+        if stored.document is not None:
+            snapshot.update(
+                {
+                    "document": stored.document.model_dump(mode="json"),
+                    "feature_history_length": len(stored.feature_history),
+                    "feature_history": [_serialize_feature_record(record) for record in stored.feature_history],
+                    "can_feature_undo": bool(stored.feature_history),
+                    "can_feature_redo": bool(stored.feature_redo_history),
+                }
+            )
+        return snapshot
 
     def _save(self, session_id: str, stored: _StoredSession) -> None:
         payload = {
@@ -270,6 +333,14 @@ class SketchMathSessionStore:
             "history": [_serialize_history_record(record) for record in stored.session.history.records],
             "redo_history": [_serialize_history_record(record) for record in stored.session.history.redo_records],
         }
+        if stored.document is not None:
+            payload.update(
+                {
+                    "document": stored.document.model_dump(mode="json"),
+                    "feature_history": [_serialize_feature_record(record) for record in stored.feature_history],
+                    "feature_redo_history": [_serialize_feature_record(record) for record in stored.feature_redo_history],
+                }
+            )
         path = self._session_path(session_id)
         tmp_path = path.with_suffix(".json.tmp")
         tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -290,7 +361,19 @@ class SketchMathSessionStore:
         metadata = dict(payload.get("session_metadata") or {})
         metadata.setdefault("persisted", True)
         metadata.setdefault("storage_path", str(path))
-        return _StoredSession(session=session, initial_state=initial_state, metadata=metadata)
+        document_payload = payload.get("document")
+        document = SketchMathDocument.model_validate(document_payload) if isinstance(document_payload, dict) else None
+        if document is None and SketchMathConfig.from_env().document_v1_enabled:
+            document = wrap_legacy_selection_context(current_state, document_id=f"doc_{session_id}")
+            document.last_rebuild = rebuild_document(document)
+        return _StoredSession(
+            session=session,
+            initial_state=initial_state,
+            metadata=metadata,
+            document=document,
+            feature_history=[_feature_record_from_payload(record) for record in payload.get("feature_history", [])],
+            feature_redo_history=[_feature_record_from_payload(record) for record in payload.get("feature_redo_history", [])],
+        )
 
     def _get_stored(self, session_id: str) -> _StoredSession:
         with self._lock:
@@ -303,15 +386,29 @@ class SketchMathSessionStore:
         return stored
 
     def create_session(self, payload: dict[str, Any] | None = None) -> tuple[str, GeometrySession]:
-        context = _selection_context_from_payload(payload)
         session_id = f"sm_{uuid4().hex[:12]}"
+        document_payload = payload.get("document") if isinstance(payload, dict) else None
+        document: SketchMathDocument | None = None
+        if SketchMathConfig.from_env().document_v1_enabled and isinstance(document_payload, dict):
+            document = SketchMathDocument.model_validate(document_payload)
+            context = self._primary_sketch(document).state.model_copy(deep=True)
+        else:
+            context = _selection_context_from_payload(payload)
+            if SketchMathConfig.from_env().document_v1_enabled:
+                document = wrap_legacy_selection_context(context, document_id=f"doc_{session_id}")
+                document.last_rebuild = rebuild_document(document)
         session = GeometrySession(context)
         metadata = {
             "persisted": True,
             "created_at": _now_iso(),
             "updated_at": _now_iso(),
         }
-        stored = _StoredSession(session=session, initial_state=context.model_copy(deep=True), metadata=metadata)
+        stored = _StoredSession(
+            session=session,
+            initial_state=context.model_copy(deep=True),
+            metadata=metadata,
+            document=document,
+        )
         with self._lock:
             self._sessions[session_id] = stored
         self._save(session_id, stored)
@@ -336,18 +433,45 @@ class SketchMathSessionStore:
             command = _validate_command_payload(payload)
             result = session.execute(command)
             if command.mode == "commit":
+                self._sync_document_sketch(stored, session.state, increment_revision=True)
+                stored.metadata["updated_at"] = _now_iso()
+                self._save(session_id, stored)
+            return {**self._build_snapshot(session_id, stored), "result": result.model_dump(mode="json")}
+
+    def run_feature_command(self, session_id: str, command_payload: dict[str, Any], *, mode: str | None = None) -> dict[str, Any]:
+        stored = self._get_stored(session_id)
+        with self._session_lock(session_id):
+            if stored.document is None:
+                raise CommandValidationError(
+                    "SketchMath document v1 is not enabled for this session",
+                    detail={"session_id": session_id, "error_code": "document_v1_disabled"},
+                )
+            payload = dict(command_payload)
+            if mode is not None:
+                payload["mode"] = mode
+            try:
+                command = FeatureCommand.model_validate(payload)
+            except ValidationError as exc:
+                raise CommandValidationError(
+                    "Feature command failed schema validation",
+                    detail={"errors": exc.errors(include_url=False)},
+                ) from exc
+            result = apply_feature_command(stored.document, command)
+            if command.mode == "commit":
+                stored.document = result.after.model_copy(deep=True)
+                stored.feature_history.append(
+                    _FeatureOperationRecord(
+                        command=command,
+                        before=result.before.model_copy(deep=True),
+                        after=result.after.model_copy(deep=True),
+                    )
+                )
+                stored.feature_redo_history.clear()
                 stored.metadata["updated_at"] = _now_iso()
                 self._save(session_id, stored)
             return {
-                "session_id": session_id,
-                "selection_context": session.state.model_dump(mode="json"),
+                **self._build_snapshot(session_id, stored),
                 "result": result.model_dump(mode="json"),
-                "history_length": session.history.cursor,
-                "session_metadata": {
-                    **stored.metadata,
-                    "persisted": True,
-                    "storage_path": str(self._session_path(session_id)),
-                },
             }
 
     def run_entity(self, session_id: str, entity_payload: dict[str, Any], *, mode: str = "commit") -> dict[str, Any]:
@@ -379,6 +503,7 @@ class SketchMathSessionStore:
         with self._session_lock(session_id):
             session = stored.session
             session.revert()
+            self._sync_document_sketch(stored, session.state, increment_revision=True)
             stored.metadata["updated_at"] = _now_iso()
             self._save(session_id, stored)
             return self._build_snapshot(session_id, stored)
@@ -387,6 +512,41 @@ class SketchMathSessionStore:
         stored = self._get_stored(session_id)
         with self._session_lock(session_id):
             stored.session.redo()
+            self._sync_document_sketch(stored, stored.session.state, increment_revision=True)
+            stored.metadata["updated_at"] = _now_iso()
+            self._save(session_id, stored)
+            return self._build_snapshot(session_id, stored)
+
+    def revert_feature(self, session_id: str) -> dict[str, Any]:
+        stored = self._get_stored(session_id)
+        with self._session_lock(session_id):
+            if stored.document is None:
+                raise CommandValidationError("SketchMath document v1 is not enabled for this session")
+            if not stored.feature_history:
+                return self._build_snapshot(session_id, stored)
+            record = stored.feature_history.pop()
+            stored.feature_redo_history.append(record)
+            restored = record.before.model_copy(deep=True)
+            restored.revision = stored.document.revision + 1
+            restored.last_rebuild = rebuild_document(restored)
+            stored.document = restored
+            stored.metadata["updated_at"] = _now_iso()
+            self._save(session_id, stored)
+            return self._build_snapshot(session_id, stored)
+
+    def redo_feature(self, session_id: str) -> dict[str, Any]:
+        stored = self._get_stored(session_id)
+        with self._session_lock(session_id):
+            if stored.document is None:
+                raise CommandValidationError("SketchMath document v1 is not enabled for this session")
+            if not stored.feature_redo_history:
+                return self._build_snapshot(session_id, stored)
+            record = stored.feature_redo_history.pop()
+            restored = record.after.model_copy(deep=True)
+            restored.revision = stored.document.revision + 1
+            restored.last_rebuild = rebuild_document(restored)
+            stored.document = restored
+            stored.feature_history.append(record)
             stored.metadata["updated_at"] = _now_iso()
             self._save(session_id, stored)
             return self._build_snapshot(session_id, stored)
