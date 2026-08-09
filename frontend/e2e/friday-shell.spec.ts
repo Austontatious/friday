@@ -22,7 +22,7 @@ test.describe("FRIDAY shell", () => {
 
     await sketchmathButton.click();
 
-    await expect(page.getByRole("heading", { name: "SketchMath" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "SketchMath", exact: true })).toBeVisible();
     await page.screenshot({ path: "../docs/runtime/screenshots/friday-command-center-sketchmath.png", fullPage: true });
 
     await page.goto("/");

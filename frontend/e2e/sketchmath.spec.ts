@@ -190,7 +190,7 @@ test.describe("SketchMath workspace", () => {
 
     await clickWorkbenchButton(page, "Apply length");
     await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("distance 17.5 mm");
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Partially analyzed");
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Under-constrained");
 
     await page.getByRole("button", { name: "Line" }).first().click();
     await page.getByTestId("sketchmath-canvas").click({ position: { x: 180, y: 260 } });
@@ -214,8 +214,9 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-selected-constraints")).toContainText("Equal length");
 
     await clickWorkbenchButton(page, "Show Advanced / Debug");
-    await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Backend: closed_form_v1");
-    await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Coverage: partial");
+    await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Backend: scipy_least_squares_v1");
+    await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Coverage: exact");
+    await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Jacobian: scipy_3_point_with_central_rank_check");
     await expect(page.getByTestId("sketchmath-solver-analysis-debug")).toContainText("Independent equations:");
     await page.getByRole("button", { name: "Show Advanced / Debug DSL" }).click();
     await expect(page.getByTestId("sketchmath-command-panel")).toBeVisible();
@@ -236,7 +237,7 @@ test.describe("SketchMath workspace", () => {
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
     await expect(page.getByTestId("sketchmath-workbench-panel")).toContainText("Closed profile: valid");
     await expect(page.getByTestId("sketchmath-workbench-panel")).toContainText("Rectangle dimensions");
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Partially analyzed");
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Under-constrained");
     await expect(page.getByTestId("sketchmath-workbench-panel")).toContainText("Ready for CAD feature");
     await page.screenshot({ path: screenshotPath("sketchmath-rectangle-after-create-selected.png"), fullPage: true });
     await page.getByRole("button", { name: "Dimension" }).first().click();
@@ -255,7 +256,7 @@ test.describe("SketchMath workspace", () => {
     await page.screenshot({ path: screenshotPath("sketchmath-dimension-edit-width.png"), fullPage: true });
     await page.getByRole("button", { name: "Apply dimension" }).click();
     await expect(widthLabel).toContainText("40 mm", { timeout: 20000 });
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Partially analyzed");
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Under-constrained");
 
     await heightLabel.click();
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Rectangle height edge");
@@ -559,7 +560,7 @@ test.describe("SketchMath workspace", () => {
     await clickSvgViewBoxPoint(page, 440, 220);
     await expect(page.locator('[data-entity-type="arc_2d"]')).toHaveCount(2);
     await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 3-point arc");
-    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Partially analyzed");
+    await expect(page.getByTestId("sketchmath-workbench-panel").getByTestId("sketchmath-status")).toContainText("Under-constrained");
 
     const pathsBeforeReload = await page.locator('[data-entity-type="arc_2d"] path.sketchmath-line').evaluateAll((paths) =>
       paths.map((path) => path.getAttribute("d")),

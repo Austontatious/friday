@@ -2215,6 +2215,7 @@ describe("SketchMath workspace", () => {
       expect.arrayContaining([
         expect.objectContaining({ mode: "commit", command_type: "define_point" }),
         expect.objectContaining({ mode: "commit", command_type: "define_line" }),
+        expect.objectContaining({ mode: "preview", command_type: "solve_constraints" }),
         expect.objectContaining({ mode: "commit", command_type: "make_profile" }),
       ]),
     );

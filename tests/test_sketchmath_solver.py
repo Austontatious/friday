@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import pytest
 
 
@@ -190,6 +192,26 @@ def test_under_constrained_solve_returns_structured_error() -> None:
     assert exc_info.value.to_dict()["code"] == "clarification_required"
     assert exc_info.value.detail["solver_run"]["outcome"] == "under_constrained"
     assert exc_info.value.detail["solver_run"]["feasible"] is True
+
+
+def test_under_constrained_preview_returns_a_non_committing_proposal() -> None:
+    session = _session(
+        [
+            {"id": "point_A", "type": "point_2d", "coords": [0, 0], "locked": False},
+            {"id": "point_B", "type": "point_2d", "coords": [1, 1], "locked": False},
+        ],
+        constraints=[
+            {"id": "c_distance", "type": "distance_constraint", "points": ["point_A", "point_B"], "distance": 5.0, "unit": "mm", "anchor": "midpoint"},
+        ],
+    )
+
+    result = session.execute(_command("solve_constraints", "preview_under", mode="preview"))
+
+    assert result.metadata["solver_run"]["outcome"] == "under_constrained"
+    assert result.metadata["warnings"] == ["under_constrained"]
+    assert math.dist(result.after.get_entity("point_A").coords, result.after.get_entity("point_B").coords) == pytest.approx(5.0)
+    assert session.state.get_entity("point_A").coords == (0.0, 0.0)
+    assert session.history.records == []
 
 
 def test_over_constrained_solve_returns_structured_error() -> None:

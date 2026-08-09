@@ -1157,6 +1157,15 @@ def _handle_solve_constraints(command: GeometryCommand, state: SelectionContext)
         }
     run = _run_constraint_path(state, constraints, solve=True)
     if run.outcome == "under_constrained":
+        if command.mode == "preview":
+            proposed = state.model_copy(deep=True)
+            for patch in run.proposed_patch:
+                proposed.replace_entity(type(state.get_entity(patch.entity_id)).model_validate(patch.after))
+            return proposed, run.changed_entity_ids, None, None, {
+                "warnings": ["under_constrained"],
+                "solver_analysis": run.analysis_after.model_dump(mode="json"),
+                "solver_run": run.model_dump(mode="json"),
+            }
         raise ClarificationRequiredError(
             "Constraint system is under-constrained",
             detail={"constraint_ids": run.requested_constraint_ids, "solver_run": run.model_dump(mode="json")},
@@ -1945,6 +1954,22 @@ def _move_center_entity(state: SelectionContext, entity: Circle2DEntity | Arc2DE
     if entity.center == target:
         return []
     _ensure_mutable(state, [entity.id], command_type)
+    if isinstance(entity, Arc2DEntity):
+        delta = subtract(target, entity.center)
+        source_point_ids = _dedupe(
+            [
+                point_id
+                for point_id in (entity.center_point_id, entity.start_point_id, entity.through_point_id, entity.end_point_id)
+                if point_id is not None
+            ]
+        )
+        if source_point_ids:
+            _ensure_mutable(state, source_point_ids, command_type)
+            for point_id in source_point_ids:
+                point = _resolve_point(state, point_id, "arc_source")
+                state.replace_entity(_replace_point(point, add(point.coords, delta)))
+            state.replace_entity(Arc2DEntity(**{**entity.model_dump(), "center": target}))
+            return [*source_point_ids, entity.id]
     center_point_id = entity.center_point_id
     if center_point_id:
         center_point = _resolve_point(state, center_point_id, "center")
@@ -1965,36 +1990,76 @@ def _apply_concentric_constraint(constraint: ConcentricConstraint, state: Select
 def _apply_tangent_constraint(constraint: TangentConstraint, state: SelectionContext) -> dict[str, Any]:
     reference = state.get_entity(constraint.entities[0])
     target = state.get_entity(constraint.entities[1])
-    if isinstance(target, Arc2DEntity) or isinstance(reference, Arc2DEntity):
-        raise SelectionResolutionError(
-            "Finite-arc tangency is not yet supported",
-            detail={"constraint_id": constraint.id, "entities": list(constraint.entities), "error_code": "unsupported_arc_tangency"},
-        )
-    target_circle = target if isinstance(target, Circle2DEntity) else None
-    if isinstance(reference, (Line2DEntity, ConstructionLine2DEntity)) and target_circle is not None:
+    target_curve = target if isinstance(target, (Circle2DEntity, Arc2DEntity)) else None
+    if isinstance(reference, (Line2DEntity, ConstructionLine2DEntity)) and target_curve is not None:
         start, end = _line_points(reference)
         line_vector = subtract(end, start)
         line_length = distance(start, end)
         if line_length <= DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm:
             raise SolverError("Tangent reference line is degenerate", detail={"constraint_id": constraint.id})
-        projected = project_point_to_line(target_circle.center, start, end)
-        side = 1.0 if _cross(line_vector, subtract(target_circle.center, start)) >= 0.0 else -1.0
+        projected = project_point_to_line(target_curve.center, start, end)
+        side = 1.0 if _cross(line_vector, subtract(target_curve.center, start)) >= 0.0 else -1.0
         normal = (-line_vector[1] / line_length, line_vector[0] / line_length)
-        desired = add(projected, scale(normal, target_circle.radius * side))
-        changed = _move_center_entity(state, target_circle, desired, "tangent_constraint")
+        desired = add(projected, scale(normal, target_curve.radius * side))
+        if isinstance(target_curve, Arc2DEntity):
+            translated = Arc2DEntity(**{**target_curve.model_dump(), "center": desired})
+            if not _arc_contains_point(translated, projected):
+                raise SelectionResolutionError(
+                    "The line touches the arc's supporting circle outside the finite arc span",
+                    detail={"constraint_id": constraint.id, "error_code": "tangent_outside_arc_span", "arc_id": target_curve.id},
+                )
+        changed = _move_center_entity(state, target_curve, desired, "tangent_constraint")
         return {"status": "changed" if changed else "ok", "changed_entity_ids": changed}
-    if isinstance(reference, Circle2DEntity) and target_circle is not None:
-        target_distance = reference.radius + target_circle.radius if constraint.tangency == "external" else abs(reference.radius - target_circle.radius)
+    if isinstance(reference, (Circle2DEntity, Arc2DEntity)) and target_curve is not None:
+        target_distance = reference.radius + target_curve.radius if constraint.tangency == "external" else abs(reference.radius - target_curve.radius)
         if target_distance <= DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm:
             raise SolverError("Internal tangency is undefined for equal radii", detail={"constraint_id": constraint.id})
-        direction = normalize(subtract(target_circle.center, reference.center))
+        direction = normalize(subtract(target_curve.center, reference.center))
         desired = add(reference.center, scale(direction, target_distance))
-        changed = _move_center_entity(state, target_circle, desired, "tangent_constraint")
+        first_contact, second_contact = _tangent_contact_points(reference.center, reference.radius, desired, target_curve.radius, constraint.tangency)
+        if isinstance(reference, Arc2DEntity) and not _arc_contains_point(reference, first_contact):
+            raise SelectionResolutionError(
+                "Tangency falls outside the reference arc span",
+                detail={"constraint_id": constraint.id, "error_code": "tangent_outside_arc_span", "arc_id": reference.id},
+            )
+        if isinstance(target_curve, Arc2DEntity):
+            translated = Arc2DEntity(**{**target_curve.model_dump(), "center": desired})
+            if not _arc_contains_point(translated, second_contact):
+                raise SelectionResolutionError(
+                    "Tangency falls outside the target arc span",
+                    detail={"constraint_id": constraint.id, "error_code": "tangent_outside_arc_span", "arc_id": target_curve.id},
+                )
+        changed = _move_center_entity(state, target_curve, desired, "tangent_constraint")
         return {"status": "changed" if changed else "ok", "changed_entity_ids": changed}
     raise WrongEntityTypeError(
-        "Tangent currently supports line-to-circle or circle-to-circle selection order",
+        "Tangent supports a line followed by a circle/arc or two circle/arc entities",
         detail={"constraint_id": constraint.id, "entities": list(constraint.entities)},
     )
+
+
+def _arc_contains_point(arc: Arc2DEntity, point: Point2D, tolerance_deg: float = 1e-5) -> bool:
+    if distance(arc.center, point) <= DEFAULT_TOLERANCE_POLICY.coordinate_abs_mm:
+        return False
+    angle = normalize_angle_degrees(math.degrees(math.atan2(point[1] - arc.center[1], point[0] - arc.center[0])))
+    start = normalize_angle_degrees(arc.start_angle_deg)
+    if arc.sweep_angle_deg > 0:
+        return (angle - start) % 360.0 <= arc.sweep_angle_deg + tolerance_deg
+    return (start - angle) % 360.0 <= -arc.sweep_angle_deg + tolerance_deg
+
+
+def _tangent_contact_points(
+    first_center: Point2D,
+    first_radius: float,
+    second_center: Point2D,
+    second_radius: float,
+    tangency: str,
+) -> tuple[Point2D, Point2D]:
+    direction = normalize(subtract(second_center, first_center))
+    if tangency == "external":
+        return add(first_center, scale(direction, first_radius)), subtract(second_center, scale(direction, second_radius))
+    if first_radius >= second_radius:
+        return add(first_center, scale(direction, first_radius)), add(second_center, scale(direction, second_radius))
+    return subtract(first_center, scale(direction, first_radius)), subtract(second_center, scale(direction, second_radius))
 
 
 def _apply_distance_constraint(constraint: DistanceConstraint, state: SelectionContext) -> dict[str, Any]:

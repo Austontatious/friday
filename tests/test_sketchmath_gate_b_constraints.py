@@ -108,7 +108,7 @@ def test_concentric_constraint_is_preserved_when_reference_center_is_dragged() -
     assert result.after.get_entity("target").center == (7.0, 8.0)
 
 
-def test_tangent_supports_line_circle_and_circle_circle_but_rejects_finite_arcs() -> None:
+def test_tangent_supports_line_circle_circle_circle_and_finite_line_arc() -> None:
     line_circle = _session(
         [
             {"id": "line", "type": "line_2d", "start": [0, 0], "end": [10, 0]},
@@ -136,16 +136,38 @@ def test_tangent_supports_line_circle_and_circle_circle_but_rejects_finite_arcs(
                 "type": "arc_2d",
                 "center": [5, 5],
                 "radius": 2,
+                "start_angle_deg": 180,
+                "sweep_angle_deg": 179.999,
+                "construction": "center",
+            },
+        ]
+    )
+    result = arc_session.execute(_command("make_tangent", "arc_tangent", ["line", "arc"]))
+    assert result.after.get_entity("arc").center == pytest.approx((5.0, 2.0))
+    assert result.after.constraints[0].type == "tangent_constraint"
+
+
+def test_finite_arc_tangent_rejects_contact_outside_arc_span() -> None:
+    session = _session(
+        [
+            {"id": "line", "type": "line_2d", "start": [0, 0], "end": [10, 0]},
+            {
+                "id": "arc",
+                "type": "arc_2d",
+                "center": [5, 5],
+                "radius": 2,
                 "start_angle_deg": 0,
                 "sweep_angle_deg": 90,
                 "construction": "center",
             },
         ]
     )
+
     with pytest.raises(Exception) as error:
-        arc_session.execute(_command("make_tangent", "arc_tangent", ["line", "arc"]))
-    assert error.value.to_dict()["detail"]["error_code"] == "unsupported_arc_tangency"
-    assert arc_session.state.constraints == []
+        session.execute(_command("make_tangent", "arc_tangent", ["line", "arc"]))
+
+    assert error.value.to_dict()["detail"]["error_code"] == "tangent_outside_arc_span"
+    assert session.state.constraints == []
 
 
 def test_tangent_constraint_is_preserved_when_linked_circle_center_is_dragged() -> None:

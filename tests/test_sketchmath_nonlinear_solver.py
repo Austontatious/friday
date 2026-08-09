@@ -7,6 +7,7 @@ import pytest
 from sketchmath.executor.command_router import GeometrySession
 from sketchmath.models.geometry_command import GeometryCommand
 from sketchmath.models.selection_context import SelectionContext
+from sketchmath.solver.analysis import analyze_constraint_system
 from sketchmath.solver.nonlinear import evaluate_nonlinear_system
 
 
@@ -179,3 +180,126 @@ def test_coincident_circle_centers_use_deterministic_tangent_seed_recovery() -> 
     assert abs(first_center[0]) == pytest.approx(5.0, abs=1e-7)
     assert first_center[1] == pytest.approx(0.0, abs=1e-7)
     assert first.metadata["solver_run"]["residual_norm"] <= 1e-7
+
+
+def test_linked_center_and_three_point_arcs_have_exact_dof() -> None:
+    center_arc = _state(
+        [
+            _point("center", 0, 0, locked=True),
+            _point("start", 2, 0, locked=True),
+            _point("end", 0, 2, locked=True),
+            {
+                "id": "arc",
+                "type": "arc_2d",
+                "center": [0, 0],
+                "radius": 2,
+                "start_angle_deg": 0,
+                "sweep_angle_deg": 90,
+                "construction": "center",
+                "center_point_id": "center",
+                "start_point_id": "start",
+                "end_point_id": "end",
+            },
+        ],
+        [],
+    )
+    three_point = _state(
+        [
+            _point("start", 2, 0),
+            _point("through", 0, 2),
+            _point("end", -2, 0),
+            {
+                "id": "arc",
+                "type": "arc_2d",
+                "center": [0, 0],
+                "radius": 2,
+                "start_angle_deg": 0,
+                "sweep_angle_deg": 180,
+                "construction": "three_point",
+                "start_point_id": "start",
+                "through_point_id": "through",
+                "end_point_id": "end",
+            },
+        ],
+        [],
+    )
+
+    center_analysis = analyze_constraint_system(center_arc)
+    three_point_analysis = analyze_constraint_system(three_point)
+
+    assert center_analysis.coverage == "exact"
+    assert center_analysis.remaining_dof == 0
+    assert center_analysis.unmodeled_entity_ids == []
+    assert three_point_analysis.coverage == "exact"
+    assert three_point_analysis.remaining_dof == 6
+    assert three_point_analysis.unmodeled_entity_ids == []
+
+
+def test_mixed_line_circle_arc_system_solves_finite_arc_tangency() -> None:
+    diagonal = math.sqrt(2.0)
+    state = _state(
+        [
+            _point("line_a", 2, -10, locked=True),
+            _point("line_b", 2, 10, locked=True),
+            {"id": "line", "type": "line_2d", "start": [2, -10], "end": [2, 10], "start_point_id": "line_a", "end_point_id": "line_b"},
+            _point("arc_center", 0, 0, locked=True),
+            _point("arc_start", diagonal, -diagonal, locked=True),
+            _point("arc_end", diagonal, diagonal, locked=True),
+            {
+                "id": "arc",
+                "type": "arc_2d",
+                "center": [0, 0],
+                "radius": 2,
+                "start_angle_deg": 315,
+                "sweep_angle_deg": 90,
+                "construction": "center",
+                "center_point_id": "arc_center",
+                "start_point_id": "arc_start",
+                "end_point_id": "arc_end",
+            },
+            _point("circle_center", 11, 0),
+            {"id": "circle", "type": "circle_2d", "center": [11, 0], "radius": 3, "center_point_id": "circle_center"},
+        ],
+        [
+            {"id": "circle_radius", "type": "radius_constraint", "circle_id": "circle", "radius": 3, "unit": "mm"},
+            {"id": "horizontal", "type": "horizontal_constraint", "points": ["arc_center", "circle_center"]},
+            {"id": "tangent", "type": "tangent_constraint", "entities": ["arc", "circle"], "tangency": "external"},
+        ],
+    )
+
+    result = _solve(GeometrySession(state))
+
+    assert result.after.get_entity("circle_center").coords == pytest.approx((5.0, 0.0), abs=1e-7)
+    assert result.metadata["solver_run"]["analysis_after"]["coverage"] == "exact"
+    assert result.metadata["solver_run"]["analysis_after"]["remaining_dof"] == 0
+    assert result.metadata["solver_run"]["residual_norm"] <= 1e-7
+
+
+def test_linked_arc_endpoint_degeneracy_is_explicitly_inconsistent() -> None:
+    state = _state(
+        [
+            _point("center", 0, 0, locked=True),
+            _point("start", 0, 0, locked=True),
+            _point("end", 0, 2, locked=True),
+            {
+                "id": "arc",
+                "type": "arc_2d",
+                "center": [0, 0],
+                "radius": 2,
+                "start_angle_deg": 0,
+                "sweep_angle_deg": 90,
+                "construction": "center",
+                "center_point_id": "center",
+                "start_point_id": "start",
+                "end_point_id": "end",
+            },
+        ],
+        [],
+    )
+
+    evaluation = evaluate_nonlinear_system(state)
+
+    assert evaluation is not None
+    assert evaluation.analysis.coverage == "exact"
+    assert evaluation.analysis.consistency_state == "inconsistent"
+    assert any("Arc source endpoint degeneracy detected for: arc" in item for item in evaluation.diagnostics)

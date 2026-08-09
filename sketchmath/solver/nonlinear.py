@@ -124,6 +124,29 @@ class _Geometry:
             )
         return center, self.scalar(f"{circle_id}.radius", entity.radius)
 
+    def arc(self, arc_id: str) -> tuple[tuple[float, float], float, float, float]:
+        entity = self.entities.get(arc_id)
+        if not isinstance(entity, Arc2DEntity):
+            raise KeyError(arc_id)
+        return (
+            (
+                self.scalar(f"{arc_id}.center_x", entity.center[0]),
+                self.scalar(f"{arc_id}.center_y", entity.center[1]),
+            ),
+            self.scalar(f"{arc_id}.radius", entity.radius),
+            self.scalar(f"{arc_id}.start_angle_deg", entity.start_angle_deg),
+            self.scalar(f"{arc_id}.sweep_angle_deg", entity.sweep_angle_deg),
+        )
+
+    def circle_like(self, entity_id: str) -> tuple[tuple[float, float], float]:
+        entity = self.entities.get(entity_id)
+        if isinstance(entity, Circle2DEntity):
+            return self.circle(entity_id)
+        if isinstance(entity, Arc2DEntity):
+            center, radius, _, _ = self.arc(entity_id)
+            return center, radius
+        raise KeyError(entity_id)
+
     def line(self, line_id: str) -> tuple[tuple[float, float], tuple[float, float]]:
         entity = self.entities.get(line_id)
         if not isinstance(entity, (Line2DEntity, ConstructionLine2DEntity)):
@@ -146,6 +169,8 @@ class _System:
         self.unsupported_constraint_ids: list[str] = []
         self.invalid_constraint_ids: list[str] = []
         self.unmodeled_entity_ids: list[str] = []
+        self.degenerate_entity_ids: list[str] = []
+        self.post_validators: list[tuple[str, Callable[[_Geometry], bool]]] = []
         self.length_scale = self._characteristic_length()
         self._build_variables()
         self.variable_index = {key: index for index, key in enumerate(self.variable_keys)}
@@ -199,6 +224,14 @@ class _System:
                 self._add_variable(f"{circle_id}.center_x", circle.center[0])
                 self._add_variable(f"{circle_id}.center_y", circle.center[1])
             self._add_variable(f"{circle_id}.radius", circle.radius)
+        arcs = {entity.id: entity for entity in self.state.items if isinstance(entity, Arc2DEntity)}
+        for arc_id in sorted(arcs):
+            arc = arcs[arc_id]
+            self._add_variable(f"{arc_id}.center_x", arc.center[0])
+            self._add_variable(f"{arc_id}.center_y", arc.center[1])
+            self._add_variable(f"{arc_id}.radius", arc.radius)
+            self._add_variable(f"{arc_id}.start_angle_deg", arc.start_angle_deg)
+            self._add_variable(f"{arc_id}.sweep_angle_deg", arc.sweep_angle_deg)
 
     def _scaled_length(self, value: float) -> float:
         return value / self.length_scale
@@ -228,12 +261,129 @@ class _System:
                         ),
                     )
                 )
+            elif isinstance(entity, Arc2DEntity):
+                if entity.locked:
+                    self.fixed_entity_ids.append(entity.id)
+                    self.groups.append(
+                        _ResidualGroup(
+                            None,
+                            lambda geometry, entity=entity: (
+                                self._scaled_length(geometry.arc(entity.id)[0][0] - entity.center[0]),
+                                self._scaled_length(geometry.arc(entity.id)[0][1] - entity.center[1]),
+                                self._scaled_length(geometry.arc(entity.id)[1] - entity.radius),
+                                _wrap_angle(math.radians(geometry.arc(entity.id)[2] - entity.start_angle_deg)),
+                                math.radians(geometry.arc(entity.id)[3] - entity.sweep_angle_deg),
+                            ),
+                        )
+                    )
+                self._build_arc_linkage_groups(entity)
+
+    def _build_arc_linkage_groups(self, arc: Arc2DEntity) -> None:
+        center_entity = self.entities.get(arc.center_point_id or "")
+        start_entity = self.entities.get(arc.start_point_id or "")
+        end_entity = self.entities.get(arc.end_point_id or "")
+        initial_center = center_entity.coords if isinstance(center_entity, Point2DEntity) else arc.center
+        if (
+            isinstance(start_entity, Point2DEntity)
+            and _length(_subtract(start_entity.coords, initial_center)) <= self.policy.coordinate_abs_mm
+        ) or (
+            isinstance(end_entity, Point2DEntity)
+            and _length(_subtract(end_entity.coords, initial_center)) <= self.policy.coordinate_abs_mm
+        ) or (
+            isinstance(start_entity, Point2DEntity)
+            and isinstance(end_entity, Point2DEntity)
+            and _length(_subtract(start_entity.coords, end_entity.coords)) <= self.policy.coordinate_abs_mm
+        ):
+            self.degenerate_entity_ids.append(arc.id)
+        if arc.center_point_id and self._points_exist((arc.center_point_id,)):
+            self.groups.append(
+                _ResidualGroup(
+                    None,
+                    lambda geometry, arc=arc: (
+                        self._scaled_length(geometry.arc(arc.id)[0][0] - geometry.point(arc.center_point_id)[0]),  # type: ignore[arg-type]
+                        self._scaled_length(geometry.arc(arc.id)[0][1] - geometry.point(arc.center_point_id)[1]),  # type: ignore[arg-type]
+                    ),
+                )
+            )
+        if arc.start_point_id and self._points_exist((arc.start_point_id,)):
+            self.groups.append(
+                _ResidualGroup(None, lambda geometry, arc=arc: self._arc_endpoint_residual(geometry, arc, start=True))
+            )
+            self.post_validators.append(
+                (
+                    arc.id,
+                    lambda geometry, arc=arc: _length(_subtract(geometry.point(arc.start_point_id), geometry.arc(arc.id)[0]))  # type: ignore[arg-type]
+                    > self.policy.coordinate_abs_mm,
+                )
+            )
+        if arc.end_point_id and self._points_exist((arc.end_point_id,)):
+            self.groups.append(
+                _ResidualGroup(None, lambda geometry, arc=arc: self._arc_endpoint_residual(geometry, arc, start=False))
+            )
+            self.post_validators.append(
+                (
+                    arc.id,
+                    lambda geometry, arc=arc: _length(_subtract(geometry.point(arc.end_point_id), geometry.arc(arc.id)[0]))  # type: ignore[arg-type]
+                    > self.policy.coordinate_abs_mm,
+                )
+            )
+        if arc.start_point_id and arc.end_point_id and self._points_exist((arc.start_point_id, arc.end_point_id)):
+            self.post_validators.append(
+                (
+                    arc.id,
+                    lambda geometry, arc=arc: _length(_subtract(geometry.point(arc.start_point_id), geometry.point(arc.end_point_id)))  # type: ignore[arg-type]
+                    > self.policy.coordinate_abs_mm,
+                )
+            )
+        if arc.through_point_id and self._points_exist((arc.through_point_id,)):
+            self.groups.append(
+                _ResidualGroup(
+                    None,
+                    lambda geometry, arc=arc: (
+                        self._scaled_length(
+                            _length(_subtract(geometry.point(arc.through_point_id), geometry.arc(arc.id)[0]))  # type: ignore[arg-type]
+                            - geometry.arc(arc.id)[1]
+                        ),
+                    ),
+                )
+            )
+            self.post_validators.append(
+                (
+                    arc.id,
+                    lambda geometry, arc=arc: self._arc_contains_point(geometry, arc.id, geometry.point(arc.through_point_id)),  # type: ignore[arg-type]
+                )
+            )
+
+    def _arc_endpoint_residual(self, geometry: _Geometry, arc: Arc2DEntity, *, start: bool) -> tuple[float, float]:
+        center, radius, start_angle, sweep = geometry.arc(arc.id)
+        angle = start_angle if start else start_angle + sweep
+        radians = math.radians(angle)
+        expected = (center[0] + radius * math.cos(radians), center[1] + radius * math.sin(radians))
+        point_id = arc.start_point_id if start else arc.end_point_id
+        actual = geometry.point(point_id)  # type: ignore[arg-type]
+        return (self._scaled_length(actual[0] - expected[0]), self._scaled_length(actual[1] - expected[1]))
+
+    @staticmethod
+    def _arc_contains_point(geometry: _Geometry, arc_id: str, point: tuple[float, float], tolerance_deg: float = 1e-5) -> bool:
+        center, radius, start, sweep = geometry.arc(arc_id)
+        if radius <= 0 or _length(_subtract(point, center)) <= 0:
+            return False
+        angle = math.degrees(math.atan2(point[1] - center[1], point[0] - center[0])) % 360.0
+        normalized_start = start % 360.0
+        if sweep > 0:
+            delta = (angle - normalized_start) % 360.0
+            return delta <= sweep + tolerance_deg
+        delta = (normalized_start - angle) % 360.0
+        return delta <= -sweep + tolerance_deg
 
     def _points_exist(self, point_ids: Sequence[str]) -> bool:
         return all(isinstance(self.entities.get(point_id), Point2DEntity) for point_id in point_ids)
 
     def _circle_exists(self, circle_id: str) -> bool:
         return isinstance(self.entities.get(circle_id), Circle2DEntity)
+
+    def _circle_like_exists(self, entity_id: str) -> bool:
+        return isinstance(self.entities.get(entity_id), (Circle2DEntity, Arc2DEntity))
 
     def _register(self, constraint: ConstraintEntity, function: ResidualFunction) -> None:
         self.supported_constraint_ids.append(constraint.id)
@@ -414,21 +564,20 @@ class _System:
             self._register(constraint, symmetric)
             return
         if isinstance(constraint, ConcentricConstraint):
-            if not all(self._circle_exists(entity_id) for entity_id in constraint.entities):
-                self.unsupported_constraint_ids.append(constraint.id)
-                return
+            if not all(self._circle_like_exists(entity_id) for entity_id in constraint.entities):
+                return self._invalid(constraint)
             self._register(
                 constraint,
                 lambda geometry, constraint=constraint: (
-                    self._scaled_length(geometry.circle(constraint.entities[1])[0][0] - geometry.circle(constraint.entities[0])[0][0]),
-                    self._scaled_length(geometry.circle(constraint.entities[1])[0][1] - geometry.circle(constraint.entities[0])[0][1]),
+                    self._scaled_length(geometry.circle_like(constraint.entities[1])[0][0] - geometry.circle_like(constraint.entities[0])[0][0]),
+                    self._scaled_length(geometry.circle_like(constraint.entities[1])[0][1] - geometry.circle_like(constraint.entities[0])[0][1]),
                 ),
             )
             return
         if isinstance(constraint, TangentConstraint):
             first = self.entities.get(constraint.entities[0])
             second = self.entities.get(constraint.entities[1])
-            if isinstance(first, (Line2DEntity, ConstructionLine2DEntity)) and isinstance(second, Circle2DEntity):
+            if isinstance(first, (Line2DEntity, ConstructionLine2DEntity)) and isinstance(second, (Circle2DEntity, Arc2DEntity)):
                 start, end = _Geometry(self.state, self.variable_index, self.initial_values).line(first.id)
                 if _length(_subtract(end, start)) <= self.policy.coordinate_abs_mm:
                     return self._invalid(constraint)
@@ -436,22 +585,36 @@ class _System:
                 def line_circle_tangent(geometry: _Geometry, line_id: str = first.id, circle_id: str = second.id) -> tuple[float]:
                     line_start, line_end = geometry.line(line_id)
                     line_vector = _subtract(line_end, line_start)
-                    center, radius = geometry.circle(circle_id)
+                    center, radius = geometry.circle_like(circle_id)
                     denominator = max(_length(line_vector), self.policy.coordinate_abs_mm)
                     return (self._scaled_length(abs(_cross(line_vector, _subtract(center, line_start))) / denominator - radius),)
 
                 self._register(constraint, line_circle_tangent)
+                if isinstance(second, Arc2DEntity):
+                    self.post_validators.append(
+                        (
+                            constraint.id,
+                            lambda geometry, line_id=first.id, arc_id=second.id: self._line_arc_contact_is_finite(geometry, line_id, arc_id),
+                        )
+                    )
                 return
-            if isinstance(first, Circle2DEntity) and isinstance(second, Circle2DEntity):
+            if isinstance(first, (Circle2DEntity, Arc2DEntity)) and isinstance(second, (Circle2DEntity, Arc2DEntity)):
                 target_sign = 1.0 if constraint.tangency == "external" else -1.0
 
                 def circle_tangent(geometry: _Geometry, constraint: TangentConstraint = constraint, target_sign: float = target_sign) -> tuple[float]:
-                    first_circle = geometry.circle(constraint.entities[0])
-                    second_circle = geometry.circle(constraint.entities[1])
+                    first_circle = geometry.circle_like(constraint.entities[0])
+                    second_circle = geometry.circle_like(constraint.entities[1])
                     target = first_circle[1] + second_circle[1] if target_sign > 0 else abs(first_circle[1] - second_circle[1])
                     return (self._scaled_length(_length(_subtract(second_circle[0], first_circle[0])) - target),)
 
                 self._register(constraint, circle_tangent)
+                if isinstance(first, Arc2DEntity) or isinstance(second, Arc2DEntity):
+                    self.post_validators.append(
+                        (
+                            constraint.id,
+                            lambda geometry, constraint=constraint: self._circle_arc_contacts_are_finite(geometry, constraint),
+                        )
+                    )
                 return
             self.unsupported_constraint_ids.append(constraint.id)
             return
@@ -460,7 +623,7 @@ class _System:
     def _classify_entities(self) -> None:
         point_ids = {entity.id for entity in self.state.items if isinstance(entity, Point2DEntity)}
         for entity in self.state.items:
-            if isinstance(entity, (Point2DEntity, Circle2DEntity)):
+            if isinstance(entity, (Point2DEntity, Circle2DEntity, Arc2DEntity)):
                 continue
             if isinstance(entity, (Line2DEntity, ConstructionLine2DEntity)):
                 if entity.start_point_id in point_ids and entity.end_point_id in point_ids:
@@ -474,6 +637,46 @@ class _System:
                 self.unmodeled_entity_ids.append(entity.id)
         self.unmodeled_entity_ids.sort()
 
+    def _line_arc_contact_is_finite(self, geometry: _Geometry, line_id: str, arc_id: str) -> bool:
+        start, end = geometry.line(line_id)
+        vector = _subtract(end, start)
+        denominator = _dot(vector, vector)
+        if denominator <= self.policy.coordinate_abs_mm**2:
+            return False
+        center, _, _, _ = geometry.arc(arc_id)
+        parameter = _dot(_subtract(center, start), vector) / denominator
+        contact = (start[0] + parameter * vector[0], start[1] + parameter * vector[1])
+        return self._arc_contains_point(geometry, arc_id, contact)
+
+    def _circle_arc_contacts_are_finite(self, geometry: _Geometry, constraint: TangentConstraint) -> bool:
+        first_center, first_radius = geometry.circle_like(constraint.entities[0])
+        second_center, second_radius = geometry.circle_like(constraint.entities[1])
+        vector = _subtract(second_center, first_center)
+        center_distance = _length(vector)
+        if center_distance <= self.policy.coordinate_abs_mm:
+            return False
+        direction = (vector[0] / center_distance, vector[1] / center_distance)
+        if constraint.tangency == "external":
+            first_contact = (first_center[0] + direction[0] * first_radius, first_center[1] + direction[1] * first_radius)
+            second_contact = (second_center[0] - direction[0] * second_radius, second_center[1] - direction[1] * second_radius)
+        elif first_radius >= second_radius:
+            first_contact = (first_center[0] + direction[0] * first_radius, first_center[1] + direction[1] * first_radius)
+            second_contact = (second_center[0] + direction[0] * second_radius, second_center[1] + direction[1] * second_radius)
+        else:
+            first_contact = (first_center[0] - direction[0] * first_radius, first_center[1] - direction[1] * first_radius)
+            second_contact = (second_center[0] - direction[0] * second_radius, second_center[1] - direction[1] * second_radius)
+        first = self.entities[constraint.entities[0]]
+        second = self.entities[constraint.entities[1]]
+        return (
+            not isinstance(first, Arc2DEntity) or self._arc_contains_point(geometry, first.id, first_contact)
+        ) and (
+            not isinstance(second, Arc2DEntity) or self._arc_contains_point(geometry, second.id, second_contact)
+        )
+
+    def failed_post_validators(self, values: Sequence[float]) -> list[str]:
+        geometry = _Geometry(self.state, self.variable_index, values)
+        return sorted({identifier for identifier, validator in self.post_validators if not validator(geometry)})
+
     def residual(self, values: Sequence[float]) -> list[float]:
         geometry = _Geometry(self.state, self.variable_index, values)
         result: list[float] = []
@@ -481,6 +684,22 @@ class _System:
             evaluated = group.evaluate(geometry)
             result.extend(float(value) if math.isfinite(float(value)) else 1e6 for value in evaluated)
         return result
+
+    def bounds(self) -> tuple[list[float], list[float]]:
+        lower = [-math.inf] * len(self.variable_keys)
+        upper = [math.inf] * len(self.variable_keys)
+        for index, key in enumerate(self.variable_keys):
+            if key.endswith(".radius"):
+                lower[index] = self.policy.coordinate_abs_mm
+            elif key.endswith(".sweep_angle_deg"):
+                initial = self.initial_values[index]
+                if initial > 0:
+                    lower[index] = 1e-8
+                    upper[index] = 360.0 - 1e-8
+                else:
+                    lower[index] = -360.0 + 1e-8
+                    upper[index] = -1e-8
+        return lower, upper
 
     def group_residuals(self, values: Sequence[float]) -> list[tuple[_ResidualGroup, list[float]]]:
         geometry = _Geometry(self.state, self.variable_index, values)
@@ -518,6 +737,29 @@ class _System:
                 )
                 radius = max(self.policy.coordinate_abs_mm, canonical(float(values[self.variable_index[f"{entity.id}.radius"]])))
             proposed.replace_entity(Circle2DEntity(**{**entity.model_dump(), "center": center, "radius": radius}))
+        for entity in list(proposed.items):
+            if not isinstance(entity, Arc2DEntity):
+                continue
+            if entity.locked:
+                continue
+            center = (
+                canonical(float(values[self.variable_index[f"{entity.id}.center_x"]])),
+                canonical(float(values[self.variable_index[f"{entity.id}.center_y"]])),
+            )
+            radius = max(self.policy.coordinate_abs_mm, canonical(float(values[self.variable_index[f"{entity.id}.radius"]])))
+            start_angle = canonical(float(values[self.variable_index[f"{entity.id}.start_angle_deg"]])) % 360.0
+            sweep_angle = canonical(float(values[self.variable_index[f"{entity.id}.sweep_angle_deg"]]))
+            proposed.replace_entity(
+                Arc2DEntity(
+                    **{
+                        **entity.model_dump(),
+                        "center": center,
+                        "radius": radius,
+                        "start_angle_deg": start_angle,
+                        "sweep_angle_deg": sweep_angle,
+                    }
+                )
+            )
         proposed_map = proposed.entity_map()
         for entity in list(proposed.items):
             if isinstance(entity, (Line2DEntity, ConstructionLine2DEntity)):
@@ -602,18 +844,25 @@ def evaluate_nonlinear_system(
     if system.invalid_constraint_ids:
         diagnostics.append("Degenerate constraints or constraints with invalid references were excluded from nonlinear analysis.")
     if system.unmodeled_entity_ids:
-        diagnostics.append("Entities outside the point/circle nonlinear subset prevent exact whole-sketch DOF classification.")
+        diagnostics.append("Entities outside the point/circle/arc nonlinear subset prevent exact whole-sketch DOF classification.")
+    if system.degenerate_entity_ids:
+        diagnostics.append(
+            "Arc source endpoint degeneracy detected for: " + ", ".join(sorted(set(system.degenerate_entity_ids))) + "."
+        )
 
     initial = np.asarray(system.initial_values, dtype=float)
+    lower_bounds, upper_bounds = system.bounds()
     if system.groups:
         candidates = []
         seeds = _deterministic_seeds(np, initial, system.length_scale, policy.nonlinear_seed_perturbation_rel)
         for seed in seeds:
+            bounded_seed = np.clip(seed, np.asarray(lower_bounds, dtype=float), np.asarray(upper_bounds, dtype=float))
             result = least_squares(
                 system.residual,
-                seed,
+                bounded_seed,
                 jac="3-point",
                 method="trf",
+                bounds=(lower_bounds, upper_bounds),
                 x_scale="jac",
                 ftol=1e-12,
                 xtol=1e-12,
@@ -651,10 +900,18 @@ def evaluate_nonlinear_system(
     canonical_residual = np.asarray(canonical_system.residual(canonical_system.initial_values), dtype=float)
     canonical_residual_norm = float(np.linalg.norm(canonical_residual)) if canonical_residual.size else 0.0
     canonical_max_abs_residual = float(np.max(np.abs(canonical_residual))) if canonical_residual.size else 0.0
+    failed_post_validators = sorted(
+        set(system.failed_post_validators(solution))
+        | set(canonical_system.failed_post_validators(canonical_system.initial_values))
+    )
     if canonical_max_abs_residual > max_abs_residual:
         residual_norm = canonical_residual_norm
         max_abs_residual = canonical_max_abs_residual
-    feasible_supported = max_abs_residual <= policy.nonlinear_feasibility_abs
+    feasible_supported = (
+        max_abs_residual <= policy.nonlinear_feasibility_abs
+        and not failed_post_validators
+        and not system.degenerate_entity_ids
+    )
     jacobian = _central_jacobian(np, system.residual, solution)
     independent_equations = _rank(np, jacobian, policy.nonlinear_rank_rel)
     redundant: list[str] = []
@@ -676,11 +933,17 @@ def evaluate_nonlinear_system(
         for group, values in system.group_residuals(solution)
         if group.constraint_id is not None and max((abs(value) for value in values), default=0.0) > policy.nonlinear_feasibility_abs
     ]
+    constraint_ids = {constraint.id for constraint in state.constraints}
+    conflicting.extend(identifier for identifier in failed_post_validators if identifier in constraint_ids and identifier not in conflicting)
     inconsistent = not feasible_supported and not (system.unsupported_constraint_ids or system.invalid_constraint_ids)
     if inconsistent and not conflicting and system.supported_constraint_ids:
         conflicting = [system.supported_constraint_ids[-1]]
     if inconsistent:
         diagnostics.append("Residual validation rejected the optimizer result as inconsistent.")
+    if failed_post_validators:
+        diagnostics.append(
+            "Finite-geometry validation failed for: " + ", ".join(failed_post_validators) + "."
+        )
     if redundant:
         diagnostics.append("One or more constraints add no independent equation at the converged solution.")
     if optimizer_success and not feasible_supported:

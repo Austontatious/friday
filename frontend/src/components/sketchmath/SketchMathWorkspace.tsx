@@ -1551,7 +1551,15 @@ const SketchMathWorkspace = () => {
       buildSolveConstraintsCommand(),
       buildMakeProfileCommand([ids.lineIds.ab, ids.lineIds.bc, ids.lineIds.cd, ids.lineIds.da], ids.profileId),
     ];
-    const command = buildBatchCommand(commands.map((subcommand) => ({ ...subcommand, mode: "commit" as const })));
+    const command = buildBatchCommand(
+      commands.map((subcommand) => ({
+        ...subcommand,
+        // A fresh rectangle intentionally retains translational DOF. Keep the
+        // intermediate solve diagnostic-only while committing the canonical
+        // geometry, constraints, and profile as one atomic batch.
+        mode: subcommand.command_type === "solve_constraints" ? "preview" as const : "commit" as const,
+      })),
+    );
     const result = await commitCommand(command);
     if (!result) {
       return;
