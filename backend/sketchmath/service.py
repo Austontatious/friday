@@ -223,6 +223,11 @@ class SketchMathSessionStore:
     session_dir: Path | None = None
     _sessions: dict[str, _StoredSession] = field(default_factory=dict)
     _lock: Lock = field(default_factory=Lock)
+    _session_locks: dict[str, Lock] = field(default_factory=dict)
+
+    def _session_lock(self, session_id: str) -> Lock:
+        with self._lock:
+            return self._session_locks.setdefault(session_id, Lock())
 
     def _root(self) -> Path:
         if self.session_dir is not None:
@@ -317,31 +322,33 @@ class SketchMathSessionStore:
 
     def snapshot(self, session_id: str, session: GeometrySession) -> dict[str, Any]:
         stored = self._get_stored(session_id)
-        stored.session = session
-        return self._build_snapshot(session_id, stored)
+        with self._session_lock(session_id):
+            stored.session = session
+            return self._build_snapshot(session_id, stored)
 
     def run_command(self, session_id: str, command_payload: dict[str, Any], *, mode: str | None = None) -> dict[str, Any]:
         stored = self._get_stored(session_id)
-        session = stored.session
-        payload = dict(command_payload)
-        if mode is not None:
-            payload["mode"] = mode
-        command = _validate_command_payload(payload)
-        result = session.execute(command)
-        if command.mode == "commit":
-            stored.metadata["updated_at"] = _now_iso()
-            self._save(session_id, stored)
-        return {
-            "session_id": session_id,
-            "selection_context": session.state.model_dump(mode="json"),
-            "result": result.model_dump(mode="json"),
-            "history_length": session.history.cursor,
-            "session_metadata": {
-                **stored.metadata,
-                "persisted": True,
-                "storage_path": str(self._session_path(session_id)),
-            },
-        }
+        with self._session_lock(session_id):
+            session = stored.session
+            payload = dict(command_payload)
+            if mode is not None:
+                payload["mode"] = mode
+            command = _validate_command_payload(payload)
+            result = session.execute(command)
+            if command.mode == "commit":
+                stored.metadata["updated_at"] = _now_iso()
+                self._save(session_id, stored)
+            return {
+                "session_id": session_id,
+                "selection_context": session.state.model_dump(mode="json"),
+                "result": result.model_dump(mode="json"),
+                "history_length": session.history.cursor,
+                "session_metadata": {
+                    **stored.metadata,
+                    "persisted": True,
+                    "storage_path": str(self._session_path(session_id)),
+                },
+            }
 
     def run_entity(self, session_id: str, entity_payload: dict[str, Any], *, mode: str = "commit") -> dict[str, Any]:
         command = _command_from_entity(entity_payload, command_id=f"{session_id}_{entity_payload.get('id', 'entity')}", mode=mode)
@@ -351,7 +358,8 @@ class SketchMathSessionStore:
         from sketchmath.translator.translator_service import translate_utterance
 
         stored = self._get_stored(session_id)
-        context = selection_context or stored.session.state
+        with self._session_lock(session_id):
+            context = selection_context or stored.session.state.model_copy(deep=True)
         outcome = translate_utterance(utterance, context)
         payload: dict[str, Any] = {
             "session_id": session_id,
@@ -368,18 +376,20 @@ class SketchMathSessionStore:
 
     def revert(self, session_id: str) -> dict[str, Any]:
         stored = self._get_stored(session_id)
-        session = stored.session
-        session.revert()
-        stored.metadata["updated_at"] = _now_iso()
-        self._save(session_id, stored)
-        return self._build_snapshot(session_id, stored)
+        with self._session_lock(session_id):
+            session = stored.session
+            session.revert()
+            stored.metadata["updated_at"] = _now_iso()
+            self._save(session_id, stored)
+            return self._build_snapshot(session_id, stored)
 
     def redo(self, session_id: str) -> dict[str, Any]:
         stored = self._get_stored(session_id)
-        stored.session.redo()
-        stored.metadata["updated_at"] = _now_iso()
-        self._save(session_id, stored)
-        return self._build_snapshot(session_id, stored)
+        with self._session_lock(session_id):
+            stored.session.redo()
+            stored.metadata["updated_at"] = _now_iso()
+            self._save(session_id, stored)
+            return self._build_snapshot(session_id, stored)
 
 
 SESSION_STORE = SketchMathSessionStore()

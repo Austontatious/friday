@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, Lock
+import time
+
 from fastapi.testclient import TestClient
 
 from backend.main import create_app
@@ -174,6 +178,48 @@ def test_v09_general_topology_select_promote_and_reload_round_trip(monkeypatch, 
     assert restored_outer["holes"] == metadata["hole_profile_ids"]
     assert reloaded.json()["history_length"] == 1
     client.close()
+
+
+def test_session_store_serializes_overlapping_commits_per_session(monkeypatch, tmp_path):
+    from backend.sketchmath.service import SketchMathSessionStore
+
+    store = SketchMathSessionStore(session_dir=tmp_path)
+    session_id, session = store.create_session({"selection_context": _selection_context()})
+    original_execute = session.execute
+    counter_lock = Lock()
+    active = 0
+    maximum_active = 0
+
+    def wrapped_execute(command):  # noqa: ANN001, ANN202
+        nonlocal active, maximum_active
+        with counter_lock:
+            active += 1
+            maximum_active = max(maximum_active, active)
+        try:
+            time.sleep(0.02)
+            return original_execute(command)
+        finally:
+            with counter_lock:
+                active -= 1
+
+    monkeypatch.setattr(session, "execute", wrapped_execute)
+    start = Barrier(2)
+
+    def commit_point(name: str, x: float) -> dict[str, object]:
+        start.wait()
+        return store.run_command(
+            session_id,
+            _command("define_point", f"commit_{name}", mode="commit", parameters={"name": name, "coords": [x, 0]}),
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(lambda item: commit_point(*item), [("point_a", 1.0), ("point_b", 2.0)]))
+
+    assert maximum_active == 1
+    assert sorted(response["history_length"] for response in responses) == [1, 2]
+    snapshot = store.snapshot(session_id, session)
+    assert snapshot["history_length"] == 2
+    assert sorted(item["id"] for item in snapshot["selection_context"]["items"]) == ["point_a", "point_b"]
 
 
 def test_sketchmath_session_preview_commit_and_revert(monkeypatch):
