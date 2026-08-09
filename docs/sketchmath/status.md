@@ -2,14 +2,14 @@
 
 Updated: 2026-08-09
 
-Current phase: Phase 1 — canonical parametric architecture
+Current phase: Phase 2 — general planar topology
 
-Gate: Gate B passed for the documented Phase 1 modeled envelope
+Gate: General topology passed for the documented v0.9 extraction, selection, promotion, and reference-preservation envelope
 
 ## Baseline
 
 - Audited checkout: `21b8153`
-- Latest SketchMath product code commit: `0621e8c`
+- Latest SketchMath product code commit: `326e813`
 - Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
@@ -59,6 +59,17 @@ On 2026-08-09 for code checkpoint `0621e8c`:
 - 16 live shell/product Playwright workflows passed; deliberately induced `409`/`422` rejection resource messages are asserted, and no unexpected console/page error is accepted.
 - Generated schema, TypeScript, production build, Compose, and 13 repository standards checks passed.
 
+## Current General Topology Validation
+
+On 2026-08-09 for topology checkpoint `b29d504` plus session serialization fix `326e813`:
+
+- 187 focused Python/runtime tests passed.
+- 65 semantic eval cases passed.
+- 66 focused frontend tests passed.
+- All 17 serial shell/product Playwright workflows passed with no unexpected console/page errors.
+- Generated schema drift, TypeScript, production build, Compose, and 13 repository standards checks passed.
+- The production build reports only the existing stale Browserslist database notice.
+
 ## Active Phase 1 Slice
 
 - ADRs 004-006 define the canonical document migration, solver/licensing, and async execution boundaries.
@@ -80,6 +91,16 @@ On 2026-08-09 for code checkpoint `0621e8c`:
 - One live solver lifecycle covers line, circle, arc, and construction geometry from remaining DOF through full constraint, structured conflict, recovery, solve, undo/redo, and identical reload. A second durable workflow covers slot/polygon editing, topology-sensitive refusal, recovery, history, and reload.
 - Current evidence: 168 focused Python tests, 52 semantic evals, 64 focused frontend tests, all 16 shell/product Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass. See `gate_b_acceptance.md`.
 
+## Active Phase 2 Slice
+
+- v0.9 `detect_regions` and `select_region` are preview-only; `make_region_profile` is the sole topology promotion command.
+- Deterministic line/circle/finite-arc noding produces stable region and loop IDs, counterclockwise outer loops, clockwise holes, nesting depth, source provenance, and typed diagnostics.
+- The adversarial envelope covers disjoint and nested loops, islands, multiple holes, shared edges, branches, intersections, touching/overlapping curves, near gaps, self-intersection, T-junctions, nested circles, and finite arcs.
+- The browser consumes the backend result directly, supports boundary-safe point selection, promotes outer/hole profiles atomically, and preserves `source_region_id` across disk reload.
+- Topology-backed profiles follow valid bundle transforms and source-set recovery; missing, ambiguous, or changed hole structures fail atomically.
+- The filesystem session store now serializes mutation, undo, and redo per session so overlapping browser commits cannot collide on the atomic persistence file.
+- Current evidence: 187 Python/runtime tests, 65 semantic evals, 66 frontend tests, all 17 serial shell/product Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards checks pass. See `general_topology_contract.md`.
+
 ## Gate A Outcome
 
 Completed and published:
@@ -94,11 +115,11 @@ Completed and published:
 
 ## Known Limitations
 
-- Arc-aware dimensions beyond radius and arc participation in general planar topology are not implemented.
+- Arc-aware dimensions beyond radius are not implemented.
 - Finite-arc tangency is supported only when the actual contact lies on the stored finite sweep; out-of-span contacts are rejected.
 - Production solve covers the documented point/circle/arc residual subset. Coordinate-only legacy lines and future geometry/constraint families remain partial/unknown.
-- Topology recognizes deterministic simple line cycles, not general planar regions.
 - Split/trim/extend intentionally reject profile- or constraint-referenced targets; automatic topology repair is not implemented.
+- Circle and finite-arc topology uses a deterministic 2-degree piecewise-linear approximation; exact analytic curved-region area is not claimed.
 - The product lacks a canonical multi-body/feature document model and downstream rebuild graph.
 - Multi-sketch, property editing, model tree, and stable face/edge references are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
@@ -118,7 +139,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Implement deterministic general planar-region topology (`SM-TOP-001` through `SM-TOP-003`) with adversarial fixtures and stable region selection.
+Implement canonical feature history and deterministic rebuild (`SM-FEAT-001`) before broadening CAD operations.
 
 ## Release Status
 

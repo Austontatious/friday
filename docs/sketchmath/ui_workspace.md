@@ -17,11 +17,12 @@
 
 The workspace keeps these local UI concerns separate:
 
-- `committedEntities`
+- `committedContext`
 - `selectedEntityIds`
+- `topology`
+- `selectedRegionId`
 - `pendingCommandText`
 - `translationOutcome`
-- `sessionMetadata`
 - `previewResult`
 - `history`
 - `theme`
@@ -44,9 +45,10 @@ The backend remains the source of truth for committed geometry and history repla
 1. Pick a sketch tool from the toolbar.
 2. Draw geometry on the canvas/grid.
 3. Use the guided workflow panel: Draw, Dimension, Hole, Extrude, Export.
-4. Let the solver update the sketch status in the normal UI.
-5. Use the Selected Object and workflow controls for profile dimensions, selected-hole edits, delete, extrusion, and STEP export.
-6. Use Advanced Constraints or Advanced / Debug only when you need manual constraints, raw JSON, measurements, command history, system events, debug labels, or backend details.
+4. For independent or nested curve boundaries, use Region select, click clearly inside a backend-detected region, then promote it to a profile.
+5. Let the solver update the sketch status in the normal UI.
+6. Use the Selected Object and workflow controls for profile dimensions, selected-hole edits, delete, extrusion, and STEP export.
+7. Use Advanced Constraints or Advanced / Debug only when you need manual constraints, raw JSON, measurements, command history, system events, debug labels, or backend details.
 
 The default workspace is canvas-first and hides raw command JSON, proposed command JSON, backend error payloads, internal point/line IDs, system events, and other DSL internals unless the advanced view is opened explicitly. Normal errors are shown as short user-facing messages; raw backend details stay in `Error details` under Advanced / Debug.
 
@@ -62,7 +64,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 ## Supported Tools
 
-- Primary canvas modes: Select, Box select, Draw rectangle, Center rectangle, Polyline, Slot, Polygon, Circle, Arc, 3-point arc, Add hole, Pan / view.
+- Primary canvas modes: Select, Region select, Box select, Draw rectangle, Center rectangle, Polyline, Slot, Polygon, Circle, Arc, 3-point arc, Add hole, Pan / view.
 - Secondary/advanced canvas tools: Point, Line, Dimension, Delete.
 - Default guided actions: Start rectangle, Apply Rectangle Dimensions, Add center hole, Add Hole placement, selected-hole update, Fix corner, Delete, Extrude, Commit Preview, Revert Preview, Download STEP.
 - Dimension actions: Set Length, Set horizontal distance, Set vertical distance, Edit Width, Edit Height, Apply radius, and Apply diameter.
@@ -79,6 +81,9 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Box select uses complete containment: both line endpoints, the full circle/arc bounds, or every profile vertex must lie inside the dragged box.
 - Split, trim, and extend currently support line and construction-line targets only. Trim/extend use selection order `target, cutter` and require contact on the finite cutter. A target referenced by a profile or constraint is rejected atomically until general topology repair exists.
 - Offset creates an independent line, circle, or arc. Duplicate and linear pattern copy complete linked bundles with remapped stable references; mirror transforms the selected linked bundle in place.
+- The Planar regions panel is refreshed from preview-only backend topology after committed session changes. It lists net area and hole count, exposes diagnostics, and can promote a listed region directly.
+- Region select disables ordinary entity hit targets while active so a canvas click reaches the backend `select_region` command. Returned outer/hole paths use even-odd SVG fill; boundary and ambiguous selections require an explicit retry or list choice.
+- Region promotion commits `make_region_profile`, creates the outer/hole profiles in one history step, and keeps the resulting `source_region_id` across reload. React never calculates or assigns region identity itself.
 - Add center hole commits a centered typed `add_profile_hole` command. Add Hole enters placement mode; `Add Centered Hole` or a click inside the selected profile commits the same command shape with the chosen center.
 - Existing holes can be selected on canvas. The workflow panel exposes diameter/center controls that commit a typed `update_profile_hole` command and immediately refresh the committed session state.
 - Selected rectangles show width/height dimension labels on canvas. Selected holes show a diameter label on canvas.
@@ -118,7 +123,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 
 ## Runtime Dependencies
 
-- The backend runtime must include `shapely>=2.0.0` for profile-hole validation. Missing Shapely is surfaced in the UI as a dependency/configuration message, with the raw backend payload only available under Advanced / Debug.
+- The backend runtime must include `shapely>=2.0.0` for profile-hole validation and general planar-region extraction. Missing Shapely is surfaced in the UI as a dependency/configuration message, with the raw backend payload only available under Advanced / Debug.
 - The canonical app backend currently runs SketchMath with `FRIDAY_WEB_CONCURRENCY=1` because sessions are cached in the backend process. Multi-worker deployment needs a shared session-store invalidation/pass-through pass before it is safe for this workflow.
 
 ## Visual System

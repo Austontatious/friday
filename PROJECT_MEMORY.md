@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-08-09 - SketchMath Deterministic General Planar Topology
+
+### What Changed
+- Added typed v0.9 `detect_regions`, `select_region`, and `make_region_profile` commands over one backend-authoritative topology result.
+- Added deterministic line/circle/finite-arc noding, stable loop/region IDs, normalized winding, nesting depth, outer/hole source provenance, point-in-region statuses, and structured diagnostics for adversarial linework.
+- Added atomic region promotion to an outer profile plus explicit hole profiles. `source_region_id` and source-set recovery preserve valid transforms/edits and reject missing, ambiguous, or changed-hole references without partial mutation.
+- Replaced the legacy detected-profile UI path with backend region overlays, a Region select canvas mode, diagnostics, direct/list selection, and promotion. Added real-browser nested annulus selection, T-junction diagnosis, promotion, and reload evidence.
+- Serialized command mutation, undo, and redo per session after the full browser gate exposed two overlapping commits colliding on the same persistence temporary file.
+
+### Why
+- `SM-TOP-001` through `SM-TOP-003` require general deterministic planar regions and adversarial selection rather than a second simple-loop or UI-only topology path.
+- Stable downstream sketch profiles need semantic region/source identity and explicit failure when recovery is unsafe.
+- Browser-issued commits are legitimately concurrent; one in-process session must never mutate history or its atomic persistence file concurrently.
+
+### New Env Flags
+- None. The topology workflow remains inside the existing default-off SketchMath frontend/backend feature gates.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 187 passed.
+- `PYTHONPATH=. python3 -m sketchmath.evals.run_sketchmath_evals --check` — 65 passed.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand --runTestsByPath src/App.test.tsx src/components/sketchmath/SketchMathWorkspace.test.tsx src/components/sketchmath/commandBuilders.test.ts src/components/sketchmath/arcGeometry.test.ts` — 66 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npx playwright test --workers=1` — TypeScript/build and all 17 serial shell/product workflows passed.
+- `PYTHONPATH=. python3 -m sketchmath.schemas.generate --check`, `docker compose config -q`, and `python3 -m pytest -q tests/test_codex_standards.py` passed.
+
+### Remaining Product Work
+- General topology is complete for the documented v0.9 envelope. Automatic split/trim/extend boundary repair, canonical feature history/rebuild, downstream solid reference naming, broader feature operations, document concurrency, artifacts, golden parts, and final release hardening remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Gate B Geometry and Safe Editing
 
 ### What Changed

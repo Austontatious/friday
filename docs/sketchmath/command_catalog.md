@@ -2,7 +2,7 @@
 
 SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 
-The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`; canonical arc commands use version `0.5`; the additional Gate B constraint families use version `0.6`; construction conversion uses version `0.7`; slot, polygon, and safe curve-edit commands use version `0.8`. Undeclared versions and command types are rejected as `invalid_command` before execution.
+The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`; canonical arc commands use version `0.5`; the additional Gate B constraint families use version `0.6`; construction conversion uses version `0.7`; slot, polygon, and safe curve-edit commands use version `0.8`; general planar-region detection, selection, and promotion use version `0.9`. Undeclared versions and command types are rejected as `invalid_command` before execution.
 
 ## Execution Loop
 
@@ -112,6 +112,16 @@ The canonical machine-readable contracts are generated from the Pydantic models 
   - Drags one addressable point while preserving the currently supported linked constraints.
 - `detect_profiles`
   - Non-mutating detection of deterministic simple closed line cycles; candidates require explicit promotion.
+- `detect_regions`
+  - Version `0.9`, preview-only, and non-mutating.
+  - Returns the typed `PlanarTopologyResult`: stable line/circle/finite-arc regions, outer/hole loops, net areas, source curves, nesting depth, approximation policy, selection state, and explicit diagnostics.
+- `select_region`
+  - Version `0.9`, preview-only, and requires `parameters.point`.
+  - Returns `selected`, `none`, `boundary`, or `ambiguous`; boundary points are never guessed into a region.
+- `make_region_profile`
+  - Version `0.9`; re-detects current topology and promotes one current `region_id` or unambiguous selection point.
+  - Creates the outer and any hole profiles atomically, records one history operation, and stores `source_region_id` plus source curve IDs for reference preservation.
+  - Missing, stale, ambiguous, or structurally changed references return structured errors without partial mutation.
 - `make_profile`
   - Detects a closed 2D profile and stores its area and winding.
 - `define_circle`
@@ -315,8 +325,9 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 
 - General nonlinear solving is limited to the documented point/circle/arc residual families; coordinate-only legacy lines and unsupported geometry remain explicitly partial.
 - Gate B editing is limited to the documented safe line/curve envelope; automatic profile/constraint topology repair is not implemented.
-- First-class circles and canonical finite arcs are supported; arc participation in general planar topology remains deferred.
-- Profile detection is limited to deterministic simple line cycles; nested/general planar-region extraction remains deferred.
+- General topology supports regular lines, circles, and canonical finite arcs. Circles/arcs use the documented deterministic 2-degree piecewise-linear approximation rather than exact analytic region area.
+- Legacy `detect_profiles` remains limited to simple line cycles for compatibility; v0.9 `detect_regions` is the general nested/disconnected topology authority.
+- Split/trim/extend do not automatically repair an already referenced region boundary; they continue to fail atomically until an explicit repair operation exists.
 - No arbitrary Python execution.
 - No hidden geometry mutation outside typed commands.
 - Ambiguous or under-constrained input returns `clarification_required`.
@@ -328,7 +339,7 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 - Run semantic SketchMath evals with:
   - `python3 -m sketchmath.evals.run_sketchmath_evals`
 - The runner loads geometry and translator contract cases from `evals/cases/sketchmath_*.json`, executes geometry cases against the deterministic executor, executes translator cases against the deterministic translator helper, and writes `evals/sketchmath_semantic_results.json`.
-- Geometry evals include v0.2 circle, horizontal-constraint, and profile-detection coverage; v0.8 polygon/slot bundle coverage; and the `extrude_profile` adapter with hole validation and STEP metadata checks when present.
+- Geometry evals include v0.2 circle, horizontal-constraint, and legacy profile-detection coverage; v0.8 polygon/slot bundle coverage; v0.9 region detect/select/promote coverage; and the `extrude_profile` adapter with hole validation and STEP metadata checks when present.
 
 All geometry changes must continue to flow through typed `GeometryCommand` objects. The gateway owns translation and policy boundaries; SketchMath owns geometry execution only.
 

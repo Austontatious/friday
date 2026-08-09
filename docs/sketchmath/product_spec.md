@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `0621e8c` (Gate B evidence: `docs/sketchmath/gate_b_acceptance.md`)
+Last validated SketchMath code milestone: `326e813` (general topology evidence: `docs/sketchmath/general_topology_contract.md`)
 
 ## Mission
 
@@ -94,6 +94,8 @@ Gate B requires a browser sequence covering mixed geometry, constraints, dimensi
 - `SM-TOP-002`: stable region IDs, loop orientation, point-in-region selection, and explicit diagnostics.
 - `SM-TOP-003`: adversarial coverage for touching/overlapping loops, nested circles, multiple holes, coincident edges, near vertices, self-intersections, T-junctions, and disconnected profiles.
 
+Phase 2 status: passed for the documented v0.9 regular-line, circle, and finite-arc envelope at `b29d504`, with per-session mutation hardening at `326e813`. This does not complete feature history, downstream solid references, or the full release gate.
+
 ## Feature Modeling Requirements
 
 - `SM-FEAT-001`: a versioned feature history with stable IDs, parameters, dependencies, editable properties, deterministic rebuild order, and structured failures.
@@ -144,7 +146,7 @@ Detailed scenario traceability and current evidence live in `docs/sketchmath/tra
 
 1. Phase 0: Gate A stable, documented, remotely reproducible baseline.
 2. Phase 1: Gate B parametric sketcher.
-3. Phase 2: general planar topology.
+3. Phase 2: general planar topology. Passed for the documented v0.9 envelope.
 4. Phase 3: feature-based modeling.
 5. Phase 4: stable topological references.
 6. Phase 5: multi-sketch CAD workspace and viewport.
