@@ -100,7 +100,19 @@ def test_layered_stl_rejects_revolve_until_a_supported_mesher_exists(tmp_path) -
     assert exc_info.value.detail["error_code"] == "unsupported_stl_feature_type"
 
 
-def test_canonical_fillet_step_resolves_semantic_edges_and_validates_kernel_solid(tmp_path) -> None:
+@pytest.mark.parametrize(
+    ("feature_type", "size_name", "expected_volume"),
+    [
+        ("fillet", "radius", 20 * 10 * 5 - 4 * (1 - math.pi / 4) * 2**2 * 5),
+        ("chamfer", "distance", 20 * 10 * 5 - 4 * (2**2 / 2) * 5),
+    ],
+)
+def test_canonical_edge_finish_step_resolves_semantic_edges_and_validates_kernel_solid(
+    tmp_path,
+    feature_type: str,
+    size_name: str,
+    expected_volume: float,
+) -> None:
     profile = _profile("fillet_box", [(0, 0), (20, 0), (20, 10), (0, 10), (0, 0)], 200, "counterclockwise")
     document = wrap_legacy_selection_context(
         SelectionContext(selection_set_id="fillet_artifact", units="mm", items=[profile]),
@@ -121,11 +133,11 @@ def test_canonical_fillet_step_resolves_semantic_edges_and_validates_kernel_soli
     vertical_edges = [
         item for item in base_report.records[0].generated_topology if item.role == "vertical_outer_edge"
     ]
-    fillet = FeatureRecord.model_validate(
+    edge_finish = FeatureRecord.model_validate(
         {
-            "feature_id": "feature_fillet",
-            "feature_type": "fillet",
-            "name": "Outer edge fillet",
+            "feature_id": f"feature_{feature_type}",
+            "feature_type": feature_type,
+            "name": f"Outer edge {feature_type}",
             "body_id": "body_main",
             "sketch_id": "sketch_main",
             "profile_id": None,
@@ -141,23 +153,22 @@ def test_canonical_fillet_step_resolves_semantic_edges_and_validates_kernel_soli
                 }
                 for edge in vertical_edges
             ],
-            "parameters": {"radius_mm": 2, "operation": "modify"},
+            "parameters": {f"{size_name}_mm": 2, "operation": "modify"},
         }
     )
-    document = document.model_copy(update={"revision": 2, "features": [base, fillet]})
+    document = document.model_copy(update={"revision": 2, "features": [base, edge_finish]})
     freecad_cmd = Path("/mnt/data/freecad/squashfs-root/usr/bin/freecadcmd")
     if not freecad_cmd.exists():
         pytest.skip("FreeCADCmd is unavailable")
 
     artifact = materialize_feature_artifact(
         document,
-        fillet.feature_id,
+        edge_finish.feature_id,
         "step",
         output_root=tmp_path / "artifacts",
         cad_adapter=CadAdapter(freecad_cmd=freecad_cmd, export_dir=tmp_path / "kernel"),
     )
 
-    expected_volume = 20 * 10 * 5 - 4 * (1 - math.pi / 4) * 2**2 * 5
     assert Path(artifact["path"]).exists()
     assert artifact["measurements"]["is_valid_solid"] is True
     assert artifact["measurements"]["volume_mm3"] == pytest.approx(expected_volume, abs=1e-5)
@@ -165,6 +176,7 @@ def test_canonical_fillet_step_resolves_semantic_edges_and_validates_kernel_soli
         {"xmin": 0, "xmax": 20, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 5}
     )
     assert artifact["measurements"]["selected_edge_count"] == 4
+    assert artifact["measurements"][f"{size_name}_mm"] == 2
     assert artifact["measurements"]["reference_policy"] == "semantic_endpoints_unique_match"
     assert all(
         item["match_basis"] == "unordered_endpoints_mm"

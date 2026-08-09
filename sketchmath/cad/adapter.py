@@ -211,7 +211,7 @@ class CadAdapter:
         )
         return result
 
-    def fillet_feature_graph(
+    def edge_finish_feature_graph(
         self,
         payload: dict[str, Any],
         *,

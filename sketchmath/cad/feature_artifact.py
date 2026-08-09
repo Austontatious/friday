@@ -11,7 +11,7 @@ from sketchmath.cad.solid_validation import validate_solid_measurements
 from sketchmath.cad.stl_export import write_ascii_stl
 from sketchmath.executor.errors import CadExportError, FeatureRebuildError, MissingEntityError, UnsupportedCadFormatError
 from sketchmath.features.rebuild import rebuild_document
-from sketchmath.models.document import ExtrudeParameters, FeatureBuildRecord, FeatureRecord, FilletParameters, SketchMathDocument
+from sketchmath.models.document import ChamferParameters, ExtrudeParameters, FeatureBuildRecord, FeatureRecord, FilletParameters, SketchMathDocument
 from sketchmath.models.entities import Profile2DEntity
 
 
@@ -49,7 +49,7 @@ def _validated_feature(document: SketchMathDocument, feature_id: str) -> tuple[F
         )
     if feature.suppressed:
         raise CadExportError("Suppressed feature cannot produce an artifact", detail={"feature_id": feature_id})
-    if record.measurements is None and feature.feature_type != "fillet":
+    if record.measurements is None and feature.feature_type not in {"fillet", "chamfer"}:
         raise FeatureRebuildError(
             "Feature rebuild did not produce required analytic measurements",
             detail={"feature_id": feature_id, "measurement_coverage": record.measurement_coverage},
@@ -57,12 +57,15 @@ def _validated_feature(document: SketchMathDocument, feature_id: str) -> tuple[F
     return feature, record
 
 
-def _fillet_step_payload(document: SketchMathDocument, feature: FeatureRecord) -> dict[str, Any]:
-    if not isinstance(feature.parameters, FilletParameters) or len(feature.dependencies) != 1:
+def _edge_finish_step_payload(document: SketchMathDocument, feature: FeatureRecord) -> dict[str, Any]:
+    is_fillet = feature.feature_type == "fillet" and isinstance(feature.parameters, FilletParameters)
+    is_chamfer = feature.feature_type == "chamfer" and isinstance(feature.parameters, ChamferParameters)
+    if not (is_fillet or is_chamfer) or len(feature.dependencies) != 1:
         raise CadExportError(
-            "Canonical fillet STEP requires one target extrusion",
-            detail={"feature_id": feature.feature_id, "error_code": "unsupported_fillet_graph"},
+            "Canonical edge-finish STEP requires one target extrusion",
+            detail={"feature_id": feature.feature_id, "error_code": "unsupported_edge_finish_graph"},
         )
+    feature_name = feature.feature_type
     terminal_index = document.features.index(feature)
     later = [
         item.feature_id
@@ -71,14 +74,14 @@ def _fillet_step_payload(document: SketchMathDocument, feature: FeatureRecord) -
     ]
     if later:
         raise CadExportError(
-            "Canonical fillet STEP requires the fillet to be the terminal body feature",
+            f"Canonical {feature_name} STEP requires the feature to be terminal in its body",
             detail={"feature_id": feature.feature_id, "later_feature_ids": later, "error_code": "artifact_feature_not_terminal"},
         )
     target = next((item for item in document.features if item.feature_id == feature.dependencies[0]), None)
     if target is None or not isinstance(target.parameters, ExtrudeParameters):
         raise CadExportError(
-            "Canonical fillet STEP currently requires an extrusion target",
-            detail={"feature_id": feature.feature_id, "error_code": "unsupported_fillet_target"},
+            f"Canonical {feature_name} STEP currently requires an extrusion target",
+            detail={"feature_id": feature.feature_id, "error_code": f"unsupported_{feature_name}_target"},
         )
     if (
         target.parameters.operation != "new_body"
@@ -87,8 +90,8 @@ def _fillet_step_payload(document: SketchMathDocument, feature: FeatureRecord) -
         or target.parameters.direction != "positive"
     ):
         raise CadExportError(
-            "Canonical fillet STEP currently requires an independent positive one-sided base extrusion",
-            detail={"feature_id": feature.feature_id, "target_feature_id": target.feature_id, "error_code": "unsupported_fillet_graph"},
+            f"Canonical {feature_name} STEP currently requires an independent positive one-sided base extrusion",
+            detail={"feature_id": feature.feature_id, "target_feature_id": target.feature_id, "error_code": "unsupported_edge_finish_graph"},
         )
     body_features = [
         item
@@ -97,8 +100,8 @@ def _fillet_step_payload(document: SketchMathDocument, feature: FeatureRecord) -
     ]
     if [item.feature_id for item in body_features] != [target.feature_id, feature.feature_id]:
         raise CadExportError(
-            "Canonical fillet STEP currently supports exactly one base extrusion followed by one fillet",
-            detail={"feature_ids": [item.feature_id for item in body_features], "error_code": "unsupported_fillet_graph"},
+            f"Canonical {feature_name} STEP currently supports exactly one base extrusion followed by one edge finish",
+            detail={"feature_ids": [item.feature_id for item in body_features], "error_code": "unsupported_edge_finish_graph"},
         )
     report = rebuild_document(document)
     target_record = next(item for item in report.records if item.feature_id == target.feature_id)
@@ -122,16 +125,20 @@ def _fillet_step_payload(document: SketchMathDocument, feature: FeatureRecord) -
         )
     profile, holes = _source_geometry(document, target)
     return {
-        "feature_type": "fillet",
+        "feature_type": feature_name,
         "base_extrusion": {
             "feature_id": target.feature_id,
             "profile": profile.model_dump(mode="json"),
             "holes": [hole.model_dump(mode="json") for hole in holes],
             "depth_mm": target.parameters.depth_mm,
         },
-        "fillet": {
+        feature_name: {
             "feature_id": feature.feature_id,
-            "radius_mm": feature.parameters.radius_mm,
+            **(
+                {"radius_mm": feature.parameters.radius_mm}
+                if isinstance(feature.parameters, FilletParameters)
+                else {"distance_mm": feature.parameters.distance_mm}
+            ),
             "edges": edge_payloads,
         },
     }
@@ -204,10 +211,10 @@ def materialize_feature_artifact(
             }
         )
     else:
-        if feature.feature_type == "fillet":
+        if feature.feature_type in {"fillet", "chamfer"}:
             adapter = cad_adapter or CadAdapter(export_dir=feature_root)
-            result = adapter.fillet_feature_graph(
-                _fillet_step_payload(document, feature),
+            result = adapter.edge_finish_feature_graph(
+                _edge_finish_step_payload(document, feature),
                 selection_set_id=_safe_segment(document.document_id),
                 command_id=f"feature_{_safe_segment(feature.feature_id)}_r{document.revision}",
             )

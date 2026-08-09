@@ -24,7 +24,7 @@ from sketchmath.cad.freecad_extrude_profile import (
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build a guarded canonical SketchMath feature graph")
+    parser = argparse.ArgumentParser(description="Build a guarded canonical SketchMath edge-finish graph")
     parser.add_argument("--input-json", required=True)
     parser.add_argument("--out-dir", required=True)
     return parser.parse_args()
@@ -123,41 +123,47 @@ def main() -> int:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     payload = json.loads(input_path.read_text(encoding="utf-8"))
-    if payload.get("feature_type") != "fillet":
-        raise ValueError("Feature-graph worker currently supports fillet only")
+    feature_type = payload.get("feature_type")
+    if feature_type not in {"fillet", "chamfer"}:
+        raise ValueError("Feature-graph worker currently supports fillet and chamfer only")
     if str(payload.get("output_format") or "step").lower() != "step":
         raise ValueError("Feature-graph worker currently exports STEP only")
 
-    fillet = payload["fillet"]
-    radius_mm = float(fillet["radius_mm"])
-    if not math.isfinite(radius_mm) or radius_mm <= 0:
-        raise ValueError("Fillet radius must be positive and finite")
-    selectors = fillet.get("edges") or []
+    edge_finish = payload[feature_type]
+    size_name = "radius" if feature_type == "fillet" else "distance"
+    size_mm = float(edge_finish[f"{size_name}_mm"])
+    if not math.isfinite(size_mm) or size_mm <= 0:
+        raise ValueError(f"{feature_type.title()} {size_name} must be positive and finite")
+    selectors = edge_finish.get("edges") or []
     if not selectors:
-        raise ValueError("Fillet requires at least one semantic edge selector")
+        raise ValueError(f"{feature_type.title()} requires at least one semantic edge selector")
 
     base_solid, base_strategy = _build_base(payload)
     base_measurements = _solid_measurements(base_solid)
     selected_edges, edge_resolution = _resolve_edges(base_solid, selectors)
-    filleted = base_solid.makeFillet(radius_mm, selected_edges)
-    if hasattr(filleted, "removeSplitter"):
-        filleted = filleted.removeSplitter()
-    measurements = _solid_measurements(filleted)
+    finished = (
+        base_solid.makeFillet(size_mm, selected_edges)
+        if feature_type == "fillet"
+        else base_solid.makeChamfer(size_mm, selected_edges)
+    )
+    if hasattr(finished, "removeSplitter"):
+        finished = finished.removeSplitter()
+    measurements = _solid_measurements(finished)
     if measurements["is_valid_solid"] is not True or measurements["volume_mm3"] <= 0:
-        raise ValueError("FreeCAD fillet did not produce a valid positive solid")
+        raise ValueError(f"FreeCAD {feature_type} did not produce a valid positive solid")
     if measurements["volume_mm3"] >= base_measurements["volume_mm3"] - 1e-7:
-        raise ValueError("Convex outer-edge fillet did not remove measurable material")
+        raise ValueError(f"Convex outer-edge {feature_type} did not remove measurable material")
     if not _bounds_equal(measurements["bbox"], base_measurements["bbox"]):
-        raise ValueError("Fillet changed the supported base extrusion bounds")
+        raise ValueError(f"{feature_type.title()} changed the supported base extrusion bounds")
 
     step_path = out_dir / "export.step"
     validation_path = out_dir / "validation.json"
-    filleted.exportStep(str(step_path))
+    finished.exportStep(str(step_path))
     validation = {
         "status": "export_ready",
         "profile_id": payload["base_extrusion"]["profile"]["id"],
         "command_id": payload["command_id"],
-        "command_type": "fillet_feature_graph",
+        "command_type": f"{feature_type}_feature_graph",
         "artifacts": {
             "step_path": str(step_path),
             "validation_json": str(validation_path),
@@ -170,7 +176,7 @@ def main() -> int:
             "base_strategy": base_strategy,
             "base_volume_mm3": base_measurements["volume_mm3"],
             "volume_delta_mm3": measurements["volume_mm3"] - base_measurements["volume_mm3"],
-            "radius_mm": radius_mm,
+            f"{size_name}_mm": size_mm,
             "selected_edge_count": len(selected_edges),
             "semantic_edge_resolution": edge_resolution,
             "reference_policy": "semantic_endpoints_unique_match",
