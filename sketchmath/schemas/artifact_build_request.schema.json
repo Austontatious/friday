@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_revision": {
+      "minimum": 0,
+      "title": "Base Revision",
+      "type": "integer"
+    },
+    "feature_id": {
+      "title": "Feature Id",
+      "type": "string"
+    },
+    "format": {
+      "enum": [
+        "step",
+        "stl"
+      ],
+      "title": "Format",
+      "type": "string"
+    }
+  },
+  "required": [
+    "feature_id",
+    "format",
+    "base_revision"
+  ],
+  "title": "ArtifactBuildRequest",
+  "type": "object"
+}

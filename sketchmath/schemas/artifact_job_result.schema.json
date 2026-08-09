@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "ArtifactRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "feature_id": {
+          "title": "Feature Id",
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "step",
+            "stl"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "feature_id",
+        "revision",
+        "format",
+        "path",
+        "content_hash"
+      ],
+      "title": "ArtifactRecord",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact": {
+      "$ref": "#/$defs/ArtifactRecord"
+    },
+    "input_revision": {
+      "minimum": 0,
+      "title": "Input Revision",
+      "type": "integer"
+    },
+    "measurements": {
+      "additionalProperties": true,
+      "title": "Measurements",
+      "type": "object"
+    },
+    "registered": {
+      "default": true,
+      "title": "Registered",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "artifact",
+    "input_revision"
+  ],
+  "title": "ArtifactJobResult",
+  "type": "object"
+}

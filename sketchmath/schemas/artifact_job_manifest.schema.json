@@ -1,0 +1,219 @@
+{
+  "$defs": {
+    "ArtifactJobError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "additionalProperties": true,
+          "title": "Detail",
+          "type": "object"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ArtifactJobError",
+      "type": "object"
+    },
+    "ArtifactJobResult": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact": {
+          "$ref": "#/$defs/ArtifactRecord"
+        },
+        "input_revision": {
+          "minimum": 0,
+          "title": "Input Revision",
+          "type": "integer"
+        },
+        "measurements": {
+          "additionalProperties": true,
+          "title": "Measurements",
+          "type": "object"
+        },
+        "registered": {
+          "default": true,
+          "title": "Registered",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "artifact",
+        "input_revision"
+      ],
+      "title": "ArtifactJobResult",
+      "type": "object"
+    },
+    "ArtifactRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "feature_id": {
+          "title": "Feature Id",
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "step",
+            "stl"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "feature_id",
+        "revision",
+        "format",
+        "path",
+        "content_hash"
+      ],
+      "title": "ArtifactRecord",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempt": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Attempt",
+      "type": "integer"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "document_id": {
+      "title": "Document Id",
+      "type": "string"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ArtifactJobError"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "feature_id": {
+      "title": "Feature Id",
+      "type": "string"
+    },
+    "format": {
+      "enum": [
+        "step",
+        "stl"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "input_content_hash": {
+      "title": "Input Content Hash",
+      "type": "string"
+    },
+    "input_revision": {
+      "minimum": 0,
+      "title": "Input Revision",
+      "type": "integer"
+    },
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ArtifactJobResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_id": {
+      "title": "Session Id",
+      "type": "string"
+    },
+    "state": {
+      "default": "READY",
+      "enum": [
+        "READY",
+        "RUNNING",
+        "DONE",
+        "FAILED"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "step": {
+      "default": "ready",
+      "title": "Step",
+      "type": "string"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "job_id",
+    "document_id",
+    "session_id",
+    "feature_id",
+    "format",
+    "input_revision",
+    "input_content_hash",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "ArtifactJobManifest",
+  "type": "object"
+}

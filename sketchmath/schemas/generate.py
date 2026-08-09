@@ -7,6 +7,7 @@ from typing import TypeAlias
 
 from pydantic import BaseModel
 
+from sketchmath.models.artifact_job import ArtifactBuildRequest, ArtifactJobManifest, ArtifactJobResult
 from sketchmath.models.document import FeatureRebuildReport, SketchMathDocument
 from sketchmath.models.feature_command import FeatureCommand, FeatureOperationResult
 from sketchmath.models.geometry_command import GeometryCommand
@@ -18,6 +19,9 @@ from sketchmath.models.solver_run_result import SolverRunResult
 
 SchemaModel: TypeAlias = type[BaseModel]
 SCHEMA_MODELS: dict[str, SchemaModel] = {
+    "artifact_build_request.schema.json": ArtifactBuildRequest,
+    "artifact_job_manifest.schema.json": ArtifactJobManifest,
+    "artifact_job_result.schema.json": ArtifactJobResult,
     "feature_command.schema.json": FeatureCommand,
     "feature_operation_result.schema.json": FeatureOperationResult,
     "feature_rebuild_report.schema.json": FeatureRebuildReport,
