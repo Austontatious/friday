@@ -200,6 +200,24 @@ def test_design_parameter_contract_requires_v11_and_protects_bound_features() ->
     assert exc_info.value.detail["design_parameter_ids"] == ["corner_hole_diameter_mm"]
     assert len(document.features) == 8
 
+    bound_hole = document.features[1]
+    changed_hole = bound_hole.model_copy(
+        update={"parameters": bound_hole.parameters.model_copy(update={"diameter_mm": 6})}
+    )
+    with pytest.raises(SelectionResolutionError) as replace_exc:
+        apply_feature_command(
+            document,
+            FeatureCommand(
+                operation_id="replace_bound_hole",
+                mode="commit",
+                base_revision=8,
+                operation_type="replace_feature",
+                target_id=bound_hole.feature_id,
+                parameters={"feature": changed_hole.model_dump(mode="json")},
+            ),
+        )
+    assert replace_exc.value.detail["error_code"] == "feature_parameter_bound"
+
 
 def test_golden_mounting_plate_typed_parameter_history_survives_undo_redo_and_reload(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")

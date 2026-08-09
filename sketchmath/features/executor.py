@@ -308,6 +308,20 @@ def apply_feature_command(document: SketchMathDocument, command: FeatureCommand)
         index = next((index for index, existing in enumerate(after.features) if existing.feature_id == target_id), None)
         if index is None:
             raise SelectionResolutionError("Feature does not exist", detail={"feature_id": target_id})
+        parameter_owners = [
+            parameter.parameter_id
+            for parameter in after.design_parameters
+            if any(binding.target_id == target_id for binding in parameter.bindings)
+        ]
+        if parameter_owners and after.features[index].parameters != feature.parameters:
+            raise SelectionResolutionError(
+                "Feature parameters are owned by a design parameter",
+                detail={
+                    "feature_id": target_id,
+                    "design_parameter_ids": parameter_owners,
+                    "error_code": "feature_parameter_bound",
+                },
+            )
         after.features[index] = feature
         changed.append(feature.feature_id)
     elif command.operation_type == "delete_feature":

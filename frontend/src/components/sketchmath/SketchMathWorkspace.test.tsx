@@ -13,8 +13,8 @@ jest.mock("@chakra-ui/react", () => {
   const Textarea = React.forwardRef(({ children, ...props }: any, ref: React.Ref<HTMLTextAreaElement>) =>
     React.createElement("textarea", { ...props, ref }, children),
   );
-  const Input = React.forwardRef(({ children, ...props }: any, ref: React.Ref<HTMLInputElement>) =>
-    React.createElement("input", { ...props, ref }, children),
+  const Input = React.forwardRef(({ children, isDisabled, ...props }: any, ref: React.Ref<HTMLInputElement>) =>
+    React.createElement("input", { ...props, ref, disabled: isDisabled }, children),
   );
   const ChakraProvider = ({ children }: any) => React.createElement(React.Fragment, null, children);
   const useColorMode = () => {
@@ -1198,6 +1198,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
+      onUpdateSimpleHole: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
       onAddSimpleHole: jest.fn(),
@@ -1296,6 +1297,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth: jest.fn(),
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
+      onUpdateSimpleHole: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
       onAddSimpleHole: jest.fn(),
@@ -1463,6 +1465,7 @@ describe("SketchMath workspace", () => {
     } as any;
     const onRenameFeature = jest.fn();
     const onSetDesignParameter = jest.fn();
+    const onUpdateSimpleHole = jest.fn();
 
     render(<FeatureHistoryPanel
       document={document}
@@ -1471,7 +1474,7 @@ describe("SketchMath workspace", () => {
       busy={false}
       canUndo={false}
       canRedo={false}
-      holeFeaturesEnabled={false}
+      holeFeaturesEnabled
       revolveFeaturesEnabled={false}
       filletFeaturesEnabled={false}
       chamferFeaturesEnabled={false}
@@ -1486,6 +1489,7 @@ describe("SketchMath workspace", () => {
       onUpdateDepth={jest.fn()}
       onUpdateFilletRadius={jest.fn()}
       onUpdateChamferDistance={jest.fn()}
+      onUpdateSimpleHole={onUpdateSimpleHole}
       onSetDesignParameter={onSetDesignParameter}
       onRenameFeature={onRenameFeature}
       onAddSimpleHole={jest.fn()}
@@ -1512,6 +1516,15 @@ describe("SketchMath workspace", () => {
     await userEvent.type(widthInput, "100");
     await userEvent.click(screen.getByRole("button", { name: "Apply" }));
     expect(onSetDesignParameter).toHaveBeenCalledWith("plate_width_mm", 100);
+
+    const holeDiameter = screen.getByRole("spinbutton", { name: "Existing hole diameter Mount hole" });
+    await userEvent.clear(holeDiameter);
+    await userEvent.type(holeDiameter, "6");
+    const holeEditor = screen.getByTestId("sketchmath-existing-hole-editor-feature_internal_hole");
+    await userEvent.click(within(holeEditor).getByRole("button", { name: "Through" }));
+    await userEvent.type(screen.getByRole("spinbutton", { name: "Existing hole depth Mount hole" }), "3");
+    await userEvent.click(within(holeEditor).getByRole("button", { name: "Apply hole" }));
+    expect(onUpdateSimpleHole).toHaveBeenCalledWith(features[2], 6, "blind", 3);
 
     const nameInput = screen.getByRole("textbox", { name: "Selected feature name" });
     await userEvent.clear(nameInput);

@@ -49,6 +49,12 @@ type FeatureHistoryPanelProps = {
   onUpdateDepth: (feature: Extract<SketchMathFeature, { feature_type: "extrude" }>, depth: number) => void;
   onUpdateFilletRadius: (feature: Extract<SketchMathFeature, { feature_type: "fillet" }>, radius: number) => void;
   onUpdateChamferDistance: (feature: Extract<SketchMathFeature, { feature_type: "chamfer" }>, distance: number) => void;
+  onUpdateSimpleHole: (
+    feature: Extract<SketchMathFeature, { feature_type: "hole" }>,
+    diameter: number,
+    termination: "through" | "blind",
+    depth: number | null,
+  ) => void;
   onSetDesignParameter: (parameterId: string, value: number) => void;
   onRenameFeature: (feature: SketchMathFeature, name: string) => void;
   onAddSimpleHole: (
@@ -122,6 +128,7 @@ const FeatureHistoryPanel = ({
   onUpdateDepth,
   onUpdateFilletRadius,
   onUpdateChamferDistance,
+  onUpdateSimpleHole,
   onSetDesignParameter,
   onRenameFeature,
   onAddSimpleHole,
@@ -148,6 +155,9 @@ const FeatureHistoryPanel = ({
   const [treeSelection, setTreeSelection] = useState<ModelTreeSelection | null>(defaultSelection);
   const [featureNameDraft, setFeatureNameDraft] = useState("");
   const designParameters = useMemo(() => document.design_parameters || [], [document.design_parameters]);
+  const boundFeatureIds = useMemo(() => new Set(
+    designParameters.flatMap((parameter) => parameter.bindings.map((binding) => binding.target_id)),
+  ), [designParameters]);
   const buildRecords = useMemo(
     () => recordByFeature(document.last_rebuild?.records || []),
     [document.last_rebuild?.records],
@@ -175,8 +185,17 @@ const FeatureHistoryPanel = ({
   useEffect(() => {
     setHoleDrafts((current) => Object.fromEntries(
       document.features
-        .filter((feature): feature is Extract<SketchMathFeature, { feature_type: "extrude" }> => feature.feature_type === "extrude")
+        .filter((feature) => feature.feature_type === "extrude" || feature.feature_type === "hole")
         .map((feature) => {
+          if (feature.feature_type === "hole") {
+            return [feature.feature_id, {
+              x: String(feature.parameters.position_mm[0]),
+              y: String(feature.parameters.position_mm[1]),
+              diameter: String(feature.parameters.diameter_mm),
+              depth: String(feature.parameters.depth_mm ?? ""),
+              termination: feature.parameters.termination,
+            } satisfies HoleDraft];
+          }
           const record = buildRecords[feature.feature_id];
           const bounds = record?.measurements?.bounds_mm;
           return [feature.feature_id, current[feature.feature_id] || {
@@ -517,6 +536,7 @@ const FeatureHistoryPanel = ({
             && holeDiameter > 0
             && (holeDraft.termination === "through" || (Number.isFinite(holeDepth) && holeDepth > 0)),
           );
+          const featureParameterBound = boundFeatureIds.has(feature.feature_id);
           return (
             <Box
               key={feature.feature_id}
@@ -657,6 +677,75 @@ const FeatureHistoryPanel = ({
                   >
                     Apply distance
                   </Button>
+                </HStack>
+              ) : null}
+              {holeFeaturesEnabled && feature.feature_type === "hole" && feature.parameters.style === "simple" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-existing-hole-editor-${feature.feature_id}`}>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    aria-label={`Existing hole diameter ${feature.name}`}
+                    value={holeDraft?.diameter || ""}
+                    onChange={(event) => setHoleDrafts((current) => ({
+                      ...current,
+                      [feature.feature_id]: { ...current[feature.feature_id], diameter: event.target.value },
+                    }))}
+                    width="100px"
+                    isDisabled={featureParameterBound}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setHoleDrafts((current) => ({
+                      ...current,
+                      [feature.feature_id]: {
+                        ...current[feature.feature_id],
+                        termination: current[feature.feature_id]?.termination === "blind" ? "through" : "blind",
+                      },
+                    }))}
+                    isDisabled={featureParameterBound}
+                  >
+                    {holeDraft?.termination === "blind" ? "Blind" : "Through"}
+                  </Button>
+                  {holeDraft?.termination === "blind" ? (
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      aria-label={`Existing hole depth ${feature.name}`}
+                      value={holeDraft.depth}
+                      onChange={(event) => setHoleDrafts((current) => ({
+                        ...current,
+                        [feature.feature_id]: { ...current[feature.feature_id], depth: event.target.value },
+                      }))}
+                      width="100px"
+                      isDisabled={featureParameterBound}
+                    />
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => holeDraft && onUpdateSimpleHole(
+                      feature,
+                      holeDiameter,
+                      holeDraft.termination,
+                      holeDraft.termination === "blind" ? holeDepth : null,
+                    )}
+                    isDisabled={
+                      featureParameterBound
+                      || !validHoleDraft
+                      || (
+                        holeDiameter === feature.parameters.diameter_mm
+                        && holeDraft?.termination === feature.parameters.termination
+                        && (holeDraft?.termination !== "blind" || holeDepth === feature.parameters.depth_mm)
+                      )
+                      || busy
+                    }
+                  >
+                    Apply hole
+                  </Button>
+                  {featureParameterBound ? <Text fontSize="xs">Controlled by a design parameter.</Text> : null}
                 </HStack>
               ) : null}
               {holeFeaturesEnabled && feature.feature_type === "extrude" ? (

@@ -2023,6 +2023,34 @@ const SketchMathWorkspace = () => {
     });
   };
 
+  const handleUpdateSimpleHole = async (
+    feature: Extract<SketchMathFeature, { feature_type: "hole" }>,
+    diameter: number,
+    termination: "through" | "blind",
+    depth: number | null,
+  ) => {
+    if (!sketchDocument || !holeFeaturesEnabled || feature.parameters.style !== "simple") return;
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "replace_feature",
+      target_id: feature.feature_id,
+      parameters: {
+        feature: {
+          ...feature,
+          parameters: {
+            ...feature.parameters,
+            diameter_mm: diameter,
+            termination,
+            depth_mm: termination === "blind" ? depth : null,
+          },
+        },
+      },
+    });
+  };
+
   const handleFeatureUndo = async () => {
     if (!sessionId || featureBusy) return;
     setFeatureBusy(true);
@@ -4288,6 +4316,9 @@ const SketchMathWorkspace = () => {
                   onUpdateDepth={(feature, depth) => void handleUpdateFeatureDepth(feature, depth)}
                   onUpdateFilletRadius={(feature, radius) => void handleUpdateFilletRadius(feature, radius)}
                   onUpdateChamferDistance={(feature, distance) => void handleUpdateChamferDistance(feature, distance)}
+                  onUpdateSimpleHole={(feature, diameter, termination, depth) => (
+                    void handleUpdateSimpleHole(feature, diameter, termination, depth)
+                  )}
                   onSetDesignParameter={(parameterId, value) => void handleSetDesignParameter(parameterId, value)}
                   onRenameFeature={(feature, name) => void handleRenameFeature(feature, name)}
                   onAddSimpleHole={(feature, topReference, position, diameter, termination, depth) => (

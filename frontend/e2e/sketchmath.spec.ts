@@ -384,7 +384,7 @@ test.describe("SketchMath workspace", () => {
         features: Array<{
           feature_id: string;
           feature_type: "extrude" | "hole";
-          parameters: { depth_mm?: number; diameter_mm?: number };
+          parameters: { depth_mm?: number | null; diameter_mm?: number; termination?: "through" | "blind" };
         }>;
         artifacts: Array<{ feature_id: string; revision: number; format: string; path: string }>;
         last_rebuild: { records: Array<{ feature_id: string; output_signature: string }> };
@@ -451,9 +451,21 @@ test.describe("SketchMath workspace", () => {
     expect(holeFeature?.parameters.diameter_mm).toBe(20);
     expect(withHole.document.last_rebuild.records[1]).toMatchObject({ feature_id: holeFeatureId });
 
+    const existingHoleEditor = page.getByTestId(`sketchmath-existing-hole-editor-${holeFeatureId}`);
+    await existingHoleEditor.getByLabel("Existing hole diameter Hole 1").fill("18");
+    await existingHoleEditor.getByRole("button", { name: "Through" }).click();
+    await existingHoleEditor.getByLabel("Existing hole depth Hole 1").fill("10");
+    await existingHoleEditor.getByRole("button", { name: "Apply hole" }).click();
+    await expect(panel).toContainText("Revision 7");
+    await panel.getByRole("button", { name: "Undo feature" }).click();
+    await expect(existingHoleEditor.getByLabel("Existing hole diameter Hole 1")).toHaveValue("20");
+    await panel.getByRole("button", { name: "Redo feature" }).click();
+    await expect(existingHoleEditor.getByLabel("Existing hole diameter Hole 1")).toHaveValue("18");
+    await expect(existingHoleEditor.getByLabel("Existing hole depth Hole 1")).toHaveValue("10");
+
     await page.getByLabel(`Feature depth ${featureId}`).fill("30");
     await page.getByTestId(`sketchmath-feature-${featureId}`).getByRole("button", { name: "Apply depth" }).click();
-    await expect(page.getByTestId("sketchmath-feature-history-panel")).toContainText("Revision 7");
+    await expect(page.getByTestId("sketchmath-feature-history-panel")).toContainText("Revision 10");
     const recoveredResponse = await page.request.get(`/api/sketchmath/sessions/${sessionId}`);
     const recovered = await recoveredResponse.json() as FeatureSnapshot & {
       document: FeatureSnapshot["document"] & {
@@ -465,8 +477,10 @@ test.describe("SketchMath workspace", () => {
     await page.reload();
     const holeRow = page.getByTestId(`sketchmath-feature-${holeFeatureId}`);
     await expect(holeRow).toContainText("hole · cut · succeeded");
+    await expect(holeRow.getByLabel("Existing hole diameter Hole 1")).toHaveValue("18");
+    await expect(holeRow.getByLabel("Existing hole depth Hole 1")).toHaveValue("10");
     await holeRow.getByRole("button", { name: "Build STL" }).click();
-    await expect(page.getByTestId(`sketchmath-artifact-status-${holeFeatureId}`)).toContainText("DONE · complete · revision 7", { timeout: 15000 });
+    await expect(page.getByTestId(`sketchmath-artifact-status-${holeFeatureId}`)).toContainText("DONE · complete · revision 10", { timeout: 15000 });
     const graphDownload = page.getByTestId(`sketchmath-artifact-download-${holeFeatureId}`);
     const graphDownloadPromise = page.waitForEvent("download");
     await graphDownload.click();
