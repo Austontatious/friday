@@ -13,11 +13,12 @@ from sketchmath.models.document import (
     FeatureRebuildReport,
     FeatureRecord,
     HoleParameters,
+    RevolveParameters,
     ResolvedTopologyReference,
     SemanticTopologyReference,
     SketchMathDocument,
 )
-from sketchmath.models.entities import Profile2DEntity
+from sketchmath.models.entities import Axis2DEntity, ConstructionLine2DEntity, Line2DEntity, Profile2DEntity
 
 
 def _hash_payload(payload: object) -> str:
@@ -284,6 +285,132 @@ def _extrude_topology(
                     measurements={"z_mm": z_value},
                 )
             )
+    return topology
+
+
+def _revolve_axis(document: SketchMathDocument, feature: FeatureRecord) -> tuple[tuple[float, float], tuple[float, float]]:
+    parameters = feature.parameters
+    if not isinstance(parameters, RevolveParameters):
+        raise ValueError("revolve feature requires revolve parameters")
+    sketch = next((candidate for candidate in document.sketches if candidate.sketch_id == feature.sketch_id), None)
+    if sketch is None:
+        raise ValueError("revolve sketch does not exist")
+    try:
+        axis = sketch.state.get_entity(parameters.axis_entity_id)
+    except Exception as exc:
+        raise ValueError("revolve axis does not exist") from exc
+    if isinstance(axis, Axis2DEntity):
+        origin = axis.origin
+        vector = axis.direction
+    elif isinstance(axis, (Line2DEntity, ConstructionLine2DEntity)):
+        origin = axis.start
+        vector = (axis.end[0] - axis.start[0], axis.end[1] - axis.start[1])
+    else:
+        raise ValueError("revolve axis must be an axis, line, or construction line")
+    magnitude = math.hypot(*vector)
+    if not math.isfinite(magnitude) or magnitude <= 1e-9:
+        raise ValueError("revolve axis must have non-zero finite direction")
+    return (float(origin[0]), float(origin[1])), (float(vector[0] / magnitude), float(vector[1] / magnitude))
+
+
+def _revolve_measurements(
+    document: SketchMathDocument,
+    feature: FeatureRecord,
+    profile: Profile2DEntity,
+    holes: list[Profile2DEntity],
+) -> tuple[FeatureMeasurements, dict[str, object]]:
+    parameters = feature.parameters
+    if not isinstance(parameters, RevolveParameters):
+        raise ValueError("revolve feature requires revolve parameters")
+    origin, axis_direction = _revolve_axis(document, feature)
+    perpendicular = (-axis_direction[1], axis_direction[0])
+    polygon = Polygon(profile.vertices, holes=[hole.vertices for hole in holes])
+    if not polygon.is_valid or polygon.area <= 0:
+        raise ValueError("revolve profile must define a valid positive material region")
+    all_vertices = [*profile.vertices, *(vertex for hole in holes for vertex in hole.vertices)]
+    signed_distances = [
+        (vertex[0] - origin[0]) * perpendicular[0] + (vertex[1] - origin[1]) * perpendicular[1]
+        for vertex in all_vertices
+    ]
+    if min(signed_distances) < -1e-9 and max(signed_distances) > 1e-9:
+        raise ValueError("revolve profile cannot cross its axis")
+    centroid = polygon.centroid
+    centroid_distance = abs(
+        (centroid.x - origin[0]) * perpendicular[0]
+        + (centroid.y - origin[1]) * perpendicular[1]
+    )
+    if centroid_distance <= 1e-9:
+        raise ValueError("revolve profile centroid must remain off axis")
+    sign = -1.0 if parameters.operation == "cut" else 1.0
+    volume = sign * polygon.area * 2.0 * math.pi * centroid_distance
+
+    x_min = math.inf
+    x_max = -math.inf
+    y_min = math.inf
+    y_max = -math.inf
+    maximum_radius = 0.0
+    for vertex in profile.vertices:
+        relative = (vertex[0] - origin[0], vertex[1] - origin[1])
+        along = relative[0] * axis_direction[0] + relative[1] * axis_direction[1]
+        radius = abs(relative[0] * perpendicular[0] + relative[1] * perpendicular[1])
+        center_x = origin[0] + along * axis_direction[0]
+        center_y = origin[1] + along * axis_direction[1]
+        x_min = min(x_min, center_x - abs(perpendicular[0]) * radius)
+        x_max = max(x_max, center_x + abs(perpendicular[0]) * radius)
+        y_min = min(y_min, center_y - abs(perpendicular[1]) * radius)
+        y_max = max(y_max, center_y + abs(perpendicular[1]) * radius)
+        maximum_radius = max(maximum_radius, radius)
+    return (
+        FeatureMeasurements(
+            net_profile_area_mm2=polygon.area,
+            volume_delta_mm3=volume,
+            bounds_mm=(x_min, x_max, y_min, y_max, -maximum_radius, maximum_radius),
+            hole_count=len(holes),
+        ),
+        {
+            "axis_entity_id": parameters.axis_entity_id,
+            "origin": origin,
+            "direction": axis_direction,
+            "centroid_distance_mm": centroid_distance,
+        },
+    )
+
+
+def _revolve_topology(
+    feature: FeatureRecord,
+    profile: Profile2DEntity,
+    holes: list[Profile2DEntity],
+    axis_geometry: dict[str, object],
+) -> list[SemanticTopologyReference]:
+    source_ids = list(profile.source_curve_ids or profile.source_line_ids)
+    if profile.source_circle_id:
+        source_ids = [profile.source_circle_id]
+    if not source_ids:
+        source_ids = [profile.id]
+    topology = [
+        _semantic_reference(
+            feature,
+            topology_type="face",
+            role="revolved_outer_face",
+            source_entity_id=source_id,
+            ordinal=ordinal,
+            geometry={"profile_vertices": profile.vertices, "axis": axis_geometry},
+            measurements={"angle_deg": 360.0},
+        )
+        for ordinal, source_id in enumerate(source_ids)
+    ]
+    topology.extend(
+        _semantic_reference(
+            feature,
+            topology_type="face",
+            role="revolved_inner_face",
+            source_entity_id=hole.id,
+            ordinal=ordinal,
+            geometry={"profile_vertices": hole.vertices, "axis": axis_geometry},
+            measurements={"angle_deg": 360.0},
+        )
+        for ordinal, hole in enumerate(holes)
+    )
     return topology
 
 
@@ -576,7 +703,7 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
 
         profile: Profile2DEntity | None = None
         holes: list[Profile2DEntity] = []
-        if error is None and feature.feature_type == "extrude":
+        if error is None and feature.feature_type in {"extrude", "revolve"}:
             profile, holes, error = _profile_for_feature(document, feature)
             status = "failed" if error is not None else status
         if error is None and feature.parameters.operation == "new_body":
@@ -608,6 +735,37 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
         resolved_references: list[ResolvedTopologyReference] = []
         if error is None:
             resolved_references, error = _resolve_topology_references(feature, records_by_id)
+        if error is None and feature.feature_type == "revolve":
+            assert isinstance(feature.parameters, RevolveParameters)
+            if not math.isclose(feature.parameters.angle_deg, 360.0, abs_tol=1e-9):
+                error = FeatureBuildError(
+                    code="unsupported_partial_revolve",
+                    message="Canonical revolve currently supports a full 360-degree sweep.",
+                    detail={"angle_deg": feature.parameters.angle_deg},
+                )
+            elif feature.parameters.operation != "new_body":
+                if len(feature.dependencies) != 1:
+                    error = FeatureBuildError(
+                        code="boolean_target_dependency_required",
+                        message="An add or cut revolve requires exactly one target feature dependency.",
+                        detail={"dependency_ids": feature.dependencies},
+                    )
+                else:
+                    dependency_id = feature.dependencies[0]
+                    face_selectors = [
+                        selector
+                        for selector in feature.topology_references
+                        if selector.owner_feature_id == dependency_id and selector.topology_type == "face"
+                    ]
+                    if len(face_selectors) != 1:
+                        error = FeatureBuildError(
+                            code="feature_attachment_reference_required",
+                            message="An add or cut revolve requires exactly one semantic target-face reference.",
+                            detail={
+                                "dependency_id": dependency_id,
+                                "attachment_reference_ids": [selector.reference_id for selector in face_selectors],
+                            },
+                        )
         attachment_z = 0.0
         if error is None and feature.feature_type == "extrude" and feature.parameters.operation != "new_body":
             if len(feature.dependencies) != 1:
@@ -735,6 +893,15 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                     source_geometry: object = {
                         "target_feature_id": feature.dependencies[0],
                         "target_signature": target_record.output_signature,
+                    }
+                elif feature.feature_type == "revolve":
+                    assert profile is not None
+                    measurements, axis_geometry = _revolve_measurements(document, feature, profile, holes)
+                    generated_topology = _revolve_topology(feature, profile, holes, axis_geometry)
+                    source_geometry = {
+                        "profile": profile.model_dump(mode="json"),
+                        "holes": [hole.model_dump(mode="json") for hole in holes],
+                        "axis": axis_geometry,
                     }
                 else:
                     assert profile is not None

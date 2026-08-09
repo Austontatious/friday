@@ -277,6 +277,11 @@ def build_feature_body_mesh(document: SketchMathDocument, terminal_feature_id: s
                     )
                 cutter = Point(feature.parameters.position_mm).buffer(feature.parameters.diameter_mm / 2.0, quad_segs=90)
                 material = material.difference(cutter)
+            else:
+                raise CadExportError(
+                    "Layered STL currently supports extrusion and simple-hole feature graphs",
+                    detail={"feature_id": feature.feature_id, "feature_type": feature.feature_type, "error_code": "unsupported_stl_feature_type"},
+                )
         if material.is_empty or not material.is_valid:
             raise CadExportError(
                 "Feature graph produced an empty or invalid material layer",

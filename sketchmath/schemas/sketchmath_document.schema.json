@@ -1197,7 +1197,8 @@
           "default": "extrude",
           "enum": [
             "extrude",
-            "hole"
+            "hole",
+            "revolve"
           ],
           "title": "Feature Type",
           "type": "string"
@@ -1213,6 +1214,9 @@
             },
             {
               "$ref": "#/$defs/HoleParameters"
+            },
+            {
+              "$ref": "#/$defs/RevolveParameters"
             }
           ],
           "title": "Parameters"
@@ -2148,6 +2152,37 @@
         "current_signature"
       ],
       "title": "ResolvedTopologyReference",
+      "type": "object"
+    },
+    "RevolveParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "angle_deg": {
+          "default": 360.0,
+          "exclusiveMinimum": 0,
+          "maximum": 360,
+          "title": "Angle Deg",
+          "type": "number"
+        },
+        "axis_entity_id": {
+          "title": "Axis Entity Id",
+          "type": "string"
+        },
+        "operation": {
+          "default": "new_body",
+          "enum": [
+            "new_body",
+            "add",
+            "cut"
+          ],
+          "title": "Operation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "axis_entity_id"
+      ],
+      "title": "RevolveParameters",
       "type": "object"
     },
     "SelectionContext": {

@@ -43,6 +43,33 @@ def _selection() -> SelectionContext:
                     "winding": "counterclockwise",
                     "source_region_id": "region_boss",
                 },
+                {
+                    "id": "profile_revolve_add",
+                    "type": "profile_2d",
+                    "vertices": [[8, 2], [10, 2], [10, 8], [8, 8], [8, 2]],
+                    "area": 12,
+                    "winding": "counterclockwise",
+                },
+                {
+                    "id": "profile_revolve_cut",
+                    "type": "profile_2d",
+                    "vertices": [[4, 2], [6, 2], [6, 8], [4, 8], [4, 2]],
+                    "area": 12,
+                    "winding": "counterclockwise",
+                },
+                {
+                    "id": "profile_cross_axis",
+                    "type": "profile_2d",
+                    "vertices": [[-2, 2], [2, 2], [2, 8], [-2, 8], [-2, 2]],
+                    "area": 24,
+                    "winding": "counterclockwise",
+                },
+                {
+                    "id": "axis_y",
+                    "type": "axis_2d",
+                    "origin": [0, 0],
+                    "direction": [0, 1],
+                },
             ],
         }
     )
@@ -159,6 +186,35 @@ def _hole_feature(
     )
 
 
+def _revolve_feature(
+    feature_id: str,
+    *,
+    profile_id: str = "profile_boss",
+    operation: str = "new_body",
+    dependencies: list[str] | None = None,
+    topology_references: list[dict] | None = None,
+    axis_entity_id: str = "axis_y",
+    angle: float = 360,
+) -> FeatureRecord:
+    return FeatureRecord.model_validate(
+        {
+            "feature_id": feature_id,
+            "feature_type": "revolve",
+            "name": feature_id.replace("_", " ").title(),
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": profile_id,
+            "dependencies": dependencies or [],
+            "topology_references": topology_references or [],
+            "parameters": {
+                "axis_entity_id": axis_entity_id,
+                "angle_deg": angle,
+                "operation": operation,
+            },
+        }
+    )
+
+
 def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch() -> None:
     document = _document()
 
@@ -166,7 +222,15 @@ def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch(
     assert document.revision == 0
     assert [body.body_id for body in document.bodies] == ["body_main"]
     assert [sketch.sketch_id for sketch in document.sketches] == ["sketch_main"]
-    assert [entity.id for entity in document.sketches[0].state.items] == ["profile_plate_hole", "profile_plate", "profile_boss"]
+    assert [entity.id for entity in document.sketches[0].state.items] == [
+        "profile_plate_hole",
+        "profile_plate",
+        "profile_boss",
+        "profile_revolve_add",
+        "profile_revolve_cut",
+        "profile_cross_axis",
+        "axis_y",
+    ]
 
 
 def test_extrude_rebuild_is_pure_deterministic_and_hole_aware() -> None:
@@ -290,6 +354,104 @@ def test_symmetric_and_two_sided_extents_have_deterministic_bounds() -> None:
     two_sided_report = rebuild_document(_document().model_copy(update={"features": [two_sided]}))
     assert two_sided_report.records[0].measurements.bounds_mm[-2:] == pytest.approx((-3, 8))
     assert two_sided_report.records[0].measurements.volume_delta_mm3 == pytest.approx(924)
+
+
+def test_full_revolve_uses_explicit_axis_and_pappus_volume() -> None:
+    revolve = _revolve_feature("feature_revolve")
+
+    first = rebuild_document(_document().model_copy(update={"features": [revolve]}))
+    second = rebuild_document(_document().model_copy(update={"features": [revolve.model_copy(deep=True)]}))
+
+    assert first == second
+    assert first.ok is True
+    record = first.records[0]
+    assert record.measurements.net_profile_area_mm2 == pytest.approx(36)
+    assert record.measurements.volume_delta_mm3 == pytest.approx(360 * math.pi)
+    assert record.measurements.bounds_mm == pytest.approx((-8, 8, 2, 8, -8, 8))
+    assert {item.role for item in record.generated_topology} == {"revolved_outer_face"}
+
+
+def test_revolve_add_and_cut_require_semantic_target_faces() -> None:
+    base = _revolve_feature("feature_revolve_base")
+    base_report = rebuild_document(_document().model_copy(update={"features": [base]}))
+    target_face = base_report.records[0].generated_topology[0]
+    selector = {
+        "reference_id": target_face.reference_id,
+        "owner_feature_id": base.feature_id,
+        "topology_type": "face",
+        "role": target_face.role,
+        "source_entity_id": target_face.source_entity_id,
+        "expected_signature": target_face.geometric_signature,
+    }
+    add = _revolve_feature(
+        "feature_revolve_add",
+        profile_id="profile_revolve_add",
+        operation="add",
+        dependencies=[base.feature_id],
+        topology_references=[selector],
+    )
+    cut = _revolve_feature(
+        "feature_revolve_cut",
+        profile_id="profile_revolve_cut",
+        operation="cut",
+        dependencies=[base.feature_id],
+        topology_references=[selector],
+    )
+
+    add_report = rebuild_document(_document().model_copy(update={"features": [base, add]}))
+    cut_report = rebuild_document(_document().model_copy(update={"features": [base, cut]}))
+
+    assert add_report.ok is True
+    assert add_report.records[1].measurements.volume_delta_mm3 == pytest.approx(216 * math.pi)
+    assert add_report.records[1].resolved_references[0].recovery_state == "exact"
+    assert cut_report.ok is True
+    assert cut_report.records[1].measurements.volume_delta_mm3 == pytest.approx(-120 * math.pi)
+
+
+def test_revolve_axis_edit_recovers_reference_and_invalid_envelopes_fail_structurally() -> None:
+    base = _revolve_feature("feature_revolve_base")
+    base_report = rebuild_document(_document().model_copy(update={"features": [base]}))
+    target_face = base_report.records[0].generated_topology[0]
+    add = _revolve_feature(
+        "feature_revolve_add",
+        profile_id="profile_revolve_add",
+        operation="add",
+        dependencies=[base.feature_id],
+        topology_references=[
+            {
+                "reference_id": target_face.reference_id,
+                "owner_feature_id": base.feature_id,
+                "topology_type": "face",
+                "role": target_face.role,
+                "source_entity_id": target_face.source_entity_id,
+                "expected_signature": target_face.geometric_signature,
+            }
+        ],
+    )
+    edited = _document().model_copy(update={"features": [base, add]})
+    axis = edited.sketches[0].state.get_entity("axis_y")
+    edited.sketches[0].state.items[edited.sketches[0].state.items.index(axis)] = axis.model_copy(update={"origin": (1, 0)})
+
+    edited_report = rebuild_document(edited)
+    partial_report = rebuild_document(
+        _document().model_copy(update={"features": [_revolve_feature("feature_partial", angle=180)]})
+    )
+    crossing_report = rebuild_document(
+        _document().model_copy(update={"features": [_revolve_feature("feature_cross", profile_id="profile_cross_axis")]})
+    )
+    missing_axis_report = rebuild_document(
+        _document().model_copy(update={"features": [_revolve_feature("feature_missing_axis", axis_entity_id="axis_missing")]})
+    )
+
+    assert edited_report.ok is True
+    assert edited_report.records[1].resolved_references[0].recovery_state == "recovered"
+    assert edited_report.records[0].generated_topology[0].reference_id == target_face.reference_id
+    assert edited_report.records[0].generated_topology[0].geometric_signature != target_face.geometric_signature
+    assert partial_report.records[0].error.code == "unsupported_partial_revolve"
+    assert crossing_report.records[0].error.code == "invalid_feature_geometry"
+    assert "cross" in crossing_report.records[0].error.message
+    assert missing_axis_report.records[0].error.code == "invalid_feature_geometry"
+    assert "axis does not exist" in missing_axis_report.records[0].error.message
 
 
 def test_add_feature_preview_and_commit_shapes_increment_revision_without_side_effects() -> None:

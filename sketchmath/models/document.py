@@ -96,6 +96,22 @@ class HoleParameters(BaseModel):
         return self
 
 
+class RevolveParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    axis_entity_id: str
+    angle_deg: float = Field(default=360.0, gt=0, le=360)
+    operation: Literal["new_body", "add", "cut"] = "new_body"
+
+    @model_validator(mode="after")
+    def validate_revolve_parameters(self) -> "RevolveParameters":
+        if not math.isfinite(self.angle_deg):
+            raise ValueError("revolve angle must be finite")
+        if not self.axis_entity_id.strip():
+            raise ValueError("revolve axis_entity_id cannot be empty")
+        return self
+
+
 class TopologyReferenceSelector(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -138,7 +154,7 @@ class FeatureRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     feature_id: str
-    feature_type: Literal["extrude", "hole"] = "extrude"
+    feature_type: Literal["extrude", "hole", "revolve"] = "extrude"
     name: str
     body_id: str
     sketch_id: str
@@ -146,7 +162,7 @@ class FeatureRecord(BaseModel):
     source_region_id: str | None = None
     dependencies: list[str] = Field(default_factory=list)
     topology_references: list[TopologyReferenceSelector] = Field(default_factory=list)
-    parameters: ExtrudeParameters | HoleParameters
+    parameters: ExtrudeParameters | HoleParameters | RevolveParameters
     suppressed: bool = False
 
     @model_validator(mode="after")
@@ -156,10 +172,16 @@ class FeatureRecord(BaseModel):
                 raise ValueError("extrude feature requires extrusion parameters")
             if not self.profile_id:
                 raise ValueError("extrude feature requires profile_id")
-        elif not isinstance(self.parameters, HoleParameters):
-            raise ValueError("hole feature requires hole parameters")
-        elif self.profile_id is not None:
-            raise ValueError("hole feature does not use profile_id")
+        elif self.feature_type == "hole":
+            if not isinstance(self.parameters, HoleParameters):
+                raise ValueError("hole feature requires hole parameters")
+            if self.profile_id is not None:
+                raise ValueError("hole feature does not use profile_id")
+        else:
+            if not isinstance(self.parameters, RevolveParameters):
+                raise ValueError("revolve feature requires revolve parameters")
+            if not self.profile_id:
+                raise ValueError("revolve feature requires profile_id")
         return self
 
 
