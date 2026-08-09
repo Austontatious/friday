@@ -487,6 +487,87 @@ test.describe("SketchMath workspace", () => {
     expect((await graphDownloadPromise).suggestedFilename()).toMatch(/\.stl$/);
   });
 
+  test("edits a full revolve axis with stable history and reload identity", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Rectangle" }).first().click();
+    await clickSvgViewBoxPoint(page, 300, 140);
+    await clickSvgViewBoxPoint(page, 420, 240);
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+
+    await clickWorkbenchButton(page, "Show Advanced Constraints");
+    for (const [index, x] of [280, 290].entries()) {
+      await page.getByRole("button", { name: "Select", exact: true }).click();
+      await dispatchCanvasViewBoxPoint(page, 500, 300);
+      await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Nothing");
+      await page.getByRole("button", { name: "Line" }).first().click();
+      await dispatchCanvasViewBoxPoint(page, x, 150);
+      await expect(page.getByTestId("sketchmath-canvas-helper")).toContainText("Click the line end point");
+      await dispatchCanvasViewBoxPoint(page, x, 230);
+      await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: 1 line");
+      await page.getByTestId("sketchmath-advanced-constraints").getByRole("button", { name: "Make construction" }).click();
+      await expect(page.locator('[data-entity-type="construction_line_2d"]')).toHaveCount(index + 1);
+    }
+
+    await page.locator('[data-entity-type="profile_2d"]').last().dispatchEvent("click");
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+    const panel = page.getByTestId("sketchmath-feature-history-panel");
+    const constructionAxisIds = await panel.getByLabel("Revolve axis").locator("option").evaluateAll((options) => (
+      options.map((option) => (option as HTMLOptionElement).value).filter(Boolean)
+    ));
+    expect(constructionAxisIds).toHaveLength(2);
+    expect(constructionAxisIds[0]).not.toBe(constructionAxisIds[1]);
+    await panel.getByLabel("Revolve axis").selectOption(constructionAxisIds[0]);
+    await panel.getByRole("button", { name: "Add full revolve" }).click();
+    await expect(panel).toContainText("Rebuild passed · 1 feature");
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+
+    type RevolveSnapshot = {
+      document: {
+        revision: number;
+        features: Array<{
+          feature_id: string;
+          feature_type: string;
+          parameters: { axis_entity_id: string; angle_deg: number };
+        }>;
+        last_rebuild: { records: Array<{ feature_id: string; output_signature: string }> };
+      };
+      feature_history_length: number;
+    };
+    const created = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as RevolveSnapshot;
+    const feature = created.document.features[0];
+    const featureId = feature.feature_id;
+    const initialSignature = created.document.last_rebuild.records[0].output_signature;
+    expect(feature).toMatchObject({
+      feature_type: "revolve",
+      parameters: { axis_entity_id: constructionAxisIds[0], angle_deg: 360 },
+    });
+
+    const editor = page.getByTestId(`sketchmath-existing-revolve-editor-${featureId}`);
+    await editor.getByLabel("Revolve axis Revolve 1").selectOption(constructionAxisIds[1]);
+    await expect(editor.getByLabel("Revolve axis Revolve 1")).toHaveValue(constructionAxisIds[1]);
+    await expect(editor.getByRole("button", { name: "Apply revolve" })).toBeEnabled();
+    await editor.getByRole("button", { name: "Apply revolve" }).click();
+    const replaced = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as RevolveSnapshot;
+    expect(replaced.document.features[0].feature_id).toBe(featureId);
+    expect(replaced.document.features[0].parameters.axis_entity_id).toBe(constructionAxisIds[1]);
+    expect(replaced.document.last_rebuild.records[0].output_signature).not.toBe(initialSignature);
+
+    await panel.getByRole("button", { name: "Undo feature" }).click();
+    await expect(editor.getByLabel("Revolve axis Revolve 1")).toHaveValue(constructionAxisIds[0]);
+    await panel.getByRole("button", { name: "Redo feature" }).click();
+    await expect(editor.getByLabel("Revolve axis Revolve 1")).toHaveValue(constructionAxisIds[1]);
+
+    await page.reload();
+    await expect(page.getByText("SketchMath").first()).toBeVisible();
+    const reloaded = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as RevolveSnapshot;
+    expect(reloaded.document.features[0].feature_id).toBe(featureId);
+    expect(reloaded.document.features[0].parameters.axis_entity_id).toBe(constructionAxisIds[1]);
+    expect(reloaded.document.last_rebuild.records[0].output_signature).toBe(replaced.document.last_rebuild.records[0].output_signature);
+    expect(reloaded.feature_history_length).toBe(2);
+    await expect(page.getByLabel("Revolve axis Revolve 1")).toHaveValue(constructionAxisIds[1]);
+  });
+
   test("selects semantic model-tree nodes and persists a feature rename", async ({ page }) => {
     await openSketchMath(page);
     const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
