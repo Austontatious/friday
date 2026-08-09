@@ -30,6 +30,7 @@ class CadAdapter:
     export_dir: str | Path | None = None
     timeout_seconds: float | None = None
     worker_script: str | Path | None = None
+    feature_worker_script: str | Path | None = None
 
     @classmethod
     def from_env(cls) -> "CadAdapter":
@@ -89,6 +90,19 @@ class CadAdapter:
         if not path.exists():
             raise CadAdapterUnavailableError(
                 "FreeCAD worker script is missing",
+                detail={"worker_script": str(path)},
+            )
+        return path
+
+    def _feature_worker_script(self) -> Path:
+        if self.feature_worker_script is not None:
+            path = Path(self.feature_worker_script)
+            if path.exists():
+                return path
+        path = _repo_root() / "sketchmath" / "cad" / "freecad_feature_graph.py"
+        if not path.exists():
+            raise CadAdapterUnavailableError(
+                "FreeCAD feature-graph worker script is missing",
                 detail={"worker_script": str(path)},
             )
         return path
@@ -193,6 +207,81 @@ class CadAdapter:
                 "profile_id": profile.id,
                 "extrusion_depth": depth,
                 "extrusion_depth_unit": depth_unit,
+            }
+        )
+        return result
+
+    def fillet_feature_graph(
+        self,
+        payload: dict[str, Any],
+        *,
+        selection_set_id: str,
+        command_id: str,
+    ) -> CadExportResult:
+        export_dir = self._resolve_export_dir(selection_set_id, command_id)
+        export_dir.mkdir(parents=True, exist_ok=True)
+        input_path = export_dir / "input.json"
+        worker_payload = {
+            **payload,
+            "selection_set_id": selection_set_id,
+            "command_id": command_id,
+            "output_format": "step",
+        }
+        input_path.write_text(json.dumps(worker_payload, indent=2, sort_keys=True), encoding="utf-8")
+
+        freecad_cmd = self._resolve_freecad_cmd()
+        worker_script = self._feature_worker_script()
+        env = dict(os.environ)
+        env.setdefault("QT_QPA_PLATFORM", "offscreen")
+        bootstrap_code = (
+            "import runpy, sys; "
+            f"sys.path.insert(0, {str(_repo_root())!r}); "
+            f"sys.argv = [{str(worker_script)!r}, '--input-json', {str(input_path)!r}, '--out-dir', {str(export_dir)!r}]; "
+            f"runpy.run_path({str(worker_script)!r}, run_name='__main__')"
+        )
+        completed = subprocess.run(
+            [str(freecad_cmd), "-c", bootstrap_code],
+            cwd=str(_repo_root()),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=self.timeout_seconds or SketchMathConfig.from_env().cad_timeout_seconds,
+            check=False,
+        )
+        if completed.returncode != 0:
+            partial_step = export_dir / "export.step"
+            if partial_step.exists() and partial_step.is_file():
+                partial_step.unlink()
+            raise CadExportError(
+                "FreeCAD feature-graph worker failed",
+                detail={
+                    "returncode": completed.returncode,
+                    "stderr": completed.stderr.strip(),
+                    "stdout": completed.stdout.strip(),
+                    "freecad_cmd": str(freecad_cmd),
+                    "worker_script": str(worker_script),
+                },
+            )
+
+        validation_path = export_dir / "validation.json"
+        if not validation_path.exists():
+            raise CadExportError(
+                "FreeCAD feature-graph worker did not produce validation output",
+                detail={"validation_json": str(validation_path)},
+            )
+        result = CadExportResult.model_validate_json(validation_path.read_text(encoding="utf-8"))
+        step_path = Path(result.artifacts.step_path) if result.artifacts else export_dir / "export.step"
+        step_stat = step_path.stat() if step_path.exists() else None
+        result.metadata.update(
+            {
+                "freecad_cmd": str(freecad_cmd),
+                "worker_script": str(worker_script),
+                "input_json": str(input_path),
+                "out_dir": str(export_dir),
+                "returncode": completed.returncode,
+                "artifact_filename": step_path.name,
+                "artifact_size_bytes": step_stat.st_size if step_stat else None,
+                "artifact_created_at": datetime.fromtimestamp(step_stat.st_mtime, timezone.utc).isoformat() if step_stat else None,
             }
         )
         return result

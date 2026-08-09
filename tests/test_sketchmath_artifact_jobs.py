@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
+
+import pytest
 
 from backend.sketchmath.artifact_jobs import SketchMathArtifactJobStore
 from backend.sketchmath.service import SketchMathSessionStore
@@ -130,3 +133,83 @@ def test_stale_artifact_result_fails_without_registration_and_retains_resumable_
     snapshot = session_store.snapshot(session_id, session_store.get_session(session_id))
     assert snapshot["document"]["revision"] == 2
     assert snapshot["document"]["artifacts"] == []
+
+
+def test_fillet_step_runs_through_resumable_job_and_registers_kernel_measurements(monkeypatch, tmp_path) -> None:
+    freecad_cmd = Path("/mnt/data/freecad/squashfs-root/usr/bin/freecadcmd")
+    if not freecad_cmd.exists():
+        pytest.skip("FreeCADCmd is unavailable")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_FREECAD_CMD", str(freecad_cmd))
+    session_store = SketchMathSessionStore(session_dir=tmp_path / "sessions")
+    selection = _selection()
+    selection["items"] = [
+        {
+            "id": "box",
+            "type": "profile_2d",
+            "vertices": [[0, 0], [20, 0], [20, 10], [0, 10], [0, 0]],
+            "area": 200,
+            "winding": "counterclockwise",
+        }
+    ]
+    session_id, _ = session_store.create_session({"selection_context": selection})
+    base_command = _feature_command()
+    base_command["parameters"]["feature"]["feature_id"] = "feature_box"
+    base_command["parameters"]["feature"]["profile_id"] = "box"
+    base_command["parameters"]["feature"]["parameters"] = {"depth_mm": 5, "operation": "new_body"}
+    base_response = session_store.run_feature_command(session_id, base_command, mode="commit")
+    edges = [
+        item
+        for item in base_response["document"]["last_rebuild"]["records"][0]["generated_topology"]
+        if item["role"] == "vertical_outer_edge"
+    ]
+    fillet_command = {
+        "version": "1.0",
+        "operation_id": "add_fillet",
+        "mode": "commit",
+        "base_revision": 1,
+        "operation_type": "add_feature",
+        "parameters": {
+            "feature": {
+                "feature_id": "feature_fillet",
+                "feature_type": "fillet",
+                "name": "Outer fillet",
+                "body_id": "body_main",
+                "sketch_id": "sketch_main",
+                "profile_id": None,
+                "dependencies": ["feature_box"],
+                "topology_references": [
+                    {
+                        "reference_id": edge["reference_id"],
+                        "owner_feature_id": "feature_box",
+                        "topology_type": "edge",
+                        "role": edge["role"],
+                        "source_entity_id": edge["source_entity_id"],
+                        "expected_signature": edge["geometric_signature"],
+                    }
+                    for edge in edges
+                ],
+                "parameters": {"radius_mm": 2, "operation": "modify"},
+            }
+        },
+    }
+    fillet_response = session_store.run_feature_command(session_id, fillet_command, mode="commit")
+    assert fillet_response["document"]["revision"] == 2
+    jobs = SketchMathArtifactJobStore(tmp_path / "jobs", output_root=tmp_path / "cad")
+
+    submitted = jobs.submit(
+        session_store,
+        session_id,
+        ArtifactBuildRequest(feature_id="feature_fillet", format="step", base_revision=2),
+        start=False,
+    )
+    completed = jobs.run(submitted.job_id, session_store)
+
+    expected_volume = 20 * 10 * 5 - 4 * (1 - math.pi / 4) * 2**2 * 5
+    assert completed.state == "DONE"
+    assert completed.result.artifact.format == "step"
+    assert Path(completed.result.artifact.path).exists()
+    assert completed.result.measurements["volume_mm3"] == pytest.approx(expected_volume, abs=1e-5)
+    assert completed.result.measurements["selected_edge_count"] == 4
+    assert (tmp_path / "jobs" / submitted.job_id / "materialize.done").exists()
+    assert (tmp_path / "jobs" / submitted.job_id / "register.done").exists()

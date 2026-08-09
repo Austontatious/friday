@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import math
+from pathlib import Path
+
 import pytest
 
+from sketchmath.cad.adapter import CadAdapter
 from sketchmath.cad.feature_artifact import materialize_feature_artifact
 from sketchmath.executor.errors import CadExportError
+from sketchmath.features.rebuild import rebuild_document
 from sketchmath.models.document import FeatureRecord, wrap_legacy_selection_context
 from sketchmath.models.entities import Profile2DEntity
 from sketchmath.models.selection_context import SelectionContext
@@ -93,3 +98,75 @@ def test_layered_stl_rejects_revolve_until_a_supported_mesher_exists(tmp_path) -
         )
 
     assert exc_info.value.detail["error_code"] == "unsupported_stl_feature_type"
+
+
+def test_canonical_fillet_step_resolves_semantic_edges_and_validates_kernel_solid(tmp_path) -> None:
+    profile = _profile("fillet_box", [(0, 0), (20, 0), (20, 10), (0, 10), (0, 0)], 200, "counterclockwise")
+    document = wrap_legacy_selection_context(
+        SelectionContext(selection_set_id="fillet_artifact", units="mm", items=[profile]),
+        document_id="doc_fillet_artifact",
+    )
+    base = FeatureRecord.model_validate(
+        {
+            "feature_id": "feature_base",
+            "feature_type": "extrude",
+            "name": "Base",
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": profile.id,
+            "parameters": {"depth_mm": 5, "operation": "new_body"},
+        }
+    )
+    base_report = rebuild_document(document.model_copy(update={"features": [base]}))
+    vertical_edges = [
+        item for item in base_report.records[0].generated_topology if item.role == "vertical_outer_edge"
+    ]
+    fillet = FeatureRecord.model_validate(
+        {
+            "feature_id": "feature_fillet",
+            "feature_type": "fillet",
+            "name": "Outer edge fillet",
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": None,
+            "dependencies": [base.feature_id],
+            "topology_references": [
+                {
+                    "reference_id": edge.reference_id,
+                    "owner_feature_id": base.feature_id,
+                    "topology_type": "edge",
+                    "role": edge.role,
+                    "source_entity_id": edge.source_entity_id,
+                    "expected_signature": edge.geometric_signature,
+                }
+                for edge in vertical_edges
+            ],
+            "parameters": {"radius_mm": 2, "operation": "modify"},
+        }
+    )
+    document = document.model_copy(update={"revision": 2, "features": [base, fillet]})
+    freecad_cmd = Path("/mnt/data/freecad/squashfs-root/usr/bin/freecadcmd")
+    if not freecad_cmd.exists():
+        pytest.skip("FreeCADCmd is unavailable")
+
+    artifact = materialize_feature_artifact(
+        document,
+        fillet.feature_id,
+        "step",
+        output_root=tmp_path / "artifacts",
+        cad_adapter=CadAdapter(freecad_cmd=freecad_cmd, export_dir=tmp_path / "kernel"),
+    )
+
+    expected_volume = 20 * 10 * 5 - 4 * (1 - math.pi / 4) * 2**2 * 5
+    assert Path(artifact["path"]).exists()
+    assert artifact["measurements"]["is_valid_solid"] is True
+    assert artifact["measurements"]["volume_mm3"] == pytest.approx(expected_volume, abs=1e-5)
+    assert artifact["measurements"]["bbox"] == pytest.approx(
+        {"xmin": 0, "xmax": 20, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 5}
+    )
+    assert artifact["measurements"]["selected_edge_count"] == 4
+    assert artifact["measurements"]["reference_policy"] == "semantic_endpoints_unique_match"
+    assert all(
+        item["match_basis"] == "unordered_endpoints_mm"
+        for item in artifact["measurements"]["semantic_edge_resolution"]
+    )

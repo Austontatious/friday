@@ -11,7 +11,7 @@ from sketchmath.cad.solid_validation import validate_solid_measurements
 from sketchmath.cad.stl_export import write_ascii_stl
 from sketchmath.executor.errors import CadExportError, FeatureRebuildError, MissingEntityError, UnsupportedCadFormatError
 from sketchmath.features.rebuild import rebuild_document
-from sketchmath.models.document import FeatureRecord, SketchMathDocument
+from sketchmath.models.document import ExtrudeParameters, FeatureBuildRecord, FeatureRecord, FilletParameters, SketchMathDocument
 from sketchmath.models.entities import Profile2DEntity
 
 
@@ -36,20 +36,105 @@ def _source_geometry(document: SketchMathDocument, feature: FeatureRecord) -> tu
     return profile, holes
 
 
-def _validated_feature(document: SketchMathDocument, feature_id: str) -> tuple[FeatureRecord, dict[str, Any]]:
+def _validated_feature(document: SketchMathDocument, feature_id: str) -> tuple[FeatureRecord, FeatureBuildRecord]:
     feature = next((item for item in document.features if item.feature_id == feature_id), None)
     if feature is None:
         raise MissingEntityError("Feature does not exist", detail={"feature_id": feature_id})
     report = rebuild_document(document)
     record = next((item for item in report.records if item.feature_id == feature_id), None)
-    if not report.ok or record is None or record.status != "succeeded" or record.measurements is None:
+    if not report.ok or record is None or record.status != "succeeded":
         raise FeatureRebuildError(
             "Feature must rebuild successfully before artifact generation",
             detail={"feature_id": feature_id, "rebuild": report.model_dump(mode="json")},
         )
     if feature.suppressed:
         raise CadExportError("Suppressed feature cannot produce an artifact", detail={"feature_id": feature_id})
-    return feature, record.measurements.model_dump(mode="json")
+    if record.measurements is None and feature.feature_type != "fillet":
+        raise FeatureRebuildError(
+            "Feature rebuild did not produce required analytic measurements",
+            detail={"feature_id": feature_id, "measurement_coverage": record.measurement_coverage},
+        )
+    return feature, record
+
+
+def _fillet_step_payload(document: SketchMathDocument, feature: FeatureRecord) -> dict[str, Any]:
+    if not isinstance(feature.parameters, FilletParameters) or len(feature.dependencies) != 1:
+        raise CadExportError(
+            "Canonical fillet STEP requires one target extrusion",
+            detail={"feature_id": feature.feature_id, "error_code": "unsupported_fillet_graph"},
+        )
+    terminal_index = document.features.index(feature)
+    later = [
+        item.feature_id
+        for item in document.features[terminal_index + 1 :]
+        if item.body_id == feature.body_id and not item.suppressed
+    ]
+    if later:
+        raise CadExportError(
+            "Canonical fillet STEP requires the fillet to be the terminal body feature",
+            detail={"feature_id": feature.feature_id, "later_feature_ids": later, "error_code": "artifact_feature_not_terminal"},
+        )
+    target = next((item for item in document.features if item.feature_id == feature.dependencies[0]), None)
+    if target is None or not isinstance(target.parameters, ExtrudeParameters):
+        raise CadExportError(
+            "Canonical fillet STEP currently requires an extrusion target",
+            detail={"feature_id": feature.feature_id, "error_code": "unsupported_fillet_target"},
+        )
+    if (
+        target.parameters.operation != "new_body"
+        or target.dependencies
+        or target.parameters.extent != "one_sided"
+        or target.parameters.direction != "positive"
+    ):
+        raise CadExportError(
+            "Canonical fillet STEP currently requires an independent positive one-sided base extrusion",
+            detail={"feature_id": feature.feature_id, "target_feature_id": target.feature_id, "error_code": "unsupported_fillet_graph"},
+        )
+    body_features = [
+        item
+        for item in document.features[: terminal_index + 1]
+        if item.body_id == feature.body_id and not item.suppressed
+    ]
+    if [item.feature_id for item in body_features] != [target.feature_id, feature.feature_id]:
+        raise CadExportError(
+            "Canonical fillet STEP currently supports exactly one base extrusion followed by one fillet",
+            detail={"feature_ids": [item.feature_id for item in body_features], "error_code": "unsupported_fillet_graph"},
+        )
+    report = rebuild_document(document)
+    target_record = next(item for item in report.records if item.feature_id == target.feature_id)
+    fillet_record = next(item for item in report.records if item.feature_id == feature.feature_id)
+    edge_payloads: list[dict[str, Any]] = []
+    for resolved in fillet_record.resolved_references:
+        edge = next(
+            item for item in target_record.generated_topology if item.reference_id == resolved.resolved_reference_id
+        )
+        values = edge.measurements
+        edge_payloads.append(
+            {
+                "reference_id": edge.reference_id,
+                "source_entity_id": edge.source_entity_id,
+                "geometric_signature": edge.geometric_signature,
+                "endpoints": [
+                    [values["x_mm"], values["y_mm"], values["z_min_mm"]],
+                    [values["x_mm"], values["y_mm"], values["z_max_mm"]],
+                ],
+            }
+        )
+    profile, holes = _source_geometry(document, target)
+    return {
+        "feature_type": "fillet",
+        "base_extrusion": {
+            "feature_id": target.feature_id,
+            "profile": profile.model_dump(mode="json"),
+            "holes": [hole.model_dump(mode="json") for hole in holes],
+            "depth_mm": target.parameters.depth_mm,
+        },
+        "fillet": {
+            "feature_id": feature.feature_id,
+            "radius_mm": feature.parameters.radius_mm,
+            "edges": edge_payloads,
+        },
+    }
 
 
 def _content_hash(path: Path) -> str:
@@ -119,12 +204,26 @@ def materialize_feature_artifact(
             }
         )
     else:
-        if feature.feature_type != "extrude":
+        if feature.feature_type == "fillet":
+            adapter = cad_adapter or CadAdapter(export_dir=feature_root)
+            result = adapter.fillet_feature_graph(
+                _fillet_step_payload(document, feature),
+                selection_set_id=_safe_segment(document.document_id),
+                command_id=f"feature_{_safe_segment(feature.feature_id)}_r{document.revision}",
+            )
+            if result.artifacts is None:
+                raise CadExportError("STEP worker did not return an artifact path", detail={"feature_id": feature_id})
+            path = Path(result.artifacts.step_path).resolve()
+            measurements = {
+                **(result.measurements.model_dump(mode="json") if result.measurements is not None else {}),
+                **result.metadata,
+            }
+        elif feature.feature_type != "extrude":
             raise CadExportError(
                 "Canonical STEP materialization currently supports extrusion features",
                 detail={"feature_id": feature_id, "feature_type": feature.feature_type, "error_code": "unsupported_artifact_feature_type"},
             )
-        if feature.parameters.operation != "new_body" or feature.dependencies:
+        elif feature.parameters.operation != "new_body" or feature.dependencies:
             raise CadExportError(
                 "Canonical STEP materialization currently requires one independent new-body extrusion",
                 detail={
@@ -134,7 +233,7 @@ def materialize_feature_artifact(
                     "error_code": "unsupported_feature_graph_for_artifact",
                 },
             )
-        if feature.parameters.extent != "one_sided" or feature.parameters.direction != "positive":
+        elif feature.parameters.extent != "one_sided" or feature.parameters.direction != "positive":
             raise CadExportError(
                 "Canonical STEP materialization currently supports positive one-sided extrusion",
                 detail={
@@ -144,25 +243,26 @@ def materialize_feature_artifact(
                     "error_code": "unsupported_extrusion_extent_for_artifact",
                 },
             )
-        profile, holes = _source_geometry(document, feature)
-        adapter = cad_adapter or CadAdapter(export_dir=feature_root)
-        result = adapter.extrude_profile(
-            profile,
-            holes=holes,
-            depth=feature.parameters.depth_mm,
-            depth_unit=document.units,
-            direction="positive_normal",
-            output_format="step",
-            selection_set_id=_safe_segment(document.document_id),
-            command_id=f"feature_{_safe_segment(feature.feature_id)}_r{document.revision}",
-        )
-        if result.artifacts is None:
-            raise CadExportError("STEP worker did not return an artifact path", detail={"feature_id": feature_id})
-        path = Path(result.artifacts.step_path).resolve()
-        measurements = {
-            **(result.measurements.model_dump(mode="json") if result.measurements is not None else {}),
-            **result.metadata,
-        }
+        else:
+            profile, holes = _source_geometry(document, feature)
+            adapter = cad_adapter or CadAdapter(export_dir=feature_root)
+            result = adapter.extrude_profile(
+                profile,
+                holes=holes,
+                depth=feature.parameters.depth_mm,
+                depth_unit=document.units,
+                direction="positive_normal",
+                output_format="step",
+                selection_set_id=_safe_segment(document.document_id),
+                command_id=f"feature_{_safe_segment(feature.feature_id)}_r{document.revision}",
+            )
+            if result.artifacts is None:
+                raise CadExportError("STEP worker did not return an artifact path", detail={"feature_id": feature_id})
+            path = Path(result.artifacts.step_path).resolve()
+            measurements = {
+                **(result.measurements.model_dump(mode="json") if result.measurements is not None else {}),
+                **result.metadata,
+            }
 
     return {
         "path": str(path.resolve()),
