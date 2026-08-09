@@ -810,6 +810,33 @@ def test_sketchmath_hole_features_default_off_and_gate_feature_route(monkeypatch
     client.close()
 
 
+def test_sketchmath_revolve_features_default_off_and_gate_feature_route(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.delenv("FRIDAY_SKETCHMATH_REVOLVE_FEATURES_ENABLED", raising=False)
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={})
+    revolve = {
+        "feature_id": "feature_gated_revolve",
+        "feature_type": "revolve",
+        "name": "Gated revolve",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": "profile_missing",
+        "parameters": {"axis_entity_id": "axis_missing", "angle_deg": 360, "operation": "new_body"},
+    }
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{created.json()['session_id']}/features/preview",
+        json={"command": _feature_command("add_feature", "gated_revolve", 0, feature=revolve)},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "sketchmath_revolve_features_disabled"
+    client.close()
+
+
 def test_sketchmath_artifact_job_build_poll_register_download_and_replay(monkeypatch, tmp_path):
     monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
     monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
@@ -1061,6 +1088,47 @@ def test_sketchmath_typed_hole_feature_recovers_top_face_after_base_edit_and_rel
     assert reloaded.status_code == 200
     assert [feature["feature_type"] for feature in reloaded.json()["document"]["features"]] == ["extrude", "hole"]
     assert reloaded.json()["document"]["revision"] == 3
+    client.close()
+
+
+def test_sketchmath_full_revolve_commits_with_explicit_axis_and_reloads(monkeypatch, tmp_path):
+    from backend.sketchmath.service import SESSION_STORE
+
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_REVOLVE_FEATURES_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    selection = _profile_selection_context()
+    selection["items"].append(
+        {"id": "axis_y", "type": "axis_2d", "origin": [0, 0], "direction": [0, 1]}
+    )
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": selection})
+    session_id = created.json()["session_id"]
+    revolve = {
+        "feature_id": "feature_revolve",
+        "feature_type": "revolve",
+        "name": "Full revolve",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": "profile_box",
+        "parameters": {"axis_entity_id": "axis_y", "angle_deg": 360, "operation": "new_body"},
+    }
+
+    committed = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={"command": _feature_command("add_feature", "add_revolve", 0, feature=revolve, mode="commit")},
+    )
+
+    assert committed.status_code == 200, committed.text
+    record = committed.json()["document"]["last_rebuild"]["records"][0]
+    assert record["measurements"]["volume_delta_mm3"] == pytest.approx(4000 * math.pi)
+    assert record["measurements"]["bounds_mm"] == pytest.approx([-20, 20, 0, 10, -20, 20])
+    assert record["generated_topology"][0]["role"] == "revolved_outer_face"
+    SESSION_STORE._sessions.pop(session_id, None)
+    reloaded = client.get(f"/api/sketchmath/sessions/{session_id}")
+    assert reloaded.status_code == 200
+    assert reloaded.json()["document"]["features"][0]["parameters"]["axis_entity_id"] == "axis_y"
     client.close()
 
 
