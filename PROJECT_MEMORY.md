@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-08-09 - SketchMath Semantic Holes, Resumable Artifacts, and Golden STL
+
+### What Changed
+- Added generated semantic face/edge topology for extrusions and typed holes, source/role/signature selectors, exact/recovered resolution, and atomic refusal for missing or ambiguous downstream references. Add/cut extrusions now require a semantic top/bottom attachment, use the resolved face Z, and reject one-sided directions away from the target.
+- Added typed simple/counterbore/countersink and through/blind hole features with finite conditional validation, cumulative target-depth semantics, target-material/edge-breakout checks, deterministic volume/bounds, generated topology, persistence, and upstream-edit recovery.
+- Added default-off persistent artifact jobs with deterministic IDs, READY/RUNNING/DONE/FAILED manifests, resumable `.done` steps, idempotent replay, revision revalidation, structured failure, STL download, and guarded polling/retry UI.
+- Added deterministic layered STL for supported vertical extrusion/simple-hole graphs, analytic-versus-mesh measurements, edge-incidence closure validation, and safe revisioned paths. Added the seven-feature golden mounting plate with four edge-offset holes, raised boss, cumulative boss through-hole, width-edit recovery, serialization, and watertight STL evidence.
+
+### Why
+- Feature breadth is unsafe without stable downstream references and physically placed feature attachments.
+- Export can exceed the request budget and must not register stale results or repeat completed work after interruption.
+- A checked-in golden part provides geometric evidence beyond a clean but underfit single extrusion.
+
+### New Env Flags
+- `FRIDAY_SKETCHMATH_HOLE_FEATURES_ENABLED=0` gates backend hole feature creation.
+- `REACT_APP_SKETCHMATH_HOLE_FEATURES_ENABLED=0` exposes the simple through/blind hole editor.
+- `FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED=0` enables backend artifact jobs.
+- `REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED=0` exposes artifact build/poll/retry/download UI.
+- `FRIDAY_SKETCHMATH_ARTIFACT_JOB_DIR=artifacts/sketchmath/jobs` sets the persistent job root.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py tests/test_sketchmath_api.py tests/test_sketchmath_feature_artifact.py tests/test_sketchmath_artifact_jobs.py tests/test_sketchmath_stl_export.py tests/test_sketchmath_golden_mounting_plate.py` — 53 focused tests.
+- `python3 -m sketchmath.schemas.generate --check` — generated schemas match.
+- `cd frontend && npx tsc --noEmit && CI=true npm test -- --runInBand --watchAll=false` — TypeScript and all 66 frontend tests pass.
+- `cd frontend && npx playwright test e2e/sketchmath.spec.ts --grep "commits revisioned extrusion history"` — live create/edit/undo/redo/reload, hole recovery, async terminal STL, and download pass.
+- `docker compose -f docker-compose.app.yml config --quiet` — capability plumbing validates.
+
+### Checkpoints and Remaining Work
+- Code checkpoints: `987cfd1`, `ee40940`, `718ee6b`, `0ef759c`, `9860570`, `217e741`, `b88b1be`, `f0c2f49`, `cc08509`, `99e2322`, `a3d705c`, `0979dfe`.
+- Revolve, fillet/chamfer/shell/pattern families, browser counterbore/countersink editing, live graph viewport, full-graph STEP, multi-sketch/model tree, job cancellation/TTL/quota, and multi-worker coordination remain open. The golden plate intentionally does not claim final acceptance scenario 1 because fillets, AI construction, and full-graph STEP are absent.
+
+---
+
 ## 2026-08-09 - SketchMath Canonical Feature History and Deterministic Rebuild
 
 ### What Changed

@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `326e813` (general topology evidence: `docs/sketchmath/general_topology_contract.md`)
+Last validated SketchMath code milestone: `0979dfe` (terminal feature-graph STL; evidence: `artifact_job_contract.md` and `golden_mounting_plate_v1.md`)
 
 ## Mission
 
@@ -106,7 +106,7 @@ Phase 2 status: passed for the documented v0.9 regular-line, circle, and finite-
 - `SM-REF-001`: downstream references use semantic source/signature/recovery data rather than permanent raw kernel indices.
 - `SM-REF-002`: upstream edits either preserve references correctly or fail explicitly and repairably.
 
-Phase 3 status: `SM-FEAT-001` is passed for the default-off v1 single-sketch extrusion/rebuild envelope at `f1431ec`, `b1e5ac4`, and `df1363c`. Canonical revisions, dependencies, deterministic rebuild reports, persisted feature undo/redo, and property editing are live without replaying FreeCAD side effects. `SM-FEAT-002` is partial: new-body/add/cut and extent semantics are modeled and tested, but broad kernel-backed solid reconstruction and the remaining feature families are not complete. See `feature_history_contract.md`.
+Phase 3 status: `SM-FEAT-001` is passed for the default-off v1 single-sketch extrusion/hole envelope. `SM-FEAT-002` remains partial but now includes semantic top/bottom attachment and physically placed add/cut bounds. `SM-FEAT-004` is partial: simple/counterbore/countersink and through/blind semantics rebuild deterministically, while the browser exposes simple through/blind and layered STL supports simple holes. `SM-REF-001/002` pass for generated extrusion/hole source-role-signature references, exact/recovered state, and explicit missing/ambiguous failure; kernel-index reconciliation and viewport picking remain open. See `feature_history_contract.md`.
 
 ## Workspace and Document Requirements
 
@@ -143,6 +143,8 @@ The normative full-product scenarios are:
 3. AI edits to an existing manual model that preserve parametric intent and can be undone.
 
 Detailed scenario traceability and current evidence live in `docs/sketchmath/traceability.md`.
+
+Acceptance scenario 1 is partially represented by `golden_mounting_plate_v1.md`: four edge-offset holes, a raised boss, a cumulative through-hole, upstream width recovery, reload-safe identities, and watertight STL validation pass. Fillets, AI construction, full-graph STEP, manual hole editing of the golden instance, and the complete scenario-level undo/reload sequence remain open, so this is not a release verdict.
 
 ## Phase Gates
 

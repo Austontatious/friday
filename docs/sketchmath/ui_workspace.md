@@ -87,7 +87,10 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Add center hole commits a centered typed `add_profile_hole` command. Add Hole enters placement mode; `Add Centered Hole` or a click inside the selected profile commits the same command shape with the chosen center.
 - Existing holes can be selected on canvas. The workflow panel exposes diameter/center controls that commit a typed `update_profile_hole` command and immediately refresh the committed session state.
 - The default-off Feature history panel consumes the backend `SketchMathDocument` directly. It shows the monotonic revision, deterministic rebuild status/signature/measurements, creates an extrusion from the selected profile, replaces depth without changing feature identity, and exposes dedicated feature undo/redo.
-- Feature history requires `FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED=1` and `REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED=1`. It does not invoke the legacy `extrude_profile` FreeCAD export path; STEP export remains an explicit separate workflow.
+- Add extrusions attach to the most recent supported extrusion top face by semantic reference. The browser refuses creation when that attachment is unavailable rather than inventing a raw face index.
+- With `FRIDAY_SKETCHMATH_HOLE_FEATURES_ENABLED=1` and `REACT_APP_SKETCHMATH_HOLE_FEATURES_ENABLED=1`, each built extrusion exposes numeric X/Y/diameter placement for simple through or blind holes. The request records the current semantic top face; typed counterbore/countersink exists at the API/model layer but is not exposed by this editor.
+- With `FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED=1` and `REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED=1`, the terminal supported body feature exposes Build STL. The panel displays READY/RUNNING/DONE/FAILED, step, input revision, retry, and Download STL; reload recovers the registered artifact from the document.
+- Feature history requires `FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED=1` and `REACT_APP_SKETCHMATH_FEATURE_HISTORY_ENABLED=1`. Canonical commits never invoke the legacy synchronous FreeCAD path. Revision-bound STL jobs are separate, while legacy STEP remains an explicit workflow.
 - Selected rectangles show width/height dimension labels on canvas. Selected holes show a diameter label on canvas.
 - Profile and hole selection use friendly labels in the default UI. Raw entity IDs remain available only under Advanced / Debug.
 - Circle is a first-class selectable entity with direct drawing, driving radius/diameter editing, an extrusion profile adapter, exact center/radius DOF analysis, and optional reuse as a profile hole.
@@ -123,6 +126,13 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - The export card states that the 3D solid preview uses the same profile, holes, and extrusion depth as the STEP export.
 - Failed FreeCAD subprocess exports remove a partial `export.step` if one exists. Broader generated STEP cleanup is manual for this MVP; generated artifacts are runtime output and should not be committed.
 
+## Revisioned STL Export
+
+- Build STL submits a persistent asynchronous request for the selected terminal feature and current document revision.
+- The current layered materializer supports vertical extrusion graphs and simple typed holes. It validates analytic bounds/volume, closed edges, safe paths, and content hash before registration.
+- STL files are downloaded through `GET /api/sketchmath/artifacts/stl?path=...`, restricted to `.stl` below the configured CAD export root.
+- Counterbore/countersink STL, full-graph STEP, cancellation, and automatic artifact cleanup remain outside this UI envelope. See `artifact_job_contract.md`.
+
 ## Runtime Dependencies
 
 - The backend runtime must include `shapely>=2.0.0` for profile-hole validation and general planar-region extraction. Missing Shapely is surfaced in the UI as a dependency/configuration message, with the raw backend payload only available under Advanced / Debug.
@@ -140,7 +150,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 ## Non-Goals
 
 - No FreeCAD GUI or broad CAD kernel wrapper.
-- No STEP viewer or full 3D CAD workbench in the browser. The browser preview is a deterministic mesh for the current rectangle/profile/hole extrusion MVP only.
+- No STEP viewer or full 3D CAD workbench in the browser. The interactive preview remains the legacy extrusion mesh; revisioned layered STL is a downloadable artifact, not yet the live viewport model.
 - No MCP wrapper.
 - No arbitrary Python execution.
 - No direct geometry mutation from React state.

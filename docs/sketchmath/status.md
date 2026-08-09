@@ -2,14 +2,14 @@
 
 Updated: 2026-08-09
 
-Current phase: Phase 3 — canonical feature history and rebuild
+Current phase: Phase 3/4/6 bounded vertical-feature slice — feature history, semantic references, and revisioned artifacts
 
-Gate: `SM-FEAT-001` passed for the documented default-off v1 single-sketch extrusion/rebuild envelope; broader feature modeling remains open
+Gate: `SM-FEAT-001` and the generated extrusion/hole reference subset pass; `SM-FEAT-002/004`, `SM-ART-001`, and golden-part evidence pass only for the documented envelope
 
 ## Baseline
 
 - Audited checkout: `21b8153`
-- Latest SketchMath product code commit: `df1363c`
+- Latest SketchMath product code commit: `0979dfe`
 - Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
@@ -81,6 +81,16 @@ On 2026-08-09 for model/rebuild checkpoint `f1431ec`, persistence/API checkpoint
 - TypeScript and the production frontend build passed; the build reports only the existing stale Browserslist database notice.
 - The targeted live Playwright workflow passed with no console/page errors and proved create, property edit, signature change, stable ID, monotonic feature undo/redo, disk reload, and history persistence.
 
+## Current Semantic Feature, Artifact, and Golden Validation
+
+On 2026-08-09 for semantic holes `f0c2f49`/`cc08509`, semantic attachments `99e2322`, layered golden STL `a3d705c`, and terminal graph UX `0979dfe`:
+
+- 53 focused feature/API/artifact/golden Python tests cover typed hole styles and terminations, stable/recovered topology references, boolean face attachment, wrong-direction/edge-breakout/depth refusal, persistent job state, stale-result rejection, deterministic STL, golden serialization, and geometric validation.
+- Generated schemas match the canonical Pydantic models; TypeScript and all 66 frontend tests pass.
+- The targeted Playwright workflow passes create/edit/undo/redo/reload, typed hole creation, upstream reference recovery, two asynchronous revision-bound STL jobs, reload persistence, and browser downloads.
+- The seven-feature golden mounting plate matches bounds `(0,100,0,60,0,13)`, analytic volume `51000−613π mm³`, five through holes, stable serialization, upstream-width recovery, deterministic STL content, and zero non-manifold edges.
+- Compose validates with every new capability default off outside the dedicated acceptance harness.
+
 ## Active Phase 1 Slice
 
 - ADRs 004-006 define the canonical document migration, solver/licensing, and async execution boundaries.
@@ -119,8 +129,10 @@ On 2026-08-09 for model/rebuild checkpoint `f1431ec`, persistence/API checkpoint
 - Revision-checked add/replace/delete/suppress operations persist independently from sketch-command history; feature undo/redo assigns new monotonic revisions.
 - Pure rebuild topologically orders dependencies, detects missing references/cycles, propagates blocked status, validates source profiles/holes/region identity, and emits deterministic hashes, signatures, bounds, net area, signed volume, and structured errors.
 - Typed extrusion parameters cover new-body/add/cut, positive/negative direction, symmetric, and one-/two-sided measurement semantics. Broad kernel-backed feature reconstruction is not claimed.
-- The guarded React panel creates extrusion features from the selected profile, edits depth with stable identity, reports rebuild evidence, and exposes dedicated feature undo/redo.
-- Legacy FreeCAD `extrude_profile` preview/export remains separate; canonical feature commits never replay external CAD work. See `feature_history_contract.md`.
+- Add/cut extrusions attach through semantic top/bottom references and are placed at the resolved face Z; missing attachments and one-sided directions away from the target fail structurally.
+- Typed holes cover simple/counterbore/countersink and through/blind analytic semantics. The guarded React panel exposes simple through/blind placement, extrusion depth editing, rebuild/reference evidence, and dedicated feature undo/redo.
+- Revision-bound artifact jobs persist READY/RUNNING/DONE/FAILED manifests and resumable step markers. Supported terminal vertical extrusion/simple-hole graphs produce validated layered STL; stale results never register.
+- Legacy FreeCAD `extrude_profile` preview/export remains separate; canonical feature commits never replay external CAD work. See `feature_history_contract.md`, `artifact_job_contract.md`, and `golden_mounting_plate_v1.md`.
 
 ## Gate A Outcome
 
@@ -141,10 +153,11 @@ Completed and published:
 - Production solve covers the documented point/circle/arc residual subset. Coordinate-only legacy lines and future geometry/constraint families remain partial/unknown.
 - Split/trim/extend intentionally reject profile- or constraint-referenced targets; automatic topology repair is not implemented.
 - Circle and finite-arc topology uses a deterministic 2-degree piecewise-linear approximation; exact analytic curved-region area is not claimed.
-- Canonical document v1 and deterministic extrusion history exist, but the compatibility session path is still single-sketch and the rebuild does not yet materialize kernel solids.
-- Multi-sketch, a full model tree, broad feature property editing, and stable face/edge references are not implemented.
+- Canonical document v1 remains a single-sketch, single-worker compatibility path; multi-sketch and a full model tree are not implemented.
+- Generated extrusion/hole semantic face/edge references are stable and recoverable, but browser face/edge picking and raw kernel-topology reconciliation are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
-- STEP lifecycle is only partially managed; STL is not implemented.
+- Layered STL supports vertical extrusion/simple-hole graphs. Counterbore/countersink STL, revolve/fillet/chamfer/shell/pattern features, and full-graph STEP remain open.
+- Artifact cancellation, automatic TTL/quota cleanup, and worker-process isolation are not implemented.
 - 3D camera mechanics pass automation, but CAD-like pan/tilt feel requires explicit manual acceptance.
 - AI translation covers a small command subset and does not yet plan over a canonical feature model.
 
@@ -160,7 +173,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Broaden canonical feature operations and add semantic solid references before artifact lifecycle and golden-part release evidence.
+Implement revolve next, then fillet/chamfer or a deliberately bounded alternative; expand browser property/model-tree behavior and full-graph STEP without weakening the current semantic-reference and artifact gates.
 
 ## Release Status
 
