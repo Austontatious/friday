@@ -125,6 +125,19 @@ class FilletParameters(BaseModel):
         return self
 
 
+class ChamferParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    distance_mm: float = Field(gt=0)
+    operation: Literal["modify"] = "modify"
+
+    @model_validator(mode="after")
+    def validate_chamfer_parameters(self) -> "ChamferParameters":
+        if not math.isfinite(self.distance_mm):
+            raise ValueError("chamfer distance must be finite")
+        return self
+
+
 class TopologyReferenceSelector(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -167,7 +180,7 @@ class FeatureRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     feature_id: str
-    feature_type: Literal["extrude", "hole", "revolve", "fillet"] = "extrude"
+    feature_type: Literal["extrude", "hole", "revolve", "fillet", "chamfer"] = "extrude"
     name: str
     body_id: str
     sketch_id: str
@@ -175,7 +188,7 @@ class FeatureRecord(BaseModel):
     source_region_id: str | None = None
     dependencies: list[str] = Field(default_factory=list)
     topology_references: list[TopologyReferenceSelector] = Field(default_factory=list)
-    parameters: ExtrudeParameters | HoleParameters | RevolveParameters | FilletParameters
+    parameters: ExtrudeParameters | HoleParameters | RevolveParameters | FilletParameters | ChamferParameters
     suppressed: bool = False
 
     @model_validator(mode="after")
@@ -195,11 +208,16 @@ class FeatureRecord(BaseModel):
                 raise ValueError("revolve feature requires revolve parameters")
             if not self.profile_id:
                 raise ValueError("revolve feature requires profile_id")
-        else:
+        elif self.feature_type == "fillet":
             if not isinstance(self.parameters, FilletParameters):
                 raise ValueError("fillet feature requires fillet parameters")
             if self.profile_id is not None:
                 raise ValueError("fillet feature does not use profile_id")
+        else:
+            if not isinstance(self.parameters, ChamferParameters):
+                raise ValueError("chamfer feature requires chamfer parameters")
+            if self.profile_id is not None:
+                raise ValueError("chamfer feature does not use profile_id")
         return self
 
 

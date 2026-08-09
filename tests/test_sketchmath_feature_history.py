@@ -247,6 +247,24 @@ def _fillet_feature(
     )
 
 
+def _chamfer_feature(
+    feature_id: str,
+    target: FeatureRecord,
+    edge_references: list,
+    *,
+    distance: float = 2,
+) -> FeatureRecord:
+    fillet = _fillet_feature(feature_id, target, edge_references, radius=distance)
+    payload = fillet.model_dump(mode="json")
+    payload.update(
+        {
+            "feature_type": "chamfer",
+            "parameters": {"distance_mm": distance, "operation": "modify"},
+        }
+    )
+    return FeatureRecord.model_validate(payload)
+
+
 def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch() -> None:
     document = _document()
 
@@ -464,6 +482,25 @@ def test_fillet_rejects_non_vertical_edge_and_excess_radius() -> None:
 
     assert wrong_edge.records[1].error.code == "unsupported_fillet_edge"
     assert excess_radius.records[1].error.code == "fillet_radius_exceeds_adjacent_edges"
+
+
+def test_chamfer_reuses_semantic_edge_contract_and_defers_measurements_to_kernel() -> None:
+    base = _feature("feature_base")
+    base_report = rebuild_document(_document().model_copy(update={"features": [base]}))
+    vertical_edges = [item for item in base_report.records[0].generated_topology if item.role == "vertical_outer_edge"]
+    chamfer = _chamfer_feature("feature_chamfer", base, vertical_edges, distance=2)
+
+    report = rebuild_document(_document().model_copy(update={"features": [base, chamfer]}))
+    too_large = rebuild_document(
+        _document().model_copy(update={"features": [base, _chamfer_feature("feature_large", base, vertical_edges[:1], distance=5)]})
+    )
+
+    assert report.ok is True
+    assert report.records[1].measurement_coverage == "kernel_required"
+    assert report.records[1].measurements is None
+    assert {item.role for item in report.records[1].generated_topology} == {"chamfer_surface"}
+    assert len(report.records[1].resolved_references) == 4
+    assert too_large.records[1].error.code == "chamfer_distance_exceeds_adjacent_edges"
 
 
 def test_revolve_add_and_cut_require_semantic_target_faces() -> None:

@@ -344,6 +344,27 @@
       "title": "BodyRecord",
       "type": "object"
     },
+    "ChamferParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "distance_mm": {
+          "exclusiveMinimum": 0,
+          "title": "Distance Mm",
+          "type": "number"
+        },
+        "operation": {
+          "const": "modify",
+          "default": "modify",
+          "title": "Operation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "distance_mm"
+      ],
+      "title": "ChamferParameters",
+      "type": "object"
+    },
     "Circle2DEntity": {
       "additionalProperties": false,
       "properties": {
@@ -1272,7 +1293,8 @@
             "extrude",
             "hole",
             "revolve",
-            "fillet"
+            "fillet",
+            "chamfer"
           ],
           "title": "Feature Type",
           "type": "string"
@@ -1294,6 +1316,9 @@
             },
             {
               "$ref": "#/$defs/FilletParameters"
+            },
+            {
+              "$ref": "#/$defs/ChamferParameters"
             }
           ],
           "title": "Parameters"
