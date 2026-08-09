@@ -185,8 +185,10 @@ class CompanionConfig:
 class SketchMathConfig:
     enabled: bool
     document_v1_enabled: bool
+    artifact_jobs_enabled: bool
     session_dir: str
     cad_export_dir: str
+    artifact_job_dir: str
     freecad_cmd: str
     cad_timeout_seconds: float
 
@@ -200,11 +202,17 @@ class SketchMathConfig:
             "FRIDAY_SKETCHMATH_CAD_EXPORT_DIR",
             default=str(Path("artifacts") / "sketchmath" / "cad"),
         )
+        artifact_job_dir = _env_str(
+            "FRIDAY_SKETCHMATH_ARTIFACT_JOB_DIR",
+            default=str(Path("artifacts") / "sketchmath" / "jobs"),
+        )
         return cls(
             enabled=_env_bool("FRIDAY_SKETCHMATH_ENABLED", default=False),
             document_v1_enabled=_env_bool("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", default=False),
+            artifact_jobs_enabled=_env_bool("FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED", default=False),
             session_dir=session_dir,
             cad_export_dir=cad_export_dir,
+            artifact_job_dir=artifact_job_dir,
             freecad_cmd=_env_str("FRIDAY_SKETCHMATH_FREECAD_CMD", default=""),
             cad_timeout_seconds=_env_float("FRIDAY_SKETCHMATH_CAD_TIMEOUT_SECONDS", default=60.0),
         )

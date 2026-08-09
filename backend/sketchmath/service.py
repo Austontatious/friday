@@ -32,7 +32,7 @@ from sketchmath.executor.errors import (
 )
 from sketchmath.features.executor import apply_feature_command
 from sketchmath.features.rebuild import rebuild_document
-from sketchmath.models.document import SketchMathDocument, SketchRecord, wrap_legacy_selection_context
+from sketchmath.models.document import ArtifactRecord, SketchMathDocument, SketchRecord, wrap_legacy_selection_context
 from sketchmath.models.feature_command import FeatureCommand
 from sketchmath.models.geometry_command import GeometryCommand
 from sketchmath.models.operation_result import OperationResult
@@ -519,6 +519,50 @@ class SketchMathSessionStore:
                 **self._build_snapshot(session_id, stored),
                 "result": result.model_dump(mode="json"),
             }
+
+    def artifact_build_snapshot(self, session_id: str, *, feature_id: str, base_revision: int) -> SketchMathDocument:
+        stored = self._get_stored(session_id)
+        with self._session_lock(session_id):
+            document = stored.document
+            if document is None:
+                raise CommandValidationError("SketchMath document v1 is not enabled for this session")
+            if document.revision != base_revision:
+                raise RevisionConflictError(
+                    "Artifact request targets a stale document revision",
+                    detail={
+                        "document_id": document.document_id,
+                        "feature_id": feature_id,
+                        "base_revision": base_revision,
+                        "current_revision": document.revision,
+                    },
+                )
+            if not any(feature.feature_id == feature_id for feature in document.features):
+                raise MissingEntityError("Feature does not exist", detail={"feature_id": feature_id})
+            return document.model_copy(deep=True)
+
+    def register_artifact(self, session_id: str, artifact: ArtifactRecord, *, input_revision: int) -> dict[str, Any]:
+        stored = self._get_stored(session_id)
+        with self._session_lock(session_id):
+            document = stored.document
+            if document is None:
+                raise CommandValidationError("SketchMath document v1 is not enabled for this session")
+            if document.revision != input_revision:
+                raise RevisionConflictError(
+                    "Artifact result is stale and cannot be registered",
+                    detail={
+                        "document_id": document.document_id,
+                        "artifact_id": artifact.artifact_id,
+                        "input_revision": input_revision,
+                        "current_revision": document.revision,
+                    },
+                )
+            candidate = document.model_copy(deep=True)
+            candidate.artifacts = [item for item in candidate.artifacts if item.artifact_id != artifact.artifact_id]
+            candidate.artifacts.append(artifact.model_copy(deep=True))
+            stored.document = candidate
+            stored.metadata["updated_at"] = _now_iso()
+            self._save(session_id, stored)
+            return self._build_snapshot(session_id, stored)
 
     def run_entity(self, session_id: str, entity_payload: dict[str, Any], *, mode: str = "commit") -> dict[str, Any]:
         command = _command_from_entity(entity_payload, command_id=f"{session_id}_{entity_payload.get('id', 'entity')}", mode=mode)

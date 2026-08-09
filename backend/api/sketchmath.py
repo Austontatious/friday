@@ -5,10 +5,13 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
+from pydantic import ValidationError
 
 from core.config import SketchMathConfig
+from backend.sketchmath.artifact_jobs import ARTIFACT_JOB_STORE
 from backend.sketchmath.service import SESSION_STORE, SketchMathSessionStore, _error_status
 from sketchmath.executor.errors import SketchMathError
+from sketchmath.models.artifact_job import ArtifactBuildRequest
 from sketchmath.models.selection_context import SelectionContext
 
 router = APIRouter(tags=["sketchmath"])
@@ -66,6 +69,19 @@ def _require_document_v1() -> None:
         )
 
 
+def _require_artifact_jobs() -> None:
+    if not SketchMathConfig.from_env().artifact_jobs_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=_error_payload(
+                "sketchmath_artifact_jobs_disabled",
+                "SketchMath artifact jobs are disabled",
+                "Set FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED=1",
+                False,
+            ),
+        )
+
+
 def _cad_export_root() -> Path:
     root = Path(SketchMathConfig.from_env().cad_export_dir)
     if not root.is_absolute():
@@ -113,6 +129,32 @@ def download_step_artifact(path: str = Query(..., min_length=1)):
         media_type="model/step",
         filename=artifact.name,
     )
+
+
+@router.get("/sketchmath/artifacts/stl", summary="Download a SketchMath STL artifact")
+def download_stl_artifact(path: str = Query(..., min_length=1)):
+    _require_enabled()
+    requested = Path(path)
+    if not requested.is_absolute():
+        requested = _cad_export_root() / requested
+    resolved = requested.resolve()
+    root = _cad_export_root()
+    if resolved.suffix.lower() != ".stl":
+        raise HTTPException(
+            status_code=400,
+            detail=_error_payload("artifact_not_stl", "Only STL artifacts can be downloaded", {"path": path}, False),
+        )
+    if root != resolved and root not in resolved.parents:
+        raise HTTPException(
+            status_code=403,
+            detail=_error_payload("artifact_outside_export_root", "Artifact path is outside the SketchMath export root", {"path": path}, False),
+        )
+    if not resolved.exists() or not resolved.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=_error_payload("artifact_not_found", "STL artifact was not found", {"path": path}, False),
+        )
+    return FileResponse(resolved, media_type="model/stl", filename=resolved.name)
 
 
 @router.get("/sketchmath/sessions/{session_id}", summary="Get a SketchMath session")
@@ -210,6 +252,53 @@ def redo_feature(session_id: str):
         return _store().redo_feature(session_id)
     except SketchMathError as exc:
         _raise_http(exc)
+
+
+@router.post("/sketchmath/sessions/{session_id}/artifacts/build", status_code=202, summary="Build a revision-bound feature artifact")
+def build_feature_artifact(session_id: str, payload: Dict[str, Any]):
+    _require_enabled()
+    _require_document_v1()
+    _require_artifact_jobs()
+    try:
+        request = ArtifactBuildRequest.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=_error_payload("invalid_artifact_request", "Artifact request failed schema validation", exc.errors(include_url=False), False),
+        ) from exc
+    try:
+        manifest = ARTIFACT_JOB_STORE.submit(_store(), session_id, request)
+    except SketchMathError as exc:
+        _raise_http(exc)
+    return manifest.model_dump(mode="json")
+
+
+@router.get("/sketchmath/sessions/{session_id}/artifacts/jobs/{job_id}", summary="Get a SketchMath artifact job")
+def get_feature_artifact_job(session_id: str, job_id: str):
+    _require_enabled()
+    _require_document_v1()
+    _require_artifact_jobs()
+    manifest = ARTIFACT_JOB_STORE.get(session_id, job_id)
+    if manifest is None:
+        raise HTTPException(
+            status_code=404,
+            detail=_error_payload("artifact_job_not_found", "Artifact job was not found", {"job_id": job_id}, False),
+        )
+    return manifest.model_dump(mode="json")
+
+
+@router.post("/sketchmath/sessions/{session_id}/artifacts/jobs/{job_id}/retry", status_code=202, summary="Retry a SketchMath artifact job")
+def retry_feature_artifact_job(session_id: str, job_id: str):
+    _require_enabled()
+    _require_document_v1()
+    _require_artifact_jobs()
+    manifest = ARTIFACT_JOB_STORE.retry(session_id, job_id, _store())
+    if manifest is None:
+        raise HTTPException(
+            status_code=404,
+            detail=_error_payload("artifact_job_not_found", "Artifact job was not found", {"job_id": job_id}, False),
+        )
+    return manifest.model_dump(mode="json")
 
 
 @router.post("/sketchmath/sessions/{session_id}/entities", summary="Create or replace a SketchMath entity")

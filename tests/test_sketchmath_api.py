@@ -756,6 +756,76 @@ def test_sketchmath_document_v1_defaults_off_and_gates_feature_routes(monkeypatc
     client.close()
 
 
+def test_sketchmath_artifact_jobs_default_off_and_gate_build_route(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.delenv("FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED", raising=False)
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={})
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{created.json()['session_id']}/artifacts/build",
+        json={"feature_id": "feature_missing", "format": "stl", "base_revision": 0},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "sketchmath_artifact_jobs_disabled"
+    client.close()
+
+
+def test_sketchmath_artifact_job_build_poll_register_download_and_replay(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ARTIFACT_JOB_DIR", str(tmp_path / "jobs"))
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_CAD_EXPORT_DIR", str(tmp_path / "cad"))
+    client = TestClient(create_app())
+    selection = _profile_selection_context_with_hole()
+    selection["items"][0]["holes"] = ["profile_inner"]
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": selection})
+    session_id = created.json()["session_id"]
+    committed = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={"command": _feature_command("add_feature", "add_artifact_plate", 0, feature=_extrude_feature(), mode="commit")},
+    )
+    assert committed.status_code == 200
+
+    request = {"feature_id": "feature_plate", "format": "stl", "base_revision": 1}
+    submitted = client.post(f"/api/sketchmath/sessions/{session_id}/artifacts/build", json=request)
+    assert submitted.status_code == 202
+    job_id = submitted.json()["job_id"]
+    job = submitted.json()
+    for _ in range(100):
+        polled = client.get(f"/api/sketchmath/sessions/{session_id}/artifacts/jobs/{job_id}")
+        assert polled.status_code == 200
+        job = polled.json()
+        if job["state"] in {"DONE", "FAILED"}:
+            break
+        time.sleep(0.02)
+
+    assert job["state"] == "DONE", job
+    assert job["input_revision"] == 1
+    assert job["result"]["measurements"]["volume_mm3"] == 1280.0
+    artifact = job["result"]["artifact"]
+    assert artifact["revision"] == 1
+    snapshot = client.get(f"/api/sketchmath/sessions/{session_id}").json()
+    assert snapshot["document"]["revision"] == 1
+    assert snapshot["document"]["artifacts"] == [artifact]
+
+    download = client.get("/api/sketchmath/artifacts/stl", params={"path": artifact["path"]})
+    assert download.status_code == 200
+    assert download.headers["content-type"].startswith("model/stl")
+    assert download.content.startswith(b"solid feature_plate\n")
+
+    replay = client.post(f"/api/sketchmath/sessions/{session_id}/artifacts/build", json=request)
+    assert replay.status_code == 202
+    assert replay.json()["job_id"] == job_id
+    assert replay.json()["state"] == "DONE"
+    client.close()
+
+
 def test_sketchmath_feature_history_preview_commit_reload_conflict_and_undo_redo(monkeypatch, tmp_path):
     from backend.sketchmath.service import SESSION_STORE
 
