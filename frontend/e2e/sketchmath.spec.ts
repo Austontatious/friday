@@ -380,9 +380,14 @@ test.describe("SketchMath workspace", () => {
   test("commits a reload-stable point-backed polyline", async ({ page }) => {
     await openSketchMath(page);
     await page.getByRole("button", { name: "Polyline", exact: true }).click();
-    await clickSvgViewBoxPoint(page, 140, 120);
-    await clickSvgViewBoxPoint(page, 260, 120);
-    await clickSvgViewBoxPoint(page, 300, 220);
+    const polylineDraft = page.getByTestId("sketchmath-polyline-draft");
+    const draftPointCount = async () => (await polylineDraft.getAttribute("points"))?.trim().split(/\s+/).length;
+    await dispatchCanvasViewBoxPoint(page, 140, 120);
+    await expect.poll(draftPointCount).toBe(2);
+    await dispatchCanvasViewBoxPoint(page, 260, 120);
+    await expect.poll(draftPointCount).toBe(3);
+    await dispatchCanvasViewBoxPoint(page, 300, 220);
+    await expect.poll(draftPointCount).toBe(4);
     await expect(page.getByTestId("sketchmath-polyline-draft")).toBeVisible();
     await clickWorkbenchButton(page, "Finish polyline");
 
