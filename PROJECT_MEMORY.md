@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-08-09 - SketchMath Full-Revolve Axis Property Editing
+
+### What Changed
+- Added an existing full-revolve property editor for its construction-axis reference and supported 360-degree sweep.
+- Routed axis replacement through the canonical typed `replace_feature` operation, preserving immutable feature identity and deterministic rebuild/history behavior.
+- Added live browser acceptance that creates two construction axes, creates the revolve, changes axes, and verifies signature change, undo, redo, disk reload, and zero browser errors.
+
+### Why
+- The release sheet required existing revolve properties to remain editable through the same operation/history boundary as manual and AI-authored features.
+- Partial sweeps remain outside the validated analytic/kernel envelope, so the editor exposes the current 360-degree support honestly instead of implying unsupported geometry.
+
+### New Env Flags
+- None. The existing default-off document-v1, feature-history, and revolve-feature flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py tests/test_sketchmath_api.py -k revolve`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm test -- --runInBand --watchAll=false src/components/sketchmath/SketchMathWorkspace.test.tsx -t "keeps full revolve creation"`
+- `cd frontend && npm run test:e2e -- --grep "edits a full revolve axis"`
+
+### Evidence
+- Code checkpoints: `1e8db05`, `7976010`.
+- Targeted Playwright passed in 10.8 seconds.
+
+---
+
 ## 2026-08-09 - SketchMath Existing Simple-Hole Property Editing
 
 ### What Changed

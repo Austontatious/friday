@@ -89,7 +89,7 @@ When the frontend flag is enabled, the workspace shows Feature history with:
 - stable feature IDs, build status, measurements, and shortened output signatures;
 - in-place extrusion-depth replacement;
 - numeric simple-hole placement and existing simple-hole diameter/through/blind/depth replacement against the current semantic top face;
-- default-off new-body full-revolve creation from a selected closed profile and chosen construction-line axis;
+- default-off new-body full-revolve creation from a selected closed profile and chosen construction-line axis, plus existing-feature axis replacement inside the supported 360-degree envelope;
 - default-off outer-vertical-edge fillet creation, radius replacement, kernel STEP build, and download for the supported bounded vertical feature graph;
 - default-off outer-vertical-edge chamfer creation, distance replacement, kernel STEP build, and download for its supported bounded vertical feature graph;
 - dedicated feature undo and redo.
@@ -106,6 +106,7 @@ A revision conflict refreshes the backend-authoritative session before the user 
 - A live Playwright workflow creates a rectangle feature, edits depth, observes a changed signature with a stable ID, performs feature undo/redo, reloads, creates a typed through hole, recovers its reference after another base edit, builds/downloads a terminal graph STL, and accepts no console/page errors.
 - The golden browser workflow commits 80→100 mm width and Ø5→Ø6 four-hole design parameters, preserves offsets/centering and stable IDs, performs undo/redo/reload, then builds and downloads a revision-12 native STEP with exact supported topology and no browser errors.
 - Existing simple-hole property editing is a complete `replace_feature` operation with rebuild, undo/redo, reload, and terminal STL evidence. A feature property owned by a design-parameter binding refuses direct replacement with `feature_parameter_bound`; rename remains allowed because it does not mutate the bound parameters.
+- Existing full-revolve axis editing uses the same typed `replace_feature` boundary. Live Playwright creates two construction axes, changes the axis of a 360-degree revolve, observes a new rebuild signature with the same feature ID, and proves undo/redo/reload with no browser errors. The angle control remains fixed at 360 degrees because partial sweeps are structurally unsupported.
 
 ## Open Boundaries
 

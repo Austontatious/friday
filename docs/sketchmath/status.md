@@ -100,6 +100,13 @@ On 2026-08-09 for canonical model `a851d99`, API gate `3481f16`, and guarded UI 
 - TypeScript, generated schemas, Compose, and all 67 frontend tests pass. The UI test proves the editor remains absent by default and selects a construction-line axis when enabled.
 - Browser creation is deliberately limited to a new-body 360-degree revolve. API/model add/cut requires a semantic target face but does not claim spatial boolean or kernel artifact validation.
 
+The property-edit checkpoint `1e8db05` with browser proof `7976010` closes the supported full-revolve property envelope:
+
+- An existing 360-degree revolve can replace its construction-axis reference through a typed revision-checked `replace_feature` operation while retaining its feature ID.
+- Targeted backend revolve coverage (5 tests), TypeScript, and focused component coverage pass.
+- Live Playwright creates two construction axes, creates a full revolve, changes its axis, observes a changed deterministic rebuild signature, and proves feature undo/redo plus disk reload in 10.8 seconds with no console/page errors.
+- The angle field remains explicitly fixed at 360 degrees; partial sweeps, spatial revolve booleans, and revolve artifacts remain open rather than implied.
+
 ## Current Kernel-Fillet Validation
 
 On 2026-08-09 for semantic model `1f1b034`, FreeCAD boundary `30af86a`, API gate `e6b272f`, and guarded UI `53a39ed`:
@@ -167,7 +174,7 @@ On 2026-08-09 for guarded UI checkpoint `bc650ca`:
 - Typed extrusion parameters cover new-body/add/cut, positive/negative direction, symmetric, and one-/two-sided measurement semantics. Broad kernel-backed feature reconstruction is not claimed.
 - Add/cut extrusions attach through semantic top/bottom references and are placed at the resolved face Z; missing attachments and one-sided directions away from the target fail structurally.
 - Typed holes cover simple/counterbore/countersink and through/blind analytic semantics. The guarded React panel exposes simple through/blind placement, extrusion depth editing, rebuild/reference evidence, and dedicated feature undo/redo.
-- Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, and a guarded new-body browser editor.
+- Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, guarded new-body creation, and existing-axis replacement with feature undo/redo/reload.
 - Typed fillet covers convex extrusion vertical edges, semantic adjacency/signature/endpoints, exact/recovered selection, finite radius editing, kernel-required measurement state, and a resumable validated FreeCAD STEP path with guarded browser creation/download.
 - Typed chamfer reuses the stable edge contract with finite distance editing, deterministic `chamfer_surface` identity, native FreeCAD STEP validation, and guarded browser creation/download.
 - Revision-bound artifact jobs persist READY/RUNNING/DONE/FAILED manifests and resumable step markers. Supported terminal vertical extrusion/simple-hole graphs produce validated layered STL, bounded terminal-fillet/chamfer graphs produce validated STEP, and stale results never register.
@@ -212,7 +219,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Close the remaining full-revolve property envelope next: edit the supported angle/axis through typed replacement operations and prove undo/redo/reload. Existing simple-hole diameter/through/blind/depth editing now passes; follow revolve editing with the remaining bounded kernel and release-regression gaps.
+Run the remaining bounded kernel and release-regression gaps next. Full-revolve creation/axis editing and simple-hole diameter/through/blind/depth editing now pass their supported property envelopes; partial revolve and general kernel/artifact expansion remain explicitly out of scope until implemented and validated.
 
 ## Release Status
 
