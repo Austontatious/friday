@@ -4,12 +4,12 @@ Updated: 2026-08-09
 
 Current phase: Phase 1 — canonical parametric architecture
 
-Gate: Gate A passed
+Gate: Gate B passed for the documented Phase 1 modeled envelope
 
 ## Baseline
 
 - Audited checkout: `21b8153`
-- Latest SketchMath product commit: `8236828`
+- Latest SketchMath product code commit: `0621e8c`
 - Source branch: `phase0-stabilize`
 - Audit working tree: clean
 - Verified remote `phase0-stabilize`: `4ed99b3`
@@ -33,7 +33,7 @@ Gate: Gate A passed
 - Versioned, non-mutating solver analysis with exact Jacobian-rank DOF for modeled point/circle/arc systems and explicit partial/unknown coverage.
 - Live Normal-mode solver labels backed by that analysis, with rank/DOF internals kept under Advanced / Debug.
 
-## Current Gate A Validation
+## Published Gate A Baseline Validation
 
 On 2026-08-08 at `54ff17e`:
 
@@ -48,6 +48,16 @@ On 2026-08-08 at `54ff17e`:
 - 13 repository standards tests passed.
 
 The build still reports the repository-wide stale Browserslist database notice. Updating frontend dependency metadata is intentionally deferred from the SketchMath-only Gate A slice.
+
+## Current Gate B Validation
+
+On 2026-08-09 for code checkpoint `0621e8c`:
+
+- 168 focused Python tests passed.
+- 52 semantic eval cases passed.
+- 64 focused frontend tests passed.
+- 16 live shell/product Playwright workflows passed; deliberately induced `409`/`422` rejection resource messages are asserted, and no unexpected console/page error is accepted.
+- Generated schema, TypeScript, production build, Compose, and 13 repository standards checks passed.
 
 ## Active Phase 1 Slice
 
@@ -65,7 +75,10 @@ The build still reports the repository-wide stale Browserslist database notice. 
 - Canonical construction points and construction lines now use stable existing entity identities plus typed v0.7 conversion, profile-source safety checks, distinct rendering, and reload-stable workspace controls.
 - Center rectangle now provides center/corner and center-origin drag construction while committing the existing canonical rectangle bundle, so dimensions, profiles, history, reload, and extrusion remain shared.
 - Open polylines now commit atomically as stable point identities plus linked line segments, with explicit finish/cancel controls and reload-stable shared vertices.
-- Current evidence: 160 focused Python tests, 50 semantic evals, 63 focused frontend tests, all 15 shell/product Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass.
+- v0.8 slots commit construction centers, linked boundary points, two lines, two finite arcs, and one curve-backed profile; regular polygons commit one stable point/line/profile bundle.
+- Complete-containment box selection and the safe editing panel expose split, trim, extend, offset, duplicate, linear pattern, and mirror. Linked transforms/copies preserve canonical source identities; edits requiring topology repair fail atomically.
+- One live solver lifecycle covers line, circle, arc, and construction geometry from remaining DOF through full constraint, structured conflict, recovery, solve, undo/redo, and identical reload. A second durable workflow covers slot/polygon editing, topology-sensitive refusal, recovery, history, and reload.
+- Current evidence: 168 focused Python tests, 52 semantic evals, 64 focused frontend tests, all 16 shell/product Playwright workflows, generated schema check, TypeScript/build, Compose, and 13 standards tests pass. See `gate_b_acceptance.md`.
 
 ## Gate A Outcome
 
@@ -85,6 +98,7 @@ Completed and published:
 - Finite-arc tangency is supported only when the actual contact lies on the stored finite sweep; out-of-span contacts are rejected.
 - Production solve covers the documented point/circle/arc residual subset. Coordinate-only legacy lines and future geometry/constraint families remain partial/unknown.
 - Topology recognizes deterministic simple line cycles, not general planar regions.
+- Split/trim/extend intentionally reject profile- or constraint-referenced targets; automatic topology repair is not implemented.
 - The product lacks a canonical multi-body/feature document model and downstream rebuild graph.
 - Multi-sketch, property editing, model tree, and stable face/edge references are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
@@ -104,7 +118,7 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Complete the remaining Gate B geometry/editing envelope (slot/polygon and safe trim/extend/split/offset/pattern flows), then enter general planar topology.
+Implement deterministic general planar-region topology (`SM-TOP-001` through `SM-TOP-003`) with adversarial fixtures and stable region selection.
 
 ## Release Status
 

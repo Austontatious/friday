@@ -2,7 +2,7 @@
 
 SketchMath owns a deterministic 2D command layer under the FRIDAY gateway.
 
-The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`; canonical arc commands use version `0.5`; the additional Gate B constraint families use version `0.6`; construction conversion uses version `0.7`. Undeclared versions and command types are rejected as `invalid_command` before execution.
+The canonical machine-readable contracts are generated from the Pydantic models with `python3 -m sketchmath.schemas.generate`. Command version `0.1` remains compatible for the original command set; browser topology/circle commands use version `0.2`; non-mutating solver analysis uses version `0.3`; driving axis and circle dimensions use version `0.4`; canonical arc commands use version `0.5`; the additional Gate B constraint families use version `0.6`; construction conversion uses version `0.7`; slot, polygon, and safe curve-edit commands use version `0.8`. Undeclared versions and command types are rejected as `invalid_command` before execution.
 
 ## Execution Loop
 
@@ -85,6 +85,20 @@ The canonical machine-readable contracts are generated from the Pydantic models 
 - `set_construction`
   - Version `0.7`; converts selected points and lines between regular and construction/reference geometry while preserving stable IDs, endpoint links, constraints, history, and reload behavior.
   - Lines used by a committed profile cannot be converted to construction geometry because that would silently invalidate the profile boundary.
+- `define_regular_polygon`
+  - Version `0.8`; creates one canonical bundle containing stable points, linked lines, and a closed curve-backed profile for an integer side count from 3 through 128.
+- `define_slot`
+  - Version `0.8`; creates construction center points, four boundary points, two linked lines, two finite semicircular arcs, and one closed curve-backed profile.
+- `split_line`
+  - Version `0.8`; splits one line at an interior parameter while preserving the source line ID and adding a stable split point plus remainder line.
+- `trim_line` / `extend_line`
+  - Version `0.8`; use selection order `target, cutter` and require a unique intersection on the finite cutter segment.
+  - Trim requires the intersection inside the target; extend requires it outside the target.
+- `offset_curve`
+  - Version `0.8`; creates an independent offset of one line, construction line, circle, or finite arc.
+  - Circle and arc offsets that collapse the radius are rejected.
+- Safe curve-edit boundary
+  - Split, trim, and extend reject profile- or constraint-referenced target curves with `error_code=unsafe_referenced_curve_edit` before session mutation. General topology repair is deferred.
 - `solve_constraints`
   - Runs the SciPy residual-validated nonlinear adapter over the full stored system through the unified `SolverRunResult` path, with a conservative closed-form fallback when SciPy is unavailable.
   - Applies only an accepted `solved` coordinate patch. Under-constrained, inconsistent, redundant, and failed proposals return structured errors with the run result and do not commit partial geometry.
@@ -123,13 +137,13 @@ The canonical machine-readable contracts are generated from the Pydantic models 
   - Parameters include positive `diameter`, `unit`, and `center`.
   - The command re-runs profile-hole validation before commit, so resized or moved holes must remain strictly inside the parent profile and non-overlapping.
 - `translate`
-  - Shifts selected geometry by a vector.
+  - Shifts selected geometry by a vector. Linked point/curve/profile dependencies are expanded and moved as one canonical bundle.
 - `rotate`
   - Rotates selected geometry around an origin.
 - `mirror`
-  - Mirrors selected geometry across a vertical axis.
+  - Mirrors selected geometry across a vertical axis, including linked source geometry for selected profiles.
 - `copy_linear`
-  - Duplicates selected geometry along a repeated translation vector.
+  - Duplicates selected geometry along a repeated translation vector and remaps point, curve, circle, arc, and profile references to stable copied IDs.
 - `intersect_lines`
   - Creates a deterministic point at the intersection of two line-like entities.
 - `project_point_to_line`
@@ -295,11 +309,12 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 - `locked_entity_mutation`
 - `invalid_units`
 - `invalid_command`
+- `selection_resolution_error`, including `unsafe_referenced_curve_edit`, `cutter_misses_segment`, and invalid primitive geometry details
 
 ## Constraint Solver Limits
 
 - General nonlinear solving is limited to the documented point/circle/arc residual families; coordinate-only legacy lines and unsupported geometry remain explicitly partial.
-- No full CAD feature tree or general topology/editing workflow yet.
+- Gate B editing is limited to the documented safe line/curve envelope; automatic profile/constraint topology repair is not implemented.
 - First-class circles and canonical finite arcs are supported; arc participation in general planar topology remains deferred.
 - Profile detection is limited to deterministic simple line cycles; nested/general planar-region extraction remains deferred.
 - No arbitrary Python execution.
@@ -313,7 +328,7 @@ Stored profile holes are included by the backend when `parameters.holes` is abse
 - Run semantic SketchMath evals with:
   - `python3 -m sketchmath.evals.run_sketchmath_evals`
 - The runner loads geometry and translator contract cases from `evals/cases/sketchmath_*.json`, executes geometry cases against the deterministic executor, executes translator cases against the deterministic translator helper, and writes `evals/sketchmath_semantic_results.json`.
-- Geometry evals include v0.2 circle, horizontal-constraint, and profile-detection coverage plus the `extrude_profile` adapter with hole validation and STEP metadata checks when present.
+- Geometry evals include v0.2 circle, horizontal-constraint, and profile-detection coverage; v0.8 polygon/slot bundle coverage; and the `extrude_profile` adapter with hole validation and STEP metadata checks when present.
 
 All geometry changes must continue to flow through typed `GeometryCommand` objects. The gateway owns translation and policy boundaries; SketchMath owns geometry execution only.
 

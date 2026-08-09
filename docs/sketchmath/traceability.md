@@ -26,6 +26,8 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | Construction/reference points and lines | Passed for canonical conversion envelope | v0.7 executor/schema/API/semantic/frontend tests plus live conversion/reload browser workflow; committed profile source lines are protected |
 | Center rectangle | Passed for canonical rectangle-bundle envelope | Center/corner unit test and live symmetric-coordinate/reload browser workflow; downstream dimensions/profile/extrusion reuse the corner-rectangle path |
 | Open polyline | Passed for canonical point/line envelope | Atomic typed batch, shared adjacent endpoint IDs, unit DOM counts, live API identity assertion, and reload browser workflow |
+| Slot and regular polygon | Passed for canonical Gate B bundles | v0.8 typed commands, stable point/line/arc/profile identities, curve-backed profile synchronization, semantic evals, unit tests, and durable browser reload |
+| Safe sketch editing | Passed for documented Gate B envelope | Complete-containment box select; point drag; dependency-safe split/trim/extend; independent line/circle/arc offset; linked-bundle duplicate/pattern/mirror; structured atomic refusal outside the safe envelope |
 | Simple closed-loop profile detection | Passed for current deterministic simple-cycle envelope | topology foundation tests and Playwright detected-profile workflow |
 | Preview/commit/revert and persistent undo/redo | Passed | API/history tests and Playwright reload/history workflow |
 | Rectangle/circle/line-profile extrusion | Passed | CAD adapter/API tests and Playwright workflows |
@@ -49,7 +51,7 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 
 | Requirement family | State | Next proof |
 | --- | --- | --- |
-| SM-SK / SM-SOL parametric sketcher | Partial | Slot/polygon, remaining safe editing families, and nonlinear/arc solver coverage |
+| SM-SK / SM-SOL parametric sketcher | Gate B passed for documented modeled envelope | General topology begins at SM-TOP; broader constraint geometry remains explicit partial/unknown |
 | SM-TOP general topology | Deferred | Adversarial planar-region fixtures and deterministic region selection |
 | SM-FEAT feature history | Deferred | Canonical document/feature model plus rebuild tests |
 | SM-REF reference stability | Deferred | Upstream-edit survival/repair tests |
@@ -68,8 +70,10 @@ This is the canonical requirement-to-evidence ledger for SketchMath. Update it w
 | SM-SOL-001 state reporting | Passed for modeled residual subset | Nonlinear consistency/redundancy/residual tests; live Normal labels plus Advanced diagnostics in unit and Playwright coverage | Minimal conflict sets are not claimed; conflicts are deterministic residual witnesses. |
 | SM-SOL-002 defensible DOF | Passed for modeled residual subset | Central-difference Jacobian rank over deterministic point/circle/arc variables; explicit partial/unknown results for unmodeled entities | Coordinate-only legacy geometry and future geometry families remain partial. |
 | SM-SK-001 arc geometry | Passed for canonical geometry and solver envelope | Canonical `arc_2d`; v0.5 center/three-point paths; source-link residuals; finite tangency validation; SVG/history/reload | Arc participation in general topology remains open. |
-| SM-SK-001 construction geometry | Initial implementation | Point construction flag, canonical `construction_line_2d`, v0.7 stable-ID conversion, profile dependency guard, distinct workspace styling | Creation/conversion/schema/API/eval/frontend tests and live reload-stable browser workflow pass; dedicated axis/reference-plane semantics remain open. |
+| SM-SK-001 construction geometry | Passed for Gate B envelope | Point construction flag, canonical `construction_line_2d`, v0.7 stable-ID conversion, profile dependency guard, distinct workspace styling | Creation/conversion/schema/API/eval/frontend tests and the mixed fully constrained reload workflow pass; dedicated axis/reference-plane semantics remain open. |
+| SM-SK-001 slot/polygon geometry | Passed for Gate B envelope | v0.8 stable point/line/finite-arc/profile bundles with `source_curve_ids` | Executor/schema/eval/frontend tests and durable mixed-geometry browser reload pass at `0621e8c`; participation in general planar topology remains open. |
+| SM-SK-002 safe editing | Passed for documented envelope | v0.8 split/trim/extend/offset; linked transform/copy expansion; box selection; existing delete/drag/construction paths | Unit and live browser evidence prove success paths, history/reload stability, and atomic `unsafe_referenced_curve_edit`; automatic topology repair is deferred. |
 | SM-SK-003 constraints and driving dimensions | Passed for modeled families | v0.4 driving dimensions plus v0.6 fixed/midpoint/collinear/symmetric/concentric/tangent residuals; exact mixed line/circle/arc tests | General topology-derived relations remain open. |
-| SM-SOL-003 invalid commit prevention | Passed for modeled residual subset | Scaled residual gate, optimizer-success separation, finite-geometry validators, canonical replay, and non-committing under/inconsistent/redundant/failed outcomes | Async cancellation remains open. |
+| SM-SOL-003 invalid commit prevention | Passed for modeled residual subset | Scaled residual gate, optimizer-success separation, finite-geometry validators, canonical replay, and live `409` conflict plus non-committing topology refusal/history assertions | Async cancellation remains open. |
 | SM-UNIT-001 centralized tolerances | Initial implementation | Versioned `NumericalTolerancePolicy` | Unit expansion and display formatting remain open. |
 | SM-OPS-002 async boundary | Design accepted | ADR 006 | Job runtime is not implemented; current export remains synchronous. |

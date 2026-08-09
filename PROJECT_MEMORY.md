@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-08-09 - SketchMath Gate B Geometry and Safe Editing
+
+### What Changed
+- Added v0.8 regular-polygon and slot primitives as canonical stable bundles. Slots use construction center points, linked boundary points, two lines, two finite arcs, and a curve-backed profile; polygons use linked points/lines and a curve-backed profile.
+- Added complete-containment box selection plus safe split, trim, extend, line/circle/arc offset, duplicate, linear pattern, and mirror controls. Linked transforms and copies expand and remap point/curve/profile references instead of leaving copied geometry attached to source points.
+- Added `Profile2DEntity.source_curve_ids` and curve-backed profile synchronization for mixed line/arc boundaries.
+- Protected profile- and constraint-referenced targets from split/trim/extend with structured `unsafe_referenced_curve_edit` refusal before mutation.
+- Completed a single mixed line/circle/arc/construction solver lifecycle with remaining-DOF drag, full constraint, live `409` conflict diagnosis, recovery, dimensional re-solve, undo/redo, and reload; added a durable slot/polygon editing and refusal/recovery workflow.
+
+### Why
+- Gate B requires the full listed primitive/editing vocabulary to share the same typed command, stable identity, history, solver, and reload paths.
+- General topology repair is not available yet, so unsafe referenced-curve edits must fail atomically instead of silently corrupting a committed profile or constraint.
+
+### New Env Flags
+- None. All behavior remains behind the existing default-off SketchMath frontend/backend feature gates.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath*.py tests/test_frontend_nginx_config.py tests/test_runtime_dependencies.py` — 168 passed.
+- `PYTHONPATH=. python3 -m sketchmath.evals.run_sketchmath_evals` — 52 passed.
+- `cd frontend && CI=true npm test -- --watchAll=false --runInBand --runTestsByPath src/App.test.tsx src/components/sketchmath/SketchMathWorkspace.test.tsx src/components/sketchmath/commandBuilders.test.ts src/components/sketchmath/arcGeometry.test.ts` — 64 passed.
+- `cd frontend && npx tsc --noEmit && npm run build && npm run test:e2e -- --workers=1` — TypeScript/build and all 16 shell/product browser workflows passed.
+- `PYTHONPATH=. python3 -m sketchmath.schemas.generate --check`, `docker compose config -q`, and `python3 -m pytest -q tests/test_codex_standards.py` passed.
+
+### Remaining Product Work
+- Enter general planar-region topology (`SM-TOP-001` through `SM-TOP-003`). Automatic topology repair, feature history, stable downstream references, document concurrency, broader artifacts, and release hardening remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Residual-Validated Nonlinear and Arc Solver
 
 ### What Changed

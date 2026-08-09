@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath milestone: `8236828`
+Last validated SketchMath code milestone: `0621e8c` (Gate B evidence: `docs/sketchmath/gate_b_acceptance.md`)
 
 ## Mission
 
