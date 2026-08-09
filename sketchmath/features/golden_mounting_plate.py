@@ -4,7 +4,12 @@ import math
 from dataclasses import dataclass
 
 from sketchmath.features.rebuild import rebuild_document
-from sketchmath.models.document import FeatureRecord, HoleParameters, SketchMathDocument, wrap_legacy_selection_context
+from sketchmath.models.document import (
+    DesignParameter,
+    FeatureRecord,
+    SketchMathDocument,
+    wrap_legacy_selection_context,
+)
 from sketchmath.models.selection_context import SelectionContext
 
 
@@ -78,7 +83,6 @@ def build_golden_mounting_plate() -> SketchMathDocument:
                     "vertices": [[0, 0], [80, 0], [80, 50], [0, 50], [0, 0]],
                     "area": 4000,
                     "winding": "counterclockwise",
-                    "source_region_id": "region_plate",
                 },
                 {
                     "id": "circle_boss",
@@ -93,7 +97,6 @@ def build_golden_mounting_plate() -> SketchMathDocument:
                     "area": math.pi * 15**2,
                     "winding": "counterclockwise",
                     "source_circle_id": "circle_boss",
-                    "source_region_id": "region_boss",
                 },
             ],
             "constraints": [],
@@ -108,7 +111,6 @@ def build_golden_mounting_plate() -> SketchMathDocument:
             "body_id": "body_main",
             "sketch_id": "sketch_main",
             "profile_id": "profile_plate",
-            "source_region_id": "region_plate",
             "parameters": {"depth_mm": 5, "operation": "new_body"},
         }
     )
@@ -127,7 +129,6 @@ def build_golden_mounting_plate() -> SketchMathDocument:
             "body_id": "body_main",
             "sketch_id": "sketch_main",
             "profile_id": "profile_boss",
-            "source_region_id": "region_boss",
             "dependencies": [base.feature_id],
             "topology_references": [plate_top],
             "parameters": {"depth_mm": 8, "direction": "positive", "operation": "add"},
@@ -167,7 +168,44 @@ def build_golden_mounting_plate() -> SketchMathDocument:
     )
     features = [*pre_finish_features, fillet]
     body = document.bodies[0].model_copy(update={"feature_ids": [feature.feature_id for feature in features]})
-    document = document.model_copy(update={"revision": len(features), "features": features, "bodies": [body]})
+    design_parameters = [
+        DesignParameter.model_validate(
+            {
+                "parameter_id": "plate_width_mm",
+                "name": "Plate width",
+                "value": 80,
+                "minimum": 31,
+                "bindings": [
+                    {"binding_type": "rectangle_profile_width", "target_id": "profile_plate"},
+                    {"binding_type": "circle_center_x", "target_id": "circle_boss", "scale": 0.5},
+                    {"binding_type": "hole_position_x", "target_id": "feature_mount_hole_2", "offset": -7},
+                    {"binding_type": "hole_position_x", "target_id": "feature_mount_hole_3", "offset": -7},
+                    {"binding_type": "hole_position_x", "target_id": "feature_boss_hole", "scale": 0.5},
+                ],
+            }
+        ),
+        DesignParameter.model_validate(
+            {
+                "parameter_id": "corner_hole_diameter_mm",
+                "name": "Corner-hole diameter",
+                "value": 5,
+                "minimum": 0.01,
+                "maximum": 13.99,
+                "bindings": [
+                    {"binding_type": "hole_diameter", "target_id": f"feature_mount_hole_{index}"}
+                    for index in range(1, 5)
+                ],
+            }
+        ),
+    ]
+    document = document.model_copy(
+        update={
+            "revision": len(features),
+            "features": features,
+            "bodies": [body],
+            "design_parameters": design_parameters,
+        }
+    )
     return document.model_copy(update={"last_rebuild": rebuild_document(document)})
 
 
@@ -177,65 +215,27 @@ def edit_golden_mounting_plate_parameters(
     plate_width_mm: float | None = None,
     corner_hole_diameter_mm: float | None = None,
 ) -> SketchMathDocument:
-    """Apply the golden fixture's declared edge-offset/center intent without replacing stable IDs."""
+    """Apply the fixture's canonical design parameters through typed feature operations."""
+    from sketchmath.features.executor import apply_feature_command
+    from sketchmath.models.feature_command import FeatureCommand
+
     edited = document.model_copy(deep=True)
-    sketch = edited.sketches[0]
-    plate = sketch.state.get_entity("profile_plate")
-    boss_circle = sketch.state.get_entity("circle_boss")
-    boss_profile = sketch.state.get_entity("profile_boss")
-    current_width = max(point[0] for point in plate.vertices)
-    width = float(plate_width_mm if plate_width_mm is not None else current_width)
-    diameter = float(
-        corner_hole_diameter_mm
-        if corner_hole_diameter_mm is not None
-        else next(
-            feature.parameters.diameter_mm
-            for feature in edited.features
-            if feature.feature_id == "feature_mount_hole_1" and isinstance(feature.parameters, HoleParameters)
-        )
+    edits = (
+        ("plate_width_mm", plate_width_mm),
+        ("corner_hole_diameter_mm", corner_hole_diameter_mm),
     )
-    if not math.isfinite(width) or width <= 30:
-        raise ValueError("Golden plate width must be finite and greater than the 30 mm boss diameter")
-    if not math.isfinite(diameter) or diameter <= 0 or diameter >= 14:
-        raise ValueError("Golden corner-hole diameter must be finite, positive, and smaller than twice the 7 mm edge offset")
-
-    plate_replacement = plate.model_copy(
-        update={
-            "vertices": [(0, 0), (width, 0), (width, 50), (0, 50), (0, 0)],
-            "area": width * 50,
-        }
-    )
-    center = (width / 2.0, 25.0)
-    boss_circle_replacement = boss_circle.model_copy(update={"center": center})
-    boss_profile_replacement = boss_profile.model_copy(update={"vertices": _circle_vertices(center, 15)})
-    replacements = {
-        plate.id: plate_replacement,
-        boss_circle.id: boss_circle_replacement,
-        boss_profile.id: boss_profile_replacement,
-    }
-    sketch.state.items = [replacements.get(item.id, item) for item in sketch.state.items]
-
-    hole_positions = {
-        "feature_mount_hole_1": (7.0, 7.0),
-        "feature_mount_hole_2": (width - 7.0, 7.0),
-        "feature_mount_hole_3": (width - 7.0, 43.0),
-        "feature_mount_hole_4": (7.0, 43.0),
-        "feature_boss_hole": center,
-    }
-    next_features: list[FeatureRecord] = []
-    for feature in edited.features:
-        if feature.feature_id not in hole_positions or not isinstance(feature.parameters, HoleParameters):
-            next_features.append(feature)
+    for parameter_id, value in edits:
+        if value is None:
             continue
-        updates: dict[str, object] = {"position_mm": hole_positions[feature.feature_id]}
-        if feature.feature_id.startswith("feature_mount_hole_"):
-            updates["diameter_mm"] = diameter
-        next_features.append(feature.model_copy(update={"parameters": feature.parameters.model_copy(update=updates)}))
-    edited.features = next_features
-    edited.revision += 1
-    edited.last_rebuild = rebuild_document(edited)
-    if not edited.last_rebuild.ok:
-        raise ValueError("Golden mounting-plate parameter edit did not rebuild")
+        command = FeatureCommand(
+            operation_id=f"golden_set_{parameter_id}_{edited.revision}",
+            mode="commit",
+            base_revision=edited.revision,
+            operation_type="set_design_parameter",
+            target_id=parameter_id,
+            parameters={"value": value},
+        )
+        edited = apply_feature_command(edited, command).after
     return edited
 
 

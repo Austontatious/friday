@@ -277,10 +277,62 @@ class ArtifactRecord(BaseModel):
     metadata: dict[str, object] = Field(default_factory=dict)
 
 
+class DesignParameterBinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    binding_type: Literal[
+        "rectangle_profile_width",
+        "circle_center_x",
+        "hole_position_x",
+        "hole_diameter",
+    ]
+    target_id: str
+    scale: float = 1.0
+    offset: float = 0.0
+
+    @model_validator(mode="after")
+    def validate_binding(self) -> "DesignParameterBinding":
+        if not self.target_id.strip():
+            raise ValueError("design parameter binding target_id cannot be empty")
+        if not math.isfinite(self.scale) or not math.isfinite(self.offset):
+            raise ValueError("design parameter binding scale and offset must be finite")
+        return self
+
+
+class DesignParameter(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parameter_id: str
+    name: str
+    value: float
+    unit: Literal["mm"] = "mm"
+    minimum: float | None = None
+    maximum: float | None = None
+    bindings: list[DesignParameterBinding] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_parameter(self) -> "DesignParameter":
+        if not self.parameter_id.strip() or not self.name.strip():
+            raise ValueError("design parameter id and name cannot be empty")
+        bounds = [self.value, self.minimum, self.maximum]
+        if not all(value is None or math.isfinite(value) for value in bounds):
+            raise ValueError("design parameter values and bounds must be finite")
+        if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
+            raise ValueError("design parameter minimum cannot exceed maximum")
+        if self.minimum is not None and self.value < self.minimum:
+            raise ValueError("design parameter value is below its minimum")
+        if self.maximum is not None and self.value > self.maximum:
+            raise ValueError("design parameter value is above its maximum")
+        binding_keys = [(binding.binding_type, binding.target_id) for binding in self.bindings]
+        if len(binding_keys) != len(set(binding_keys)):
+            raise ValueError("duplicate bindings are not allowed within a design parameter")
+        return self
+
+
 class SketchMathDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.1"
     document_id: str
     name: str = "SketchMath document"
     units: str = "mm"
@@ -288,16 +340,20 @@ class SketchMathDocument(BaseModel):
     bodies: list[BodyRecord] = Field(default_factory=list)
     sketches: list[SketchRecord] = Field(default_factory=list)
     features: list[FeatureRecord] = Field(default_factory=list)
+    design_parameters: list[DesignParameter] = Field(default_factory=list)
     artifacts: list[ArtifactRecord] = Field(default_factory=list)
     provenance: dict[str, object] = Field(default_factory=dict)
     last_rebuild: FeatureRebuildReport | None = None
 
     @model_validator(mode="after")
     def validate_identity_graph(self) -> "SketchMathDocument":
+        if self.design_parameters and self.schema_version != "1.1":
+            raise ValueError("design parameters require document schema version 1.1")
         for label, values in (
             ("body", [item.body_id for item in self.bodies]),
             ("sketch", [item.sketch_id for item in self.sketches]),
             ("feature", [item.feature_id for item in self.features]),
+            ("design parameter", [item.parameter_id for item in self.design_parameters]),
             ("artifact", [item.artifact_id for item in self.artifacts]),
         ):
             if len(values) != len(set(values)):
@@ -306,6 +362,7 @@ class SketchMathDocument(BaseModel):
         body_ids = {body.body_id for body in self.bodies}
         sketch_ids = {sketch.sketch_id for sketch in self.sketches}
         feature_ids = {feature.feature_id for feature in self.features}
+        entity_ids = {entity.id for sketch in self.sketches for entity in sketch.state.items}
         for body in self.bodies:
             if not set(body.sketch_ids).issubset(sketch_ids):
                 raise ValueError(f"body {body.body_id} references an unknown sketch")
@@ -316,6 +373,17 @@ class SketchMathDocument(BaseModel):
                 raise ValueError(f"feature {feature.feature_id} references an unknown body")
             if feature.sketch_id not in sketch_ids:
                 raise ValueError(f"feature {feature.feature_id} references an unknown sketch")
+        binding_keys: list[tuple[str, str]] = []
+        for parameter in self.design_parameters:
+            for binding in parameter.bindings:
+                if binding.binding_type in {"rectangle_profile_width", "circle_center_x"}:
+                    if binding.target_id not in entity_ids:
+                        raise ValueError(f"design parameter {parameter.parameter_id} references an unknown entity")
+                elif binding.target_id not in feature_ids:
+                    raise ValueError(f"design parameter {parameter.parameter_id} references an unknown feature")
+                binding_keys.append((binding.binding_type, binding.target_id))
+        if len(binding_keys) != len(set(binding_keys)):
+            raise ValueError("design parameter bindings must have one owner")
         return self
 
 

@@ -26,6 +26,7 @@
         "replace_feature",
         "delete_feature",
         "set_feature_suppressed",
+        "set_design_parameter",
         "rebuild"
       ],
       "title": "Operation Type",
@@ -49,8 +50,11 @@
       "title": "Target Id"
     },
     "version": {
-      "const": "1.0",
-      "default": "1.0",
+      "default": "1.1",
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
       "title": "Version",
       "type": "string"
     }

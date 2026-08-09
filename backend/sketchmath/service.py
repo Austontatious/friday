@@ -304,9 +304,17 @@ class SketchMathSessionStore:
         stored.document = document
 
     @staticmethod
-    def _restore_feature_state(current: SketchMathDocument, source: SketchMathDocument) -> SketchMathDocument:
+    def _restore_feature_state(
+        current: SketchMathDocument,
+        source: SketchMathDocument,
+        *,
+        restore_design_parameter_state: bool = False,
+    ) -> SketchMathDocument:
         candidate = current.model_copy(deep=True)
         candidate.features = [feature.model_copy(deep=True) for feature in source.features]
+        if restore_design_parameter_state:
+            candidate.sketches = [sketch.model_copy(deep=True) for sketch in source.sketches]
+            candidate.design_parameters = [parameter.model_copy(deep=True) for parameter in source.design_parameters]
         source_feature_ids = {body.body_id: list(body.feature_ids) for body in source.bodies}
         candidate.bodies = [
             body.model_copy(update={"feature_ids": source_feature_ids.get(body.body_id, [])})
@@ -505,6 +513,8 @@ class SketchMathSessionStore:
             result = apply_feature_command(stored.document, command)
             if command.mode == "commit":
                 stored.document = result.after.model_copy(deep=True)
+                if command.operation_type == "set_design_parameter":
+                    stored.session.state = self._primary_sketch(stored.document).state.model_copy(deep=True)
                 stored.feature_history.append(
                     _FeatureOperationRecord(
                         command=command,
@@ -638,10 +648,16 @@ class SketchMathSessionStore:
             if not stored.feature_history:
                 return self._build_snapshot(session_id, stored)
             record = stored.feature_history[-1]
-            restored = self._restore_feature_state(stored.document, record.before)
+            restored = self._restore_feature_state(
+                stored.document,
+                record.before,
+                restore_design_parameter_state=record.command.operation_type == "set_design_parameter",
+            )
             stored.feature_history.pop()
             stored.feature_redo_history.append(record)
             stored.document = restored
+            if record.command.operation_type == "set_design_parameter":
+                stored.session.state = self._primary_sketch(restored).state.model_copy(deep=True)
             stored.metadata["updated_at"] = _now_iso()
             self._save(session_id, stored)
             return self._build_snapshot(session_id, stored)
@@ -654,9 +670,15 @@ class SketchMathSessionStore:
             if not stored.feature_redo_history:
                 return self._build_snapshot(session_id, stored)
             record = stored.feature_redo_history[-1]
-            restored = self._restore_feature_state(stored.document, record.after)
+            restored = self._restore_feature_state(
+                stored.document,
+                record.after,
+                restore_design_parameter_state=record.command.operation_type == "set_design_parameter",
+            )
             stored.feature_redo_history.pop()
             stored.document = restored
+            if record.command.operation_type == "set_design_parameter":
+                stored.session.state = self._primary_sketch(restored).state.model_copy(deep=True)
             stored.feature_history.append(record)
             stored.metadata["updated_at"] = _now_iso()
             self._save(session_id, stored)

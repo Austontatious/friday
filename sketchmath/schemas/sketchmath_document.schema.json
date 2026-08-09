@@ -685,6 +685,104 @@
       "title": "ConstructionLine2DEntity",
       "type": "object"
     },
+    "DesignParameter": {
+      "additionalProperties": false,
+      "properties": {
+        "bindings": {
+          "items": {
+            "$ref": "#/$defs/DesignParameterBinding"
+          },
+          "minItems": 1,
+          "title": "Bindings",
+          "type": "array"
+        },
+        "maximum": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum"
+        },
+        "minimum": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "parameter_id": {
+          "title": "Parameter Id",
+          "type": "string"
+        },
+        "unit": {
+          "const": "mm",
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "parameter_id",
+        "name",
+        "value",
+        "bindings"
+      ],
+      "title": "DesignParameter",
+      "type": "object"
+    },
+    "DesignParameterBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_type": {
+          "enum": [
+            "rectangle_profile_width",
+            "circle_center_x",
+            "hole_position_x",
+            "hole_diameter"
+          ],
+          "title": "Binding Type",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0.0,
+          "title": "Offset",
+          "type": "number"
+        },
+        "scale": {
+          "default": 1.0,
+          "title": "Scale",
+          "type": "number"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binding_type",
+        "target_id"
+      ],
+      "title": "DesignParameterBinding",
+      "type": "object"
+    },
     "DiameterConstraint": {
       "additionalProperties": false,
       "properties": {
@@ -2838,6 +2936,13 @@
       "title": "Bodies",
       "type": "array"
     },
+    "design_parameters": {
+      "items": {
+        "$ref": "#/$defs/DesignParameter"
+      },
+      "title": "Design Parameters",
+      "type": "array"
+    },
     "document_id": {
       "title": "Document Id",
       "type": "string"
@@ -2877,8 +2982,11 @@
       "type": "integer"
     },
     "schema_version": {
-      "const": "1.0",
-      "default": "1.0",
+      "default": "1.1",
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
       "title": "Schema Version",
       "type": "string"
     },

@@ -268,7 +268,7 @@ def _chamfer_feature(
 def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch() -> None:
     document = _document()
 
-    assert document.schema_version == "1.0"
+    assert document.schema_version == "1.1"
     assert document.revision == 0
     assert [body.body_id for body in document.bodies] == ["body_main"]
     assert [sketch.sketch_id for sketch in document.sketches] == ["sketch_main"]
