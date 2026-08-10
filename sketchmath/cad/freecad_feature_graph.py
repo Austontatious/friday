@@ -200,6 +200,29 @@ def _build_body(operations: list[dict[str, Any]]) -> tuple[Any, list[dict[str, A
                     **style_metadata,
                 }
             )
+        elif feature_type == "shell":
+            if solid is None:
+                raise ValueError("Shell operation requires an existing solid")
+            bounds = [float(value) for value in operation["cavity_bounds_mm"]]
+            if len(bounds) != 6 or not all(math.isfinite(value) for value in bounds):
+                raise ValueError("Shell cavity bounds must contain six finite values")
+            x_min, x_max, y_min, y_max, z_min, z_max = bounds
+            width, height, depth = x_max - x_min, y_max - y_min, z_max - z_min
+            thickness_mm = float(operation["thickness_mm"])
+            if min(width, height, depth, thickness_mm) <= 0:
+                raise ValueError("Shell cavity dimensions and thickness must be positive")
+            cutter = Part.makeBox(width, height, depth, FreeCAD.Vector(x_min, y_min, z_min))
+            solid = solid.cut(cutter)
+            execution.append(
+                {
+                    "feature_id": operation.get("feature_id"),
+                    "feature_type": feature_type,
+                    "operation": "cut",
+                    "opening": operation.get("opening"),
+                    "thickness_mm": thickness_mm,
+                    "cavity_bounds_mm": bounds,
+                }
+            )
         else:
             raise ValueError(f"Unsupported feature-graph operation: {feature_type}")
         if hasattr(solid, "removeSplitter"):

@@ -152,6 +152,47 @@ def _advanced_hole_document(style: str) -> tuple[SketchMathDocument, FeatureReco
     return document.model_copy(update={"revision": 2, "features": [base, hole]}), hole
 
 
+def _shell_document() -> tuple[SketchMathDocument, FeatureRecord]:
+    profile = _profile("shell_base", [(0, 0), (20, 0), (20, 10), (0, 10), (0, 0)], 200, "counterclockwise")
+    document = wrap_legacy_selection_context(
+        SelectionContext(selection_set_id="shell_artifact", units="mm", items=[profile]),
+        document_id="doc_shell_artifact",
+    )
+    base = FeatureRecord.model_validate(
+        {
+            "feature_id": "feature_base",
+            "name": "Base",
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": profile.id,
+            "parameters": {"depth_mm": 10, "operation": "new_body"},
+        }
+    )
+    base_report = rebuild_document(document.model_copy(update={"features": [base]}))
+    top = next(item for item in base_report.records[0].generated_topology if item.role == "top")
+    shell = FeatureRecord.model_validate(
+        {
+            "feature_id": "feature_shell",
+            "feature_type": "shell",
+            "name": "Top-open shell",
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": None,
+            "dependencies": [base.feature_id],
+            "topology_references": [{
+                "reference_id": top.reference_id,
+                "owner_feature_id": base.feature_id,
+                "topology_type": "face",
+                "role": top.role,
+                "source_entity_id": top.source_entity_id,
+                "expected_signature": top.geometric_signature,
+            }],
+            "parameters": {"thickness_mm": 1, "opening": "top", "operation": "modify"},
+        }
+    )
+    return document.model_copy(update={"revision": 2, "features": [base, shell]}), shell
+
+
 def test_canonical_stl_materialization_uses_revisioned_safe_path_and_validates_geometry(tmp_path) -> None:
     outer = _profile("plate", [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], 100, "counterclockwise")
     hole = _profile("hole", [(3, 3), (3, 7), (7, 7), (7, 3), (3, 3)], 16, "clockwise")
@@ -298,6 +339,41 @@ def test_canonical_step_materializes_advanced_holes_with_kernel_validation(
         {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 10}
     )
     assert artifact["measurements"]["operation_execution"][-1]["style"] == style
+
+
+def test_canonical_step_materializes_rectangular_shell_with_kernel_validation(tmp_path) -> None:
+    freecad_cmd = Path("/mnt/data/freecad/squashfs-root/usr/bin/freecadcmd")
+    if not freecad_cmd.exists():
+        pytest.skip("FreeCADCmd is unavailable")
+    document, shell = _shell_document()
+
+    artifact = materialize_feature_artifact(
+        document,
+        shell.feature_id,
+        "step",
+        output_root=tmp_path / "artifacts",
+        cad_adapter=CadAdapter(freecad_cmd=freecad_cmd, export_dir=tmp_path / "kernel"),
+    )
+
+    assert Path(artifact["path"]).exists()
+    assert artifact["measurements"]["is_valid_solid"] is True
+    assert artifact["measurements"]["volume_mm3"] == pytest.approx(704, abs=1e-6)
+    assert artifact["measurements"]["bbox"] == pytest.approx(
+        {"xmin": 0, "xmax": 20, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 10}
+    )
+    shell_execution = artifact["measurements"]["operation_execution"][-1]
+    assert shell_execution["feature_type"] == "shell"
+    assert shell_execution["thickness_mm"] == pytest.approx(1)
+    assert shell_execution["cavity_bounds_mm"] == pytest.approx([1, 19, 1, 9, 1, 10])
+
+
+def test_layered_stl_rejects_shell_until_a_supported_mesher_exists(tmp_path) -> None:
+    document, shell = _shell_document()
+
+    with pytest.raises(CadExportError) as exc_info:
+        materialize_feature_artifact(document, shell.feature_id, "stl", output_root=tmp_path / "artifacts")
+
+    assert exc_info.value.detail["error_code"] == "unsupported_stl_feature_type"
 
 
 def test_layered_stl_rejects_revolve_until_a_supported_mesher_exists(tmp_path) -> None:

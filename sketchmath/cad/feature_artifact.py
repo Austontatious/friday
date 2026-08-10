@@ -11,7 +11,7 @@ from sketchmath.cad.solid_validation import validate_solid_measurements
 from sketchmath.cad.stl_export import write_ascii_stl
 from sketchmath.executor.errors import CadExportError, FeatureRebuildError, MissingEntityError, UnsupportedCadFormatError
 from sketchmath.features.rebuild import rebuild_document
-from sketchmath.models.document import ChamferParameters, ExtrudeParameters, FeatureBuildRecord, FeatureRecord, FilletParameters, HoleParameters, RevolveParameters, SketchMathDocument
+from sketchmath.models.document import ChamferParameters, ExtrudeParameters, FeatureBuildRecord, FeatureRecord, FilletParameters, HoleParameters, RevolveParameters, ShellParameters, SketchMathDocument
 from sketchmath.models.entities import Axis2DEntity, Circle2DEntity, ConstructionLine2DEntity, Line2DEntity, Profile2DEntity
 
 
@@ -237,9 +237,9 @@ def _edge_finish_step_payload(document: SketchMathDocument, feature: FeatureReco
 
 
 def _solid_graph_step_payload(document: SketchMathDocument, feature: FeatureRecord) -> dict[str, Any]:
-    if feature.feature_type not in {"extrude", "hole"}:
+    if feature.feature_type not in {"extrude", "hole", "shell"}:
         raise CadExportError(
-            "Canonical solid STEP requires an extrusion or hole terminal feature",
+            "Canonical solid STEP requires an extrusion, hole, or shell terminal feature",
             detail={"feature_id": feature.feature_id, "error_code": "unsupported_solid_graph"},
         )
     terminal_index = document.features.index(feature)
@@ -322,6 +322,18 @@ def _solid_graph_step_payload(document: SketchMathDocument, feature: FeatureReco
                     "counterbore_depth_mm": item.parameters.counterbore_depth_mm,
                     "countersink_diameter_mm": item.parameters.countersink_diameter_mm,
                     "countersink_angle_deg": item.parameters.countersink_angle_deg,
+                }
+            )
+        elif item.feature_type == "shell" and isinstance(item.parameters, ShellParameters):
+            cavity = record.measurements.bounds_mm
+            operations.append(
+                {
+                    "feature_id": item.feature_id,
+                    "feature_type": "shell",
+                    "operation": "cut",
+                    "thickness_mm": item.parameters.thickness_mm,
+                    "opening": item.parameters.opening,
+                    "cavity_bounds_mm": list(cavity),
                 }
             )
         else:
@@ -517,7 +529,7 @@ def materialize_feature_artifact(
                 **(result.measurements.model_dump(mode="json") if result.measurements is not None else {}),
                 **result.metadata,
             }
-        elif feature.feature_type == "hole" or (
+        elif feature.feature_type in {"hole", "shell"} or (
             feature.feature_type == "extrude"
             and isinstance(feature.parameters, ExtrudeParameters)
             and (feature.parameters.operation != "new_body" or bool(feature.dependencies))
