@@ -895,6 +895,35 @@ def test_sketchmath_chamfer_features_default_off_and_gate_feature_route(monkeypa
     client.close()
 
 
+def test_sketchmath_pattern_features_default_off_and_gate_feature_route(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.delenv("FRIDAY_SKETCHMATH_PATTERN_FEATURES_ENABLED", raising=False)
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={})
+    pattern = {
+        "feature_id": "feature_gated_pattern",
+        "feature_type": "linear_pattern",
+        "name": "Gated pattern",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": None,
+        "dependencies": ["feature_missing"],
+        "topology_references": [],
+        "parameters": {"count": 3, "spacing_mm": 5, "direction_xy": [1, 0], "operation": "modify"},
+    }
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{created.json()['session_id']}/features/preview",
+        json={"command": _feature_command("add_feature", "gated_pattern", 0, feature=pattern)},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "sketchmath_pattern_features_disabled"
+    client.close()
+
+
 def test_sketchmath_artifact_job_build_poll_register_download_and_replay(monkeypatch, tmp_path):
     monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
     monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
@@ -1146,6 +1175,110 @@ def test_sketchmath_typed_hole_feature_recovers_top_face_after_base_edit_and_rel
     assert reloaded.status_code == 200
     assert [feature["feature_type"] for feature in reloaded.json()["document"]["features"]] == ["extrude", "hole"]
     assert reloaded.json()["document"]["revision"] == 3
+    client.close()
+
+
+def test_sketchmath_linear_hole_pattern_commits_edits_undoes_redoes_and_reloads(monkeypatch, tmp_path):
+    from backend.sketchmath.service import SESSION_STORE
+
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_HOLE_FEATURES_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_PATTERN_FEATURES_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": _profile_selection_context()})
+    session_id = created.json()["session_id"]
+    base = _extrude_feature(10)
+    base_response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={"command": _feature_command("add_feature", "add_pattern_base", 0, feature=base, mode="commit")},
+    )
+    top = next(
+        item
+        for item in base_response.json()["document"]["last_rebuild"]["records"][0]["generated_topology"]
+        if item["role"] == "top"
+    )
+    hole = {
+        "feature_id": "feature_pattern_seed",
+        "feature_type": "hole",
+        "name": "Pattern seed",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "dependencies": ["feature_plate"],
+        "topology_references": [{
+            "reference_id": top["reference_id"],
+            "owner_feature_id": "feature_plate",
+            "topology_type": "face",
+            "role": "top",
+            "source_entity_id": "profile_box",
+            "expected_signature": top["geometric_signature"],
+        }],
+        "parameters": {
+            "style": "simple",
+            "termination": "through",
+            "position_mm": [4, 5],
+            "diameter_mm": 2,
+            "operation": "cut",
+        },
+    }
+    hole_response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={"command": _feature_command("add_feature", "add_pattern_seed", 1, feature=hole, mode="commit")},
+    )
+    assert hole_response.status_code == 200, hole_response.text
+    pattern = {
+        "feature_id": "feature_linear_pattern",
+        "feature_type": "linear_pattern",
+        "name": "Mounting row",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": None,
+        "dependencies": ["feature_pattern_seed"],
+        "topology_references": [],
+        "parameters": {"count": 3, "spacing_mm": 6, "direction_xy": [1, 0], "operation": "modify"},
+    }
+    pattern_response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={"command": _feature_command("add_feature", "add_linear_pattern", 2, feature=pattern, mode="commit")},
+    )
+    assert pattern_response.status_code == 200, pattern_response.text
+    pattern_record = pattern_response.json()["document"]["last_rebuild"]["records"][2]
+    assert pattern_record["measurements"]["volume_delta_mm3"] == pytest.approx(-20 * math.pi)
+    assert pattern_record["measurements"]["bounds_mm"] == pytest.approx([9, 17, 4, 6, 0, 10])
+
+    edited_pattern = {**pattern, "parameters": {**pattern["parameters"], "count": 2}}
+    edited = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={
+            "command": _feature_command(
+                "replace_feature",
+                "edit_linear_pattern",
+                3,
+                feature=edited_pattern,
+                target_id="feature_linear_pattern",
+                mode="commit",
+            )
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["document"]["features"][2]["parameters"]["count"] == 2
+    reverted = client.post(f"/api/sketchmath/sessions/{session_id}/features/revert")
+    assert reverted.status_code == 200
+    assert reverted.json()["document"]["features"][2]["parameters"]["count"] == 3
+    redone = client.post(f"/api/sketchmath/sessions/{session_id}/features/redo")
+    assert redone.status_code == 200
+    assert redone.json()["document"]["features"][2]["parameters"]["count"] == 2
+
+    SESSION_STORE._sessions.pop(session_id, None)
+    reloaded = client.get(f"/api/sketchmath/sessions/{session_id}")
+    assert reloaded.status_code == 200
+    assert [feature["feature_type"] for feature in reloaded.json()["document"]["features"]] == [
+        "extrude",
+        "hole",
+        "linear_pattern",
+    ]
+    assert reloaded.json()["document"]["features"][2]["parameters"]["count"] == 2
     client.close()
 
 

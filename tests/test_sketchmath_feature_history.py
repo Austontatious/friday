@@ -265,6 +265,34 @@ def _chamfer_feature(
     return FeatureRecord.model_validate(payload)
 
 
+def _linear_pattern_feature(
+    feature_id: str,
+    seed: FeatureRecord,
+    *,
+    count: int = 3,
+    spacing: float = 2,
+    direction: tuple[float, float] = (1, 0),
+) -> FeatureRecord:
+    return FeatureRecord.model_validate(
+        {
+            "feature_id": feature_id,
+            "feature_type": "linear_pattern",
+            "name": feature_id.replace("_", " ").title(),
+            "body_id": seed.body_id,
+            "sketch_id": seed.sketch_id,
+            "profile_id": None,
+            "dependencies": [seed.feature_id],
+            "topology_references": [],
+            "parameters": {
+                "count": count,
+                "spacing_mm": spacing,
+                "direction_xy": direction,
+                "operation": "modify",
+            },
+        }
+    )
+
+
 def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch() -> None:
     document = _document()
 
@@ -356,6 +384,62 @@ def test_dependency_order_drives_add_and_cut_rebuild() -> None:
     assert [record.measurements.volume_delta_mm3 for record in report.records if record.measurements] == pytest.approx([840, 144, -72])
     assert report.records[1].measurements.bounds_mm[-2:] == pytest.approx((10, 14))
     assert report.records[2].measurements.bounds_mm[-2:] == pytest.approx((12, 14))
+
+
+def test_linear_hole_pattern_rebuild_is_exact_deterministic_and_topology_stable() -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    seed = _hole_feature("hole_seed", base, position=(3, 5), diameter=1)
+    pattern = _linear_pattern_feature("pattern_holes", seed, count=3, spacing=2, direction=(2, 0))
+    document = _document().model_copy(update={"features": [pattern, seed, base]})
+
+    first = rebuild_document(document)
+    second = rebuild_document(document.model_copy(deep=True))
+
+    assert first == second
+    assert first.ok is True
+    assert first.rebuild_order == ["feature_base", "hole_seed", "pattern_holes"]
+    record = first.records[2]
+    assert record.measurements is not None
+    assert record.measurements.net_profile_area_mm2 == pytest.approx(math.pi / 2)
+    assert record.measurements.volume_delta_mm3 == pytest.approx(-5 * math.pi)
+    assert record.measurements.bounds_mm == pytest.approx((4.5, 7.5, 4.5, 5.5, 0, 10))
+    assert record.measurements.hole_count == 2
+    assert len(record.generated_topology) == 4
+    assert {item.measurements["instance_index"] for item in record.generated_topology} == {1, 2}
+    assert {item.measurements["offset_x_mm"] for item in record.generated_topology} == {2.0, 4.0}
+
+
+@pytest.mark.parametrize(
+    ("count", "spacing", "direction"),
+    [(1, 2, (1, 0)), (3, 0, (1, 0)), (3, 2, (0, 0)), (3, math.inf, (1, 0))],
+)
+def test_linear_pattern_rejects_invalid_typed_parameters(
+    count: int,
+    spacing: float,
+    direction: tuple[float, float],
+) -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    seed = _hole_feature("hole_seed", base, position=(3, 5), diameter=1)
+
+    with pytest.raises(ValueError):
+        _linear_pattern_feature("pattern_holes", seed, count=count, spacing=spacing, direction=direction)
+
+
+def test_linear_pattern_refuses_overlap_and_instances_outside_target_atomically() -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    seed = _hole_feature("hole_seed", base, position=(3, 5), diameter=1)
+    overlap = _linear_pattern_feature("pattern_overlap", seed, spacing=0.5)
+    outside = _linear_pattern_feature("pattern_outside", seed, count=4, spacing=2)
+
+    overlap_report = rebuild_document(_document().model_copy(update={"features": [base, seed, overlap]}))
+    outside_report = rebuild_document(_document().model_copy(update={"features": [base, seed, outside]}))
+
+    assert overlap_report.ok is False
+    assert overlap_report.records[2].error is not None
+    assert overlap_report.records[2].error.code == "linear_pattern_instances_overlap"
+    assert outside_report.ok is False
+    assert outside_report.records[2].error is not None
+    assert outside_report.records[2].error.code == "linear_pattern_instance_outside_target"
 
 
 def test_boolean_extrusion_requires_semantic_attachment_and_direction_into_target() -> None:

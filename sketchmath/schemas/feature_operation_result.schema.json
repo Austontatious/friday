@@ -1396,7 +1396,8 @@
             "hole",
             "revolve",
             "fillet",
-            "chamfer"
+            "chamfer",
+            "linear_pattern"
           ],
           "title": "Feature Type",
           "type": "string"
@@ -1421,6 +1422,9 @@
             },
             {
               "$ref": "#/$defs/ChamferParameters"
+            },
+            {
+              "$ref": "#/$defs/LinearPatternParameters"
             }
           ],
           "title": "Parameters"
@@ -1898,6 +1902,52 @@
         "end"
       ],
       "title": "Line2DEntity",
+      "type": "object"
+    },
+    "LinearPatternParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "maximum": 128,
+          "minimum": 2,
+          "title": "Count",
+          "type": "integer"
+        },
+        "direction_xy": {
+          "default": [
+            1.0,
+            0.0
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Direction Xy",
+          "type": "array"
+        },
+        "operation": {
+          "const": "modify",
+          "default": "modify",
+          "title": "Operation",
+          "type": "string"
+        },
+        "spacing_mm": {
+          "exclusiveMinimum": 0,
+          "title": "Spacing Mm",
+          "type": "number"
+        }
+      },
+      "required": [
+        "count",
+        "spacing_mm"
+      ],
+      "title": "LinearPatternParameters",
       "type": "object"
     },
     "MidpointConstraint": {

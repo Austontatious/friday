@@ -125,6 +125,16 @@ def _require_enabled_feature_family(command: Dict[str, Any]) -> None:
                 False,
             ),
         )
+    if isinstance(feature, dict) and feature.get("feature_type") == "linear_pattern" and not SketchMathConfig.from_env().pattern_features_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=_error_payload(
+                "sketchmath_pattern_features_disabled",
+                "SketchMath feature patterns are disabled",
+                "Set FRIDAY_SKETCHMATH_PATTERN_FEATURES_ENABLED=1",
+                False,
+            ),
+        )
 
 
 def _cad_export_root() -> Path:

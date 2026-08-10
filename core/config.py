@@ -189,6 +189,7 @@ class SketchMathConfig:
     revolve_features_enabled: bool
     fillet_features_enabled: bool
     chamfer_features_enabled: bool
+    pattern_features_enabled: bool
     artifact_jobs_enabled: bool
     session_dir: str
     cad_export_dir: str
@@ -217,6 +218,7 @@ class SketchMathConfig:
             revolve_features_enabled=_env_bool("FRIDAY_SKETCHMATH_REVOLVE_FEATURES_ENABLED", default=False),
             fillet_features_enabled=_env_bool("FRIDAY_SKETCHMATH_FILLET_FEATURES_ENABLED", default=False),
             chamfer_features_enabled=_env_bool("FRIDAY_SKETCHMATH_CHAMFER_FEATURES_ENABLED", default=False),
+            pattern_features_enabled=_env_bool("FRIDAY_SKETCHMATH_PATTERN_FEATURES_ENABLED", default=False),
             artifact_jobs_enabled=_env_bool("FRIDAY_SKETCHMATH_ARTIFACT_JOBS_ENABLED", default=False),
             session_dir=session_dir,
             cad_export_dir=cad_export_dir,

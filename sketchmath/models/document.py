@@ -138,6 +138,23 @@ class ChamferParameters(BaseModel):
         return self
 
 
+class LinearPatternParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    count: int = Field(ge=2, le=128)
+    spacing_mm: float = Field(gt=0)
+    direction_xy: tuple[float, float] = (1.0, 0.0)
+    operation: Literal["modify"] = "modify"
+
+    @model_validator(mode="after")
+    def validate_linear_pattern_parameters(self) -> "LinearPatternParameters":
+        if not math.isfinite(self.spacing_mm) or not all(math.isfinite(value) for value in self.direction_xy):
+            raise ValueError("linear pattern parameters must be finite")
+        if math.hypot(*self.direction_xy) <= 1e-9:
+            raise ValueError("linear pattern direction must be non-zero")
+        return self
+
+
 class TopologyReferenceSelector(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -180,7 +197,7 @@ class FeatureRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     feature_id: str
-    feature_type: Literal["extrude", "hole", "revolve", "fillet", "chamfer"] = "extrude"
+    feature_type: Literal["extrude", "hole", "revolve", "fillet", "chamfer", "linear_pattern"] = "extrude"
     name: str
     body_id: str
     sketch_id: str
@@ -188,7 +205,7 @@ class FeatureRecord(BaseModel):
     source_region_id: str | None = None
     dependencies: list[str] = Field(default_factory=list)
     topology_references: list[TopologyReferenceSelector] = Field(default_factory=list)
-    parameters: ExtrudeParameters | HoleParameters | RevolveParameters | FilletParameters | ChamferParameters
+    parameters: ExtrudeParameters | HoleParameters | RevolveParameters | FilletParameters | ChamferParameters | LinearPatternParameters
     suppressed: bool = False
 
     @model_validator(mode="after")
@@ -213,11 +230,16 @@ class FeatureRecord(BaseModel):
                 raise ValueError("fillet feature requires fillet parameters")
             if self.profile_id is not None:
                 raise ValueError("fillet feature does not use profile_id")
-        else:
+        elif self.feature_type == "chamfer":
             if not isinstance(self.parameters, ChamferParameters):
                 raise ValueError("chamfer feature requires chamfer parameters")
             if self.profile_id is not None:
                 raise ValueError("chamfer feature does not use profile_id")
+        else:
+            if not isinstance(self.parameters, LinearPatternParameters):
+                raise ValueError("linear pattern feature requires linear pattern parameters")
+            if self.profile_id is not None:
+                raise ValueError("linear pattern feature does not use profile_id")
         return self
 
 
