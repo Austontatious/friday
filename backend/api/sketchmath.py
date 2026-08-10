@@ -135,6 +135,16 @@ def _require_enabled_feature_family(command: Dict[str, Any]) -> None:
                 False,
             ),
         )
+    if isinstance(feature, dict) and feature.get("feature_type") == "mirror" and not SketchMathConfig.from_env().mirror_features_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=_error_payload(
+                "sketchmath_mirror_features_disabled",
+                "SketchMath feature mirrors are disabled",
+                "Set FRIDAY_SKETCHMATH_MIRROR_FEATURES_ENABLED=1",
+                False,
+            ),
+        )
 
 
 def _cad_export_root() -> Path:

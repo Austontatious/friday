@@ -1382,7 +1382,8 @@
             "fillet",
             "chamfer",
             "linear_pattern",
-            "circular_pattern"
+            "circular_pattern",
+            "mirror"
           ],
           "title": "Feature Type",
           "type": "string"
@@ -1413,6 +1414,9 @@
             },
             {
               "$ref": "#/$defs/CircularPatternParameters"
+            },
+            {
+              "$ref": "#/$defs/MirrorParameters"
             }
           ],
           "title": "Parameters"
@@ -1993,6 +1997,26 @@
         "line_points"
       ],
       "title": "MidpointConstraint",
+      "type": "object"
+    },
+    "MirrorParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "mirror_line_entity_id": {
+          "title": "Mirror Line Entity Id",
+          "type": "string"
+        },
+        "operation": {
+          "const": "modify",
+          "default": "modify",
+          "title": "Operation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mirror_line_entity_id"
+      ],
+      "title": "MirrorParameters",
       "type": "object"
     },
     "ParallelConstraint": {

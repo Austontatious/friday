@@ -924,6 +924,35 @@ def test_sketchmath_pattern_features_default_off_and_gate_feature_route(monkeypa
     client.close()
 
 
+def test_sketchmath_mirror_features_default_off_and_gate_feature_route(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.delenv("FRIDAY_SKETCHMATH_MIRROR_FEATURES_ENABLED", raising=False)
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={})
+    mirror = {
+        "feature_id": "feature_gated_mirror",
+        "feature_type": "mirror",
+        "name": "Gated mirror",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": None,
+        "dependencies": ["feature_missing"],
+        "topology_references": [],
+        "parameters": {"mirror_line_entity_id": "axis_missing", "operation": "modify"},
+    }
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{created.json()['session_id']}/features/preview",
+        json={"command": _feature_command("add_feature", "gated_mirror", 0, feature=mirror)},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "sketchmath_mirror_features_disabled"
+    client.close()
+
+
 def test_sketchmath_artifact_job_build_poll_register_download_and_replay(monkeypatch, tmp_path):
     monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
     monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
@@ -1185,9 +1214,14 @@ def test_sketchmath_linear_hole_pattern_commits_edits_undoes_redoes_and_reloads(
     monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
     monkeypatch.setenv("FRIDAY_SKETCHMATH_HOLE_FEATURES_ENABLED", "1")
     monkeypatch.setenv("FRIDAY_SKETCHMATH_PATTERN_FEATURES_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_MIRROR_FEATURES_ENABLED", "1")
     monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
     client = TestClient(create_app())
-    created = client.post("/api/sketchmath/sessions", json={"selection_context": _profile_selection_context()})
+    selection = _profile_selection_context()
+    selection["items"].append(
+        {"id": "axis_x6", "type": "construction_line_2d", "start": [6, 0], "end": [6, 10]}
+    )
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": selection})
     session_id = created.json()["session_id"]
     base = _extrude_feature(10)
     base_response = client.post(
@@ -1304,6 +1338,34 @@ def test_sketchmath_linear_hole_pattern_commits_edits_undoes_redoes_and_reloads(
     assert circular_record["measurements"]["volume_delta_mm3"] == pytest.approx(-10 * math.pi)
     assert circular_record["measurements"]["bounds_mm"] == pytest.approx([15, 17, 4, 6, 0, 10])
 
+    mirror = {
+        "feature_id": "feature_mirror",
+        "feature_type": "mirror",
+        "name": "Opposed hole",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": None,
+        "dependencies": ["feature_pattern_seed"],
+        "topology_references": [],
+        "parameters": {"mirror_line_entity_id": "axis_x6", "operation": "modify"},
+    }
+    mirror_response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={
+            "command": _feature_command(
+                "add_feature",
+                "add_feature_mirror",
+                circular_response.json()["document"]["revision"],
+                feature=mirror,
+                mode="commit",
+            )
+        },
+    )
+    assert mirror_response.status_code == 200, mirror_response.text
+    mirror_record = mirror_response.json()["document"]["last_rebuild"]["records"][4]
+    assert mirror_record["measurements"]["volume_delta_mm3"] == pytest.approx(-10 * math.pi)
+    assert mirror_record["measurements"]["bounds_mm"] == pytest.approx([7, 9, 4, 6, 0, 10])
+
     SESSION_STORE._sessions.pop(session_id, None)
     reloaded = client.get(f"/api/sketchmath/sessions/{session_id}")
     assert reloaded.status_code == 200
@@ -1312,9 +1374,11 @@ def test_sketchmath_linear_hole_pattern_commits_edits_undoes_redoes_and_reloads(
         "hole",
         "linear_pattern",
         "circular_pattern",
+        "mirror",
     ]
     assert reloaded.json()["document"]["features"][2]["parameters"]["count"] == 2
     assert reloaded.json()["document"]["features"][3]["parameters"]["center_mm"] == [10.0, 5.0]
+    assert reloaded.json()["document"]["features"][4]["parameters"]["mirror_line_entity_id"] == "axis_x6"
     client.close()
 
 

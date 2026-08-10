@@ -17,6 +17,7 @@ from sketchmath.models.document import (
     FilletParameters,
     HoleParameters,
     LinearPatternParameters,
+    MirrorParameters,
     RevolveParameters,
     ResolvedTopologyReference,
     SemanticTopologyReference,
@@ -942,6 +943,171 @@ def _circular_pattern_contract(
     return measurements, generated_topology, source_geometry, None
 
 
+def _mirror_line(document: SketchMathDocument, feature: FeatureRecord) -> tuple[tuple[float, float], tuple[float, float]]:
+    parameters = feature.parameters
+    if not isinstance(parameters, MirrorParameters):
+        raise ValueError("mirror feature requires mirror parameters")
+    sketch = next((candidate for candidate in document.sketches if candidate.sketch_id == feature.sketch_id), None)
+    if sketch is None:
+        raise ValueError("mirror sketch does not exist")
+    try:
+        axis = sketch.state.get_entity(parameters.mirror_line_entity_id)
+    except Exception as exc:
+        raise ValueError("mirror line does not exist") from exc
+    if isinstance(axis, Axis2DEntity):
+        origin = axis.origin
+        vector = axis.direction
+    elif isinstance(axis, (Line2DEntity, ConstructionLine2DEntity)):
+        origin = axis.start
+        vector = (axis.end[0] - axis.start[0], axis.end[1] - axis.start[1])
+    else:
+        raise ValueError("mirror reference must be an axis, line, or construction line")
+    magnitude = math.hypot(*vector)
+    if not math.isfinite(magnitude) or magnitude <= 1e-9:
+        raise ValueError("mirror line must have non-zero finite direction")
+    return (float(origin[0]), float(origin[1])), (float(vector[0] / magnitude), float(vector[1] / magnitude))
+
+
+def _mirror_contract(
+    feature: FeatureRecord,
+    records_by_id: dict[str, FeatureBuildRecord],
+    feature_map: dict[str, FeatureRecord],
+    document: SketchMathDocument,
+) -> tuple[FeatureMeasurements | None, list[SemanticTopologyReference], dict[str, object], FeatureBuildError | None]:
+    if not isinstance(feature.parameters, MirrorParameters):
+        return None, [], {}, FeatureBuildError(
+            code="invalid_mirror_parameters",
+            message="Mirror feature requires matching parameters.",
+        )
+    if len(feature.dependencies) != 1:
+        return None, [], {}, FeatureBuildError(
+            code="mirror_seed_dependency_required",
+            message="A feature mirror requires exactly one seed feature dependency.",
+            detail={"dependency_ids": feature.dependencies},
+        )
+    seed_id = feature.dependencies[0]
+    seed_feature = feature_map.get(seed_id)
+    seed_record = records_by_id.get(seed_id)
+    if (
+        seed_feature is None
+        or seed_record is None
+        or seed_record.measurements is None
+        or seed_feature.feature_type != "hole"
+        or not isinstance(seed_feature.parameters, HoleParameters)
+    ):
+        return None, [], {}, FeatureBuildError(
+            code="unsupported_mirror_seed",
+            message="Canonical feature mirror currently supports a built hole seed.",
+            detail={"seed_feature_id": seed_id, "feature_type": seed_feature.feature_type if seed_feature else None},
+        )
+    if not seed_feature.dependencies:
+        return None, [], {}, FeatureBuildError(
+            code="mirror_seed_target_missing",
+            message="The hole seed must retain its target dependency.",
+            detail={"seed_feature_id": seed_id},
+        )
+    target_feature = feature_map.get(seed_feature.dependencies[0])
+    if target_feature is None or target_feature.feature_type != "extrude":
+        return None, [], {}, FeatureBuildError(
+            code="unsupported_mirror_target",
+            message="Canonical mirrored holes currently require an extrusion target.",
+            detail={"target_feature_id": seed_feature.dependencies[0], "feature_type": target_feature.feature_type if target_feature else None},
+        )
+    target_profile, target_holes, target_error = _profile_for_feature(document, target_feature)
+    if target_error is not None or target_profile is None:
+        return None, [], {}, target_error
+    try:
+        line_origin, line_direction = _mirror_line(document, feature)
+    except ValueError as exc:
+        return None, [], {}, FeatureBuildError(
+            code="invalid_mirror_line",
+            message=str(exc),
+            detail={"mirror_line_entity_id": feature.parameters.mirror_line_entity_id},
+        )
+
+    seed_center = seed_feature.parameters.position_mm
+    relative = (seed_center[0] - line_origin[0], seed_center[1] - line_origin[1])
+    along = relative[0] * line_direction[0] + relative[1] * line_direction[1]
+    projection = (line_origin[0] + along * line_direction[0], line_origin[1] + along * line_direction[1])
+    mirrored_center = (2.0 * projection[0] - seed_center[0], 2.0 * projection[1] - seed_center[1])
+    distance_to_line = math.dist(seed_center, projection)
+    if distance_to_line <= 1e-9:
+        return None, [], {}, FeatureBuildError(
+            code="mirror_seed_on_line",
+            message="Mirror seed must remain away from the mirror line.",
+            detail={"seed_center_mm": seed_center, "mirror_line_entity_id": feature.parameters.mirror_line_entity_id},
+        )
+    radius = max(
+        seed_feature.parameters.diameter_mm,
+        float(seed_feature.parameters.counterbore_diameter_mm or 0.0),
+        float(seed_feature.parameters.countersink_diameter_mm or 0.0),
+    ) / 2.0
+    if math.dist(seed_center, mirrored_center) < 2.0 * radius - 1e-9:
+        return None, [], {}, FeatureBuildError(
+            code="mirror_instance_overlaps_seed",
+            message="Mirrored hole cannot overlap its seed.",
+            detail={"seed_center_mm": seed_center, "mirrored_center_mm": mirrored_center, "radius_mm": radius},
+        )
+    target_polygon = Polygon(target_profile.vertices, holes=[hole.vertices for hole in target_holes])
+    point = Point(mirrored_center)
+    if not target_polygon.covers(point) or target_polygon.boundary.distance(point) + 1e-9 < radius:
+        return None, [], {}, FeatureBuildError(
+            code="mirror_instance_outside_target",
+            message="Mirrored hole must remain inside target material.",
+            detail={"mirrored_center_mm": mirrored_center, "radius_mm": radius},
+        )
+
+    seed_measurements = seed_record.measurements
+    measurements = FeatureMeasurements(
+        net_profile_area_mm2=seed_measurements.net_profile_area_mm2,
+        volume_delta_mm3=seed_measurements.volume_delta_mm3,
+        bounds_mm=(
+            mirrored_center[0] - radius,
+            mirrored_center[0] + radius,
+            mirrored_center[1] - radius,
+            mirrored_center[1] + radius,
+            seed_measurements.bounds_mm[4],
+            seed_measurements.bounds_mm[5],
+        ),
+        hole_count=seed_measurements.hole_count,
+    )
+    offset = (mirrored_center[0] - seed_center[0], mirrored_center[1] - seed_center[1])
+    generated_topology = [
+        _semantic_reference(
+            feature,
+            topology_type=seed_topology.topology_type,
+            role=seed_topology.role,
+            source_entity_id=seed_topology.reference_id,
+            ordinal=ordinal,
+            geometry={
+                "seed_reference_id": seed_topology.reference_id,
+                "mirror_line_entity_id": feature.parameters.mirror_line_entity_id,
+                "line_origin": line_origin,
+                "line_direction": line_direction,
+                "mirrored_center_mm": mirrored_center,
+            },
+            measurements={
+                **seed_topology.measurements,
+                "offset_x_mm": offset[0],
+                "offset_y_mm": offset[1],
+                "mirrored_center_x_mm": mirrored_center[0],
+                "mirrored_center_y_mm": mirrored_center[1],
+            },
+        )
+        for ordinal, seed_topology in enumerate(seed_record.generated_topology)
+    ]
+    source_geometry = {
+        "seed_feature_id": seed_id,
+        "seed_signature": seed_record.output_signature,
+        "mirror_line_entity_id": feature.parameters.mirror_line_entity_id,
+        "line_origin": line_origin,
+        "line_direction": line_direction,
+        "seed_center_mm": seed_center,
+        "mirrored_center_mm": mirrored_center,
+    }
+    return measurements, generated_topology, source_geometry, None
+
+
 def _resolve_topology_references(
     feature: FeatureRecord,
     records_by_id: dict[str, FeatureBuildRecord],
@@ -1209,6 +1375,13 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                 feature_map,
                 document,
             )
+        if error is None and feature.feature_type == "mirror":
+            pattern_measurements, pattern_topology, pattern_source_geometry, error = _mirror_contract(
+                feature,
+                records_by_id,
+                feature_map,
+                document,
+            )
         if error is None and feature.feature_type == "revolve":
             assert isinstance(feature.parameters, RevolveParameters)
             if not math.isclose(feature.parameters.angle_deg, 360.0, abs_tol=1e-9):
@@ -1395,7 +1568,7 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                         "target_signature": records_by_id[feature.dependencies[0]].output_signature,
                         "distance_mm": feature.parameters.distance_mm,
                     }
-                elif feature.feature_type in {"linear_pattern", "circular_pattern"}:
+                elif feature.feature_type in {"linear_pattern", "circular_pattern", "mirror"}:
                     assert pattern_measurements is not None
                     measurements = pattern_measurements
                     generated_topology = pattern_topology

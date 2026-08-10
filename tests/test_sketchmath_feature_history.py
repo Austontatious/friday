@@ -70,6 +70,12 @@ def _selection() -> SelectionContext:
                     "origin": [0, 0],
                     "direction": [0, 1],
                 },
+                {
+                    "id": "axis_x5",
+                    "type": "axis_2d",
+                    "origin": [5, 0],
+                    "direction": [0, 1],
+                },
             ],
         }
     )
@@ -322,6 +328,22 @@ def _circular_pattern_feature(
     )
 
 
+def _mirror_feature(feature_id: str, seed: FeatureRecord, *, line_id: str = "axis_x5") -> FeatureRecord:
+    return FeatureRecord.model_validate(
+        {
+            "feature_id": feature_id,
+            "feature_type": "mirror",
+            "name": feature_id.replace("_", " ").title(),
+            "body_id": seed.body_id,
+            "sketch_id": seed.sketch_id,
+            "profile_id": None,
+            "dependencies": [seed.feature_id],
+            "topology_references": [],
+            "parameters": {"mirror_line_entity_id": line_id, "operation": "modify"},
+        }
+    )
+
+
 def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch() -> None:
     document = _document()
 
@@ -337,6 +359,7 @@ def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch(
         "profile_revolve_cut",
         "profile_cross_axis",
         "axis_y",
+        "axis_x5",
     ]
 
 
@@ -524,6 +547,54 @@ def test_circular_pattern_refuses_degenerate_overlap_and_outside_instances(
     pattern = _circular_pattern_feature("pattern_holes", seed, center=center, count=count)
 
     report = rebuild_document(_document().model_copy(update={"features": [base, seed, pattern]}))
+
+    assert report.ok is False
+    assert report.records[2].error is not None
+    assert report.records[2].error.code == expected_code
+
+
+def test_feature_mirror_rebuild_is_exact_deterministic_and_topology_stable() -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    seed = _hole_feature("hole_seed", base, position=(3, 5), diameter=1)
+    mirror = _mirror_feature("mirror_hole", seed)
+    document = _document().model_copy(update={"features": [mirror, seed, base]})
+
+    first = rebuild_document(document)
+    second = rebuild_document(document.model_copy(deep=True))
+
+    assert first == second
+    assert first.ok is True
+    assert first.rebuild_order == ["feature_base", "hole_seed", "mirror_hole"]
+    record = first.records[2]
+    assert record.measurements is not None
+    assert record.measurements.net_profile_area_mm2 == pytest.approx(math.pi / 4)
+    assert record.measurements.volume_delta_mm3 == pytest.approx(-2.5 * math.pi)
+    assert record.measurements.bounds_mm == pytest.approx((6.5, 7.5, 4.5, 5.5, 0, 10))
+    assert record.measurements.hole_count == 1
+    assert len(record.generated_topology) == 2
+    assert {item.measurements["mirrored_center_x_mm"] for item in record.generated_topology} == {7.0}
+    assert {item.measurements["offset_x_mm"] for item in record.generated_topology} == {4.0}
+
+
+@pytest.mark.parametrize(
+    ("seed_position", "line_id", "expected_code"),
+    [
+        ((5, 5), "axis_x5", "mirror_seed_on_line"),
+        ((4.75, 5), "axis_x5", "mirror_instance_overlaps_seed"),
+        ((3, 5), "axis_y", "mirror_instance_outside_target"),
+        ((3, 5), "axis_missing", "invalid_mirror_line"),
+    ],
+)
+def test_feature_mirror_refuses_degenerate_overlap_outside_and_missing_lines(
+    seed_position: tuple[float, float],
+    line_id: str,
+    expected_code: str,
+) -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    seed = _hole_feature("hole_seed", base, position=seed_position, diameter=1)
+    mirror = _mirror_feature("mirror_hole", seed, line_id=line_id)
+
+    report = rebuild_document(_document().model_copy(update={"features": [base, seed, mirror]}))
 
     assert report.ok is False
     assert report.records[2].error is not None
