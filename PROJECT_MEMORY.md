@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-08-09 - SketchMath Canonical Linear Hole Pattern
+
+### What Changed
+- Added `linear_pattern` as a typed feature-history record with bounded count, spacing, direction, and explicit hole-seed dependency.
+- Added exact deterministic removed-volume, bounds, instance topology, overlap refusal, and extrusion-target containment checks.
+- Added default-off browser create/edit controls plus feature commit, undo/redo, persistence, and reload coverage.
+
+### Why
+- `SM-FEAT-005` previously had no canonical feature-level pattern; the existing pattern command only copied sketch geometry.
+
+### New Env Flags
+- `FRIDAY_SKETCHMATH_PATTERN_FEATURES_ENABLED=0`
+- `REACT_APP_SKETCHMATH_PATTERN_FEATURES_ENABLED=0`
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py tests/test_sketchmath_api.py`
+- `python3 -m sketchmath.schemas.generate --check`
+- `cd frontend && CI=true npm test -- --runInBand --watchAll=false --runTestsByPath src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run build`
+
+### Evidence and Boundary
+- The modeled count includes the seed; generated instances carry stable seed-reference/index/offset topology metadata.
+- This slice is limited to one terminal hole seed on an extrusion and has no kernel artifact path. Circular pattern, feature mirror, shell, broader seeds, and pattern STL/STEP remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Kernel-Validated Advanced-Hole STEP
 
 ### What Changed

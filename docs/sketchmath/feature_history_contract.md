@@ -14,6 +14,7 @@ Both flags are required for the browser workflow:
 - full revolves additionally require backend `FRIDAY_SKETCHMATH_REVOLVE_FEATURES_ENABLED=1` and frontend `REACT_APP_SKETCHMATH_REVOLVE_FEATURES_ENABLED=1`
 - fillets additionally require backend `FRIDAY_SKETCHMATH_FILLET_FEATURES_ENABLED=1` and frontend `REACT_APP_SKETCHMATH_FILLET_FEATURES_ENABLED=1`
 - chamfers additionally require backend `FRIDAY_SKETCHMATH_CHAMFER_FEATURES_ENABLED=1` and frontend `REACT_APP_SKETCHMATH_CHAMFER_FEATURES_ENABLED=1`
+- feature patterns additionally require backend `FRIDAY_SKETCHMATH_PATTERN_FEATURES_ENABLED=1` and frontend `REACT_APP_SKETCHMATH_PATTERN_FEATURES_ENABLED=1`
 
 Both default to off. The existing `FRIDAY_SKETCHMATH_ENABLED` and `REACT_APP_SKETCHMATH_ENABLED` gates are still required. With document v1 off, legacy sessions keep their prior response and persistence shape.
 
@@ -75,6 +76,8 @@ Typed revolve parameters name a stable sketch axis entity, a finite angle, and n
 Typed fillet parameters carry a positive radius and semantic convex outer-vertical-edge selectors. Extrusion topology records source/adjacency identity, 3D endpoints, geometric signature, corner class, and a safe radius bound. Rebuild resolves exact/recovered state and refuses missing, ambiguous, duplicate, non-vertical, concave, or oversized selections. Fillet measurements are explicitly `kernel_required`; validated volume/bounds come from the revision-bound FreeCAD STEP job described in `fillet_feature_contract.md`.
 
 Typed chamfer parameters carry a positive distance and reuse that exact edge selector/recovery contract. Rebuild generates `chamfer_surface` references, enforces the same adjacent-edge bound, and leaves measurements `kernel_required`. The bounded job invokes native FreeCAD `makeChamfer`; see `chamfer_feature_contract.md`.
+
+Typed linear-pattern parameters carry a bounded count, positive spacing, non-zero 2D direction, and `modify` operation. The current stable envelope patterns one terminal hole across its extrusion target, computes exact additional volume/bounds/topology, refuses overlap or target-boundary crossings atomically, and supports browser creation/replacement plus undo/redo/reload. See `linear_pattern_feature_contract.md`. Circular pattern, feature mirror, shell, broader seeds, and kernel artifacts remain open.
 
 Preview is side-effect free. Feature commits, rebuild, undo, redo, and reload never invoke FreeCAD. Kernel work runs only through an explicit revision-bound artifact job; the legacy `extrude_profile` preview/STEP workflow remains a separate compatibility path.
 
