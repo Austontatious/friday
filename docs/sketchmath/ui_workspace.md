@@ -133,7 +133,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 ## Revisioned STL Export
 
 - Build STL submits a persistent asynchronous request for the selected terminal feature and current document revision.
-- The current layered materializer supports vertical extrusion graphs and simple typed holes. It validates analytic bounds/volume, closed edges, safe paths, and content hash before registration.
+- The current layered materializer supports vertical new-body/add/cut extrusion graphs and simple typed holes. It validates analytic bounds/volume, closed edges, safe paths, and content hash before registration; the live semantic-cut workflow proves job polling, registration, download, and reload.
 - STL files are downloaded through `GET /api/sketchmath/artifacts/stl?path=...`, restricted to `.stl` below the configured CAD export root.
 - Counterbore/countersink/fillet/chamfer STL, STEP beyond independent extrusion or terminal fillet/chamfer, cancellation, and automatic artifact cleanup remain outside this UI envelope. See `artifact_job_contract.md`.
 

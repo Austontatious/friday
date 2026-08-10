@@ -94,7 +94,7 @@ When the frontend flag is enabled, the workspace shows Feature history with:
 - default-off outer-vertical-edge chamfer creation, distance replacement, kernel STEP build, and download for its supported bounded vertical feature graph;
 - dedicated feature undo and redo.
 
-For the bounded downstream creation path, the browser attaches to the most recent extrusion's semantic top face. Add remains positive and a one-sided cut is automatically directed negative into that face, matching structural rebuild validation. This is not arbitrary face picking: other target selection, spatial kernel booleans, and cut STL/STEP remain outside the current envelope.
+For the bounded downstream creation path, the browser attaches to the most recent extrusion's semantic top face. Add remains positive and a one-sided cut is automatically directed negative into that face, matching structural rebuild validation. A terminal cut graph can run through the validated layered STL job. This is not arbitrary face picking or a spatial kernel boolean: other target selection and cut STEP remain outside the current envelope.
 
 Normal-mode tree labels use names and feature types rather than raw body/sketch/feature/profile/axis IDs. Persisted body/sketch visibility is shown read-only until renderer behavior supports a truthful mutation control. See `model_tree_contract.md`.
 
@@ -115,6 +115,6 @@ A revision conflict refreshes the backend-authoritative session before the user 
 ## Open Boundaries
 
 - The adapter supports one sketch and one process-authoritative session cache.
-- Deterministic layered STL materializes supported vertical extrusion/simple-hole graphs; STEP additionally materializes a bounded positive base/additive-extrusion/simple-hole graph with one terminal fillet or chamfer. Other intermediate feature types and general full-graph STEP remain open.
+- Deterministic layered STL materializes supported vertical new-body/add/cut extrusion and simple-hole graphs; STEP additionally materializes a bounded positive base/additive-extrusion/simple-hole graph with one terminal fillet or chamfer. Other intermediate feature types and general full-graph STEP remain open.
 - Partial revolve, kernel-backed revolve boolean/artifact validation, broader fillet/chamfer, shell, and feature pattern/mirror operations remain open.
 - Semantic source/role/signature recovery is implemented for generated extrusion/hole/revolve/edge-finish-input topology. Fillet/chamfer artifact execution uniquely reconciles supported edges by endpoints; arbitrary browser picking and general kernel-topology reconciliation remain open.

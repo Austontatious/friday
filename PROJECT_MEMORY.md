@@ -7,6 +7,29 @@
 
 ---
 
+## 2026-08-09 - SketchMath Semantic Cut STL Acceptance
+
+### What Changed
+- Added exact artifact evidence for the existing layered extrusion-subtraction path: a 10 × 10 × 10 base with a 4 × 4 × 4 top pocket materializes as a closed 936 mm³ STL.
+- Extended the live semantic-cut workflow through the revision-bound asynchronous STL job, artifact registration, browser download, and reload.
+
+### Why
+- Cut authoring was proven at rebuild level, but the supported layered mesher had no explicit cut-graph acceptance and documentation still classified cut STL as open.
+
+### New Env Flags
+- None; the existing artifact-job flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_artifact.py tests/test_sketchmath_artifact_jobs.py`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run test:e2e -- --grep "creates an explicit semantic cut" --timeout 60000`
+
+### Evidence and Boundary
+- Evidence checkpoint: `c0a773a`; eight artifact/materializer/job tests passed and targeted Playwright passed in 9.8 seconds.
+- The result proves deterministic layered STL, not a FreeCAD spatial boolean. Cut STEP and arbitrary face/body target selection remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Semantic Cut Extrusion Authoring
 
 ### What Changed
@@ -30,7 +53,7 @@
 ### Evidence and Boundary
 - Code checkpoint: `775df7d`; targeted Playwright passed in 8.2 seconds.
 - The browser proves a two-feature base/cut graph with exact top-face resolution, negative volume, cut bounds `[6,10]`, stable feature identity, undo/redo, and reload.
-- Target inference is deliberately limited to the latest extrusion's top face. Arbitrary face picking and kernel-backed cut STL/STEP remain open.
+- Target inference is deliberately limited to the latest extrusion's top face. Checkpoint `c0a773a` subsequently proved layered cut STL; arbitrary face picking and kernel-backed cut STEP remain open.
 
 ---
 
