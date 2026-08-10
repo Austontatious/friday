@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-08-09 - SketchMath Canonical Hole Feature Mirror
+
+### What Changed
+- Added `mirror` as a typed feature-history record with one stable sketch axis/line reference and explicit terminal hole-seed dependency.
+- Added exact reflected center, removed volume, bounds, copied topology, and structured refusal for missing/degenerate lines, on-line seeds, overlap, and target-boundary escape.
+- Added paired default-off flags plus guarded browser create/edit controls and API persistence/reload coverage.
+
+### Why
+- `SM-FEAT-005` requires feature mirror semantics distinct from the existing in-place sketch-geometry mirror command.
+
+### New Env Flags
+- `FRIDAY_SKETCHMATH_MIRROR_FEATURES_ENABLED=0`
+- `REACT_APP_SKETCHMATH_MIRROR_FEATURES_ENABLED=0`
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py tests/test_sketchmath_api.py`
+- `python3 -m sketchmath.schemas.generate --check`
+- `cd frontend && CI=true npm test -- --runInBand --watchAll=false --runTestsByPath src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run build`
+
+### Evidence and Boundary
+- Generated topology records the stable mirror-line identity, normalized line geometry, mirrored center, and per-reference offset.
+- Plane/face mirrors, non-hole seeds, nested feature execution, shell, and mirror STL/STEP remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Canonical Circular Hole Pattern
 
 ### What Changed
