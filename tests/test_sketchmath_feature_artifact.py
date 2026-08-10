@@ -9,7 +9,7 @@ from sketchmath.cad.adapter import CadAdapter
 from sketchmath.cad.feature_artifact import materialize_feature_artifact
 from sketchmath.executor.errors import CadExportError
 from sketchmath.features.rebuild import rebuild_document
-from sketchmath.models.document import FeatureRecord, wrap_legacy_selection_context
+from sketchmath.models.document import FeatureRecord, SketchMathDocument, wrap_legacy_selection_context
 from sketchmath.models.entities import Profile2DEntity
 from sketchmath.models.selection_context import SelectionContext
 
@@ -27,43 +27,7 @@ def _profile(profile_id: str, vertices: list[tuple[float, float]], area: float, 
     )
 
 
-def test_canonical_stl_materialization_uses_revisioned_safe_path_and_validates_geometry(tmp_path) -> None:
-    outer = _profile("plate", [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], 100, "counterclockwise")
-    hole = _profile("hole", [(3, 3), (3, 7), (7, 7), (7, 3), (3, 3)], 16, "clockwise")
-    outer = outer.model_copy(update={"holes": [hole.id]})
-    selection = SelectionContext(selection_set_id="artifact", units="mm", items=[outer, hole])
-    document = wrap_legacy_selection_context(selection, document_id="doc/golden plate")
-    feature = FeatureRecord.model_validate(
-        {
-            "feature_id": "feature/plate",
-            "name": "Golden plate",
-            "body_id": "body_main",
-            "sketch_id": "sketch_main",
-            "profile_id": "plate",
-            "parameters": {"depth_mm": 10, "operation": "new_body"},
-        }
-    )
-    document = document.model_copy(update={"revision": 7, "features": [feature]})
-
-    artifact = materialize_feature_artifact(
-        document,
-        feature.feature_id,
-        "stl",
-        output_root=tmp_path / "artifacts",
-    )
-
-    path = tmp_path / "artifacts" / "doc_golden_plate" / "revision_7" / "feature_plate" / "doc_golden_plate_feature_plate_r7.stl"
-    assert artifact["path"] == str(path.resolve())
-    assert artifact["format"] == "stl"
-    assert artifact["revision"] == 7
-    assert artifact["measurements"]["volume_mm3"] == pytest.approx(840.0)
-    assert artifact["measurements"]["bbox"] == pytest.approx(
-        {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 10}
-    )
-    assert path.exists()
-
-
-def test_canonical_stl_materializes_a_terminal_semantic_cut_graph(tmp_path) -> None:
+def _semantic_cut_document() -> tuple[SketchMathDocument, FeatureRecord, FeatureRecord]:
     outer = _profile("base", [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], 100, "counterclockwise")
     cutter = _profile("pocket", [(3, 3), (7, 3), (7, 7), (3, 7), (3, 3)], 16, "counterclockwise")
     document = wrap_legacy_selection_context(
@@ -103,7 +67,47 @@ def test_canonical_stl_materializes_a_terminal_semantic_cut_graph(tmp_path) -> N
             "parameters": {"depth_mm": 4, "direction": "negative", "operation": "cut"},
         }
     )
-    document = document.model_copy(update={"revision": 2, "features": [base, cut]})
+    return document.model_copy(update={"revision": 2, "features": [base, cut]}), base, cut
+
+
+def test_canonical_stl_materialization_uses_revisioned_safe_path_and_validates_geometry(tmp_path) -> None:
+    outer = _profile("plate", [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], 100, "counterclockwise")
+    hole = _profile("hole", [(3, 3), (3, 7), (7, 7), (7, 3), (3, 3)], 16, "clockwise")
+    outer = outer.model_copy(update={"holes": [hole.id]})
+    selection = SelectionContext(selection_set_id="artifact", units="mm", items=[outer, hole])
+    document = wrap_legacy_selection_context(selection, document_id="doc/golden plate")
+    feature = FeatureRecord.model_validate(
+        {
+            "feature_id": "feature/plate",
+            "name": "Golden plate",
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": "plate",
+            "parameters": {"depth_mm": 10, "operation": "new_body"},
+        }
+    )
+    document = document.model_copy(update={"revision": 7, "features": [feature]})
+
+    artifact = materialize_feature_artifact(
+        document,
+        feature.feature_id,
+        "stl",
+        output_root=tmp_path / "artifacts",
+    )
+
+    path = tmp_path / "artifacts" / "doc_golden_plate" / "revision_7" / "feature_plate" / "doc_golden_plate_feature_plate_r7.stl"
+    assert artifact["path"] == str(path.resolve())
+    assert artifact["format"] == "stl"
+    assert artifact["revision"] == 7
+    assert artifact["measurements"]["volume_mm3"] == pytest.approx(840.0)
+    assert artifact["measurements"]["bbox"] == pytest.approx(
+        {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 10}
+    )
+    assert path.exists()
+
+
+def test_canonical_stl_materializes_a_terminal_semantic_cut_graph(tmp_path) -> None:
+    document, base, cut = _semantic_cut_document()
 
     artifact = materialize_feature_artifact(
         document,
@@ -121,6 +125,32 @@ def test_canonical_stl_materializes_a_terminal_semantic_cut_graph(tmp_path) -> N
     )
     assert artifact["measurements"]["feature_ids"] == [base.feature_id, cut.feature_id]
     assert artifact["measurements"]["layer_count"] == 2
+
+
+def test_canonical_step_materializes_a_terminal_semantic_cut_with_kernel_validation(tmp_path) -> None:
+    freecad_cmd = Path("/mnt/data/freecad/squashfs-root/usr/bin/freecadcmd")
+    if not freecad_cmd.exists():
+        pytest.skip("FreeCADCmd is unavailable")
+    document, base, cut = _semantic_cut_document()
+
+    artifact = materialize_feature_artifact(
+        document,
+        cut.feature_id,
+        "step",
+        output_root=tmp_path / "artifacts",
+        cad_adapter=CadAdapter(freecad_cmd=freecad_cmd, export_dir=tmp_path / "kernel"),
+    )
+
+    assert Path(artifact["path"]).exists()
+    assert artifact["measurements"]["is_valid_solid"] is True
+    assert artifact["measurements"]["volume_mm3"] == pytest.approx(936.0, abs=1e-6)
+    assert artifact["measurements"]["bbox"] == pytest.approx(
+        {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 10}
+    )
+    assert artifact["measurements"]["canonical_volume_mm3"] == pytest.approx(936.0, abs=1e-6)
+    assert [item["operation"] for item in artifact["measurements"]["operation_execution"]] == ["new_body", "cut"]
+    assert artifact["measurements"]["operation_execution"][1]["feature_id"] == cut.feature_id
+    assert artifact["measurements"]["operation_execution"][0]["feature_id"] == base.feature_id
 
 
 def test_layered_stl_rejects_revolve_until_a_supported_mesher_exists(tmp_path) -> None:

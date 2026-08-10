@@ -90,8 +90,10 @@ def _build_body(operations: list[dict[str, Any]]) -> tuple[Any, list[dict[str, A
                 solid = candidate
             elif mode == "add":
                 solid = solid.fuse(candidate)
+            elif mode == "cut":
+                solid = solid.cut(candidate)
             else:
-                raise ValueError("Feature-graph extrusions after the base must be additive")
+                raise ValueError("Feature-graph extrusions after the base must be additive or subtractive")
             execution.append(
                 {
                     "feature_id": operation.get("feature_id"),
@@ -217,19 +219,10 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     feature_type = payload.get("feature_type")
-    if feature_type not in {"fillet", "chamfer"}:
-        raise ValueError("Feature-graph worker currently supports fillet and chamfer only")
+    if feature_type not in {"solid", "fillet", "chamfer"}:
+        raise ValueError("Feature-graph worker currently supports solid, fillet, and chamfer graphs")
     if str(payload.get("output_format") or "step").lower() != "step":
         raise ValueError("Feature-graph worker currently exports STEP only")
-
-    edge_finish = payload[feature_type]
-    size_name = "radius" if feature_type == "fillet" else "distance"
-    size_mm = float(edge_finish[f"{size_name}_mm"])
-    if not math.isfinite(size_mm) or size_mm <= 0:
-        raise ValueError(f"{feature_type.title()} {size_name} must be positive and finite")
-    selectors = edge_finish.get("edges") or []
-    if not selectors:
-        raise ValueError(f"{feature_type.title()} requires at least one semantic edge selector")
 
     operations = payload.get("operations") or []
     base_solid, operation_execution = _build_body(operations)
@@ -243,21 +236,54 @@ def main() -> int:
         volume_tolerance = max(1e-5, abs(float(expected_volume)) * 1e-8)
         if abs(base_measurements["volume_mm3"] - float(expected_volume)) > volume_tolerance:
             raise ValueError("Feature graph did not preserve canonical pre-finish volume")
-    selected_edges, edge_resolution = _resolve_edges(base_solid, selectors)
-    finished = (
-        base_solid.makeFillet(size_mm, selected_edges)
-        if feature_type == "fillet"
-        else base_solid.makeChamfer(size_mm, selected_edges)
-    )
-    if hasattr(finished, "removeSplitter"):
-        finished = finished.removeSplitter()
-    measurements = _solid_measurements(finished)
-    if measurements["is_valid_solid"] is not True or measurements["volume_mm3"] <= 0:
-        raise ValueError(f"FreeCAD {feature_type} did not produce a valid positive solid")
-    if measurements["volume_mm3"] >= base_measurements["volume_mm3"] - 1e-7:
-        raise ValueError(f"Convex outer-edge {feature_type} did not remove measurable material")
-    if not _bounds_equal(measurements["bbox"], base_measurements["bbox"]):
-        raise ValueError(f"{feature_type.title()} changed the supported base extrusion bounds")
+
+    if feature_type == "solid":
+        finished = base_solid
+        measurements = base_measurements
+        metadata = {
+            "freecad_version": getattr(FreeCAD, "__version__", None),
+            "operation_execution": operation_execution,
+            "canonical_volume_mm3": measurements["volume_mm3"],
+            "canonical_bbox": measurements["bbox"],
+            "canonical_hole_count": int(expected.get("hole_count") or 0),
+        }
+    else:
+        edge_finish = payload[feature_type]
+        size_name = "radius" if feature_type == "fillet" else "distance"
+        size_mm = float(edge_finish[f"{size_name}_mm"])
+        if not math.isfinite(size_mm) or size_mm <= 0:
+            raise ValueError(f"{feature_type.title()} {size_name} must be positive and finite")
+        selectors = edge_finish.get("edges") or []
+        if not selectors:
+            raise ValueError(f"{feature_type.title()} requires at least one semantic edge selector")
+        selected_edges, edge_resolution = _resolve_edges(base_solid, selectors)
+        finished = (
+            base_solid.makeFillet(size_mm, selected_edges)
+            if feature_type == "fillet"
+            else base_solid.makeChamfer(size_mm, selected_edges)
+        )
+        if hasattr(finished, "removeSplitter"):
+            finished = finished.removeSplitter()
+        measurements = _solid_measurements(finished)
+        if measurements["is_valid_solid"] is not True or measurements["volume_mm3"] <= 0:
+            raise ValueError(f"FreeCAD {feature_type} did not produce a valid positive solid")
+        if measurements["volume_mm3"] >= base_measurements["volume_mm3"] - 1e-7:
+            raise ValueError(f"Convex outer-edge {feature_type} did not remove measurable material")
+        if not _bounds_equal(measurements["bbox"], base_measurements["bbox"]):
+            raise ValueError(f"{feature_type.title()} changed the supported base extrusion bounds")
+        metadata = {
+            "freecad_version": getattr(FreeCAD, "__version__", None),
+            "operation_execution": operation_execution,
+            "pre_finish_volume_mm3": base_measurements["volume_mm3"],
+            "pre_finish_bbox": base_measurements["bbox"],
+            "volume_delta_mm3": measurements["volume_mm3"] - base_measurements["volume_mm3"],
+            f"{size_name}_mm": size_mm,
+            "selected_edge_count": len(selected_edges),
+            "semantic_edge_resolution": edge_resolution,
+            "reference_policy": "semantic_endpoints_unique_match",
+            "canonical_hole_count": int(expected.get("hole_count") or 0),
+            "cylindrical_face_radii_mm": _cylindrical_face_radii(finished),
+        }
 
     step_path = out_dir / "export.step"
     validation_path = out_dir / "validation.json"
@@ -274,19 +300,7 @@ def main() -> int:
         },
         "measurements": measurements,
         "warnings": [],
-        "metadata": {
-            "freecad_version": getattr(FreeCAD, "__version__", None),
-            "operation_execution": operation_execution,
-            "pre_finish_volume_mm3": base_measurements["volume_mm3"],
-            "pre_finish_bbox": base_measurements["bbox"],
-            "volume_delta_mm3": measurements["volume_mm3"] - base_measurements["volume_mm3"],
-            f"{size_name}_mm": size_mm,
-            "selected_edge_count": len(selected_edges),
-            "semantic_edge_resolution": edge_resolution,
-            "reference_policy": "semantic_endpoints_unique_match",
-            "canonical_hole_count": int(expected.get("hole_count") or 0),
-            "cylindrical_face_radii_mm": _cylindrical_face_radii(finished),
-        },
+        "metadata": metadata,
     }
     validation_path.write_text(json.dumps(validation, indent=2, sort_keys=True), encoding="utf-8")
     return 0

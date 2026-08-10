@@ -555,13 +555,6 @@ const FeatureHistoryPanel = ({
             ?? (feature.feature_type === "chamfer" ? String(feature.parameters.distance_mm) : "2");
           const nextChamferDistance = validDepth(chamferDraft);
           const artifactJob = artifactJobs[feature.feature_id];
-          const artifactFormat: "step" | "stl" = ["fillet", "chamfer"].includes(feature.feature_type) ? "step" : "stl";
-          const registeredArtifact = artifactJob?.result?.artifact
-            || document.artifacts.find((artifact) => (
-              artifact.feature_id === feature.feature_id
-              && artifact.revision === document.revision
-              && artifact.format === artifactFormat
-            ));
           const laterBodyFeatures = document.features.slice(featureIndex + 1).filter(
             (candidate) => candidate.body_id === feature.body_id && !candidate.suppressed,
           );
@@ -582,9 +575,36 @@ const FeatureHistoryPanel = ({
                 ? candidate.parameters.operation === (index === 0 ? "new_body" : "add")
                 : candidate.feature_type === "hole" && candidate.parameters.style === "simple"
             ));
-          const canBuildArtifact = record?.status === "succeeded"
+          const graphSupportsSolidStep = feature.feature_type === "extrude"
+            && bodyGraph.every((candidate, index) => (
+              candidate.feature_type === "extrude"
+                ? candidate.parameters.extent === "one_sided" && (
+                  (index === 0
+                    && candidate.parameters.operation === "new_body"
+                    && candidate.parameters.direction === "positive"
+                    && candidate.dependencies.length === 0)
+                  || (index > 0
+                    && candidate.parameters.operation === "add"
+                    && candidate.parameters.direction === "positive")
+                  || (index > 0
+                    && candidate.parameters.operation === "cut"
+                    && candidate.parameters.direction === "negative")
+                )
+                : candidate.feature_type === "hole" && candidate.parameters.style === "simple"
+            ));
+          const artifactFormats: Array<"step" | "stl"> = ["fillet", "chamfer"].includes(feature.feature_type)
+            ? ["step"]
+            : ["stl", ...(graphSupportsSolidStep ? ["step" as const] : [])];
+          const activeArtifactFormat = artifactJob?.format || artifactFormats[0];
+          const registeredArtifact = artifactJob?.result?.artifact
+            || document.artifacts.find((artifact) => (
+              artifact.feature_id === feature.feature_id
+              && artifact.revision === document.revision
+              && artifact.format === activeArtifactFormat
+            ));
+          const canBuildArtifact = (format: "step" | "stl") => record?.status === "succeeded"
             && laterBodyFeatures.length === 0
-            && (artifactFormat === "stl" ? graphSupportsStl : graphSupportsEdgeFinishStep);
+            && (format === "stl" ? graphSupportsStl : graphSupportsEdgeFinishStep || graphSupportsSolidStep);
           const artifactBusy = artifactJob?.state === "READY" || artifactJob?.state === "RUNNING";
           const topReference = record?.generated_topology.find((reference) => reference.topology_type === "face" && reference.role === "top");
           const verticalOuterEdges = record?.generated_topology.filter(
@@ -1081,17 +1101,20 @@ const FeatureHistoryPanel = ({
               {artifactJobsEnabled ? (
                 <Box mt={2} data-testid={`sketchmath-artifact-job-${feature.feature_id}`}>
                   <HStack spacing={2} flexWrap="wrap">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onBuildArtifact(feature, artifactFormat)}
-                      isDisabled={!canBuildArtifact || artifactBusy || busy}
-                    >
-                      Build {artifactFormat.toUpperCase()}
-                    </Button>
+                    {artifactFormats.map((format) => (
+                      <Button
+                        key={format}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onBuildArtifact(feature, format)}
+                        isDisabled={!canBuildArtifact(format) || artifactBusy || busy}
+                      >
+                        Build {format.toUpperCase()}
+                      </Button>
+                    ))}
                     {artifactJob?.state === "FAILED" ? (
                       <Button size="sm" variant="outline" onClick={() => onRetryArtifact(artifactJob)} isDisabled={busy}>
-                        Retry {artifactFormat.toUpperCase()}
+                        Retry {artifactJob.format.toUpperCase()}
                       </Button>
                     ) : null}
                     {registeredArtifact ? (
@@ -1109,7 +1132,7 @@ const FeatureHistoryPanel = ({
                       {artifactJob.format.toUpperCase()} artifact · {artifactJob.state} · {artifactJob.step} · revision {artifactJob.input_revision}
                       {artifactJob.error ? ` · ${artifactJob.error.code}: ${artifactJob.error.message}` : ""}
                     </Text>
-                  ) : !canBuildArtifact ? (
+                  ) : !artifactFormats.some(canBuildArtifact) ? (
                     <Text fontSize="xs" opacity={0.65} mt={1}>Artifact build is available on the terminal supported body feature.</Text>
                   ) : null}
                 </Box>

@@ -236,6 +236,133 @@ def _edge_finish_step_payload(document: SketchMathDocument, feature: FeatureReco
     }
 
 
+def _extrusion_graph_step_payload(document: SketchMathDocument, feature: FeatureRecord) -> dict[str, Any]:
+    if feature.feature_type != "extrude" or not isinstance(feature.parameters, ExtrudeParameters):
+        raise CadExportError(
+            "Canonical solid STEP requires an extrusion terminal feature",
+            detail={"feature_id": feature.feature_id, "error_code": "unsupported_solid_graph"},
+        )
+    terminal_index = document.features.index(feature)
+    later = [
+        item.feature_id
+        for item in document.features[terminal_index + 1 :]
+        if item.body_id == feature.body_id and not item.suppressed
+    ]
+    if later:
+        raise CadExportError(
+            "Canonical solid STEP requires the requested extrusion to be terminal in its body",
+            detail={"feature_id": feature.feature_id, "later_feature_ids": later, "error_code": "artifact_feature_not_terminal"},
+        )
+    body_features = [
+        item
+        for item in document.features[: terminal_index + 1]
+        if item.body_id == feature.body_id and not item.suppressed
+    ]
+    if not body_features or body_features[0].feature_type != "extrude":
+        raise CadExportError(
+            "Canonical solid STEP requires a base extrusion",
+            detail={"feature_ids": [item.feature_id for item in body_features], "error_code": "unsupported_solid_graph"},
+        )
+    report = rebuild_document(document)
+    records_by_id = {item.feature_id: item for item in report.records}
+    operations: list[dict[str, Any]] = []
+    for index, item in enumerate(body_features):
+        record = records_by_id[item.feature_id]
+        if record.measurements is None:
+            raise CadExportError(
+                "Canonical solid STEP requires exact analytic measurements for every operation",
+                detail={"feature_id": item.feature_id, "error_code": "unsupported_solid_graph"},
+            )
+        z_min, z_max = record.measurements.bounds_mm[-2:]
+        if item.feature_type == "extrude" and isinstance(item.parameters, ExtrudeParameters):
+            is_base = index == 0
+            supported = (
+                item.parameters.extent == "one_sided"
+                and (
+                    (is_base and item.parameters.operation == "new_body" and item.parameters.direction == "positive" and not item.dependencies)
+                    or (not is_base and item.parameters.operation == "add" and item.parameters.direction == "positive")
+                    or (not is_base and item.parameters.operation == "cut" and item.parameters.direction == "negative")
+                )
+            )
+            if not supported:
+                raise CadExportError(
+                    "Canonical solid STEP supports a positive base plus positive adds or negative top-face cuts",
+                    detail={
+                        "feature_id": item.feature_id,
+                        "operation": item.parameters.operation,
+                        "direction": item.parameters.direction,
+                        "extent": item.parameters.extent,
+                        "error_code": "unsupported_solid_graph",
+                    },
+                )
+            profile, holes = _source_geometry(document, item)
+            operations.append(
+                {
+                    "feature_id": item.feature_id,
+                    "feature_type": "extrude",
+                    "operation": item.parameters.operation,
+                    "profile": _profile_payload(document, item.sketch_id, profile),
+                    "holes": [_profile_payload(document, item.sketch_id, hole) for hole in holes],
+                    "z_min_mm": z_min,
+                    "z_max_mm": z_max,
+                }
+            )
+        elif item.feature_type == "hole" and isinstance(item.parameters, HoleParameters):
+            if item.parameters.style != "simple":
+                raise CadExportError(
+                    "Canonical solid STEP currently supports simple holes",
+                    detail={"feature_id": item.feature_id, "style": item.parameters.style, "error_code": "unsupported_solid_graph"},
+                )
+            operations.append(
+                {
+                    "feature_id": item.feature_id,
+                    "feature_type": "hole",
+                    "operation": "cut",
+                    "center_mm": list(item.parameters.position_mm),
+                    "diameter_mm": item.parameters.diameter_mm,
+                    "z_min_mm": z_min,
+                    "z_max_mm": z_max,
+                }
+            )
+        else:
+            raise CadExportError(
+                "Canonical solid STEP graph contains an unsupported intermediate feature",
+                detail={"feature_id": item.feature_id, "feature_type": item.feature_type, "error_code": "unsupported_solid_graph"},
+            )
+    positive_bounds = [
+        records_by_id[item.feature_id].measurements.bounds_mm
+        for item in body_features
+        if records_by_id[item.feature_id].measurements is not None
+        and records_by_id[item.feature_id].measurements.volume_delta_mm3 > 0
+    ]
+    expected_volume = sum(
+        records_by_id[item.feature_id].measurements.volume_delta_mm3
+        for item in body_features
+        if records_by_id[item.feature_id].measurements is not None
+    )
+    if not positive_bounds or expected_volume <= 0:
+        raise CadExportError(
+            "Canonical solid STEP graph must retain positive material",
+            detail={"feature_id": feature.feature_id, "expected_volume_mm3": expected_volume, "error_code": "unsupported_solid_graph"},
+        )
+    return {
+        "feature_type": "solid",
+        "operations": operations,
+        "expected_pre_finish": {
+            "bbox": {
+                "xmin": min(item[0] for item in positive_bounds),
+                "xmax": max(item[1] for item in positive_bounds),
+                "ymin": min(item[2] for item in positive_bounds),
+                "ymax": max(item[3] for item in positive_bounds),
+                "zmin": min(item[4] for item in positive_bounds),
+                "zmax": max(item[5] for item in positive_bounds),
+            },
+            "volume_mm3": expected_volume,
+            "hole_count": sum(item.feature_type == "hole" for item in body_features),
+        },
+    }
+
+
 def _content_hash(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -307,6 +434,24 @@ def materialize_feature_artifact(
             adapter = cad_adapter or CadAdapter(export_dir=feature_root)
             result = adapter.edge_finish_feature_graph(
                 _edge_finish_step_payload(document, feature),
+                selection_set_id=_safe_segment(document.document_id),
+                command_id=f"feature_{_safe_segment(feature.feature_id)}_r{document.revision}",
+            )
+            if result.artifacts is None:
+                raise CadExportError("STEP worker did not return an artifact path", detail={"feature_id": feature_id})
+            path = Path(result.artifacts.step_path).resolve()
+            measurements = {
+                **(result.measurements.model_dump(mode="json") if result.measurements is not None else {}),
+                **result.metadata,
+            }
+        elif (
+            feature.feature_type == "extrude"
+            and isinstance(feature.parameters, ExtrudeParameters)
+            and (feature.parameters.operation != "new_body" or bool(feature.dependencies))
+        ):
+            adapter = cad_adapter or CadAdapter(export_dir=feature_root)
+            result = adapter.feature_graph(
+                _extrusion_graph_step_payload(document, feature),
                 selection_set_id=_safe_segment(document.document_id),
                 command_id=f"feature_{_safe_segment(feature.feature_id)}_r{document.revision}",
             )

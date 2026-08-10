@@ -211,7 +211,7 @@ class CadAdapter:
         )
         return result
 
-    def edge_finish_feature_graph(
+    def feature_graph(
         self,
         payload: dict[str, Any],
         *,
@@ -285,3 +285,16 @@ class CadAdapter:
             }
         )
         return result
+
+    def edge_finish_feature_graph(
+        self,
+        payload: dict[str, Any],
+        *,
+        selection_set_id: str,
+        command_id: str,
+    ) -> CadExportResult:
+        return self.feature_graph(
+            payload,
+            selection_set_id=selection_set_id,
+            command_id=command_id,
+        )

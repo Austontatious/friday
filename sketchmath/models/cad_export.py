@@ -28,7 +28,12 @@ class CadExportResult(BaseModel):
     status: Literal["export_ready", "validation_failed", "adapter_unavailable", "export_failed"]
     profile_id: str
     command_id: str
-    command_type: Literal["extrude_profile", "fillet_feature_graph", "chamfer_feature_graph"] = "extrude_profile"
+    command_type: Literal[
+        "extrude_profile",
+        "solid_feature_graph",
+        "fillet_feature_graph",
+        "chamfer_feature_graph",
+    ] = "extrude_profile"
     artifacts: CadExportArtifacts | None = None
     measurements: CadExportMeasurements | None = None
     warnings: list[str] = Field(default_factory=list)

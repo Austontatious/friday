@@ -610,6 +610,21 @@ test.describe("SketchMath workspace", () => {
       format: "stl",
       revision: reloaded.document.revision,
     }));
+    await cutRow.getByRole("button", { name: "Build STEP" }).click();
+    await expect(page.getByTestId(`sketchmath-artifact-status-${cutFeatureId}`)).toContainText(
+      `DONE · complete · revision ${reloaded.document.revision}`,
+      { timeout: 15000 },
+    );
+    const stepDownload = page.getByTestId(`sketchmath-artifact-download-${cutFeatureId}`);
+    const stepDownloadPromise = page.waitForEvent("download");
+    await stepDownload.click();
+    expect((await stepDownloadPromise).suggestedFilename()).toMatch(/\.step$/);
+    const withStep = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as CutSnapshot;
+    expect(withStep.document.artifacts).toContainEqual(expect.objectContaining({
+      feature_id: cutFeatureId,
+      format: "step",
+      revision: reloaded.document.revision,
+    }));
   });
 
   test("edits a full revolve axis with stable history and reload identity", async ({ page }) => {

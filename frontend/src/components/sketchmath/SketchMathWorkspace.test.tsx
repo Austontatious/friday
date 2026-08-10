@@ -1386,7 +1386,9 @@ describe("SketchMath workspace", () => {
     } as any;
     rerender(<FeatureHistoryPanel {...props} document={filletDocument} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Build STEP" }));
+    await userEvent.click(
+      within(screen.getByTestId("sketchmath-feature-feature_fillet")).getByRole("button", { name: "Build STEP" }),
+    );
     expect(onBuildArtifact).toHaveBeenCalledWith(filletFeature, "step");
     expect(screen.getByText("Measurements require a validated kernel artifact.")).toBeInTheDocument();
   });
