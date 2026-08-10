@@ -149,12 +149,46 @@ def _build_body(operations: list[dict[str, Any]]) -> tuple[Any, list[dict[str, A
                 raise ValueError("Hole geometry must be finite")
             if radius_mm <= 0 or depth_mm <= 0:
                 raise ValueError("Hole diameter and depth must be positive")
-            epsilon = 1e-5
-            cutter = Part.makeCylinder(
+            shaft = Part.makeCylinder(
                 radius_mm,
-                depth_mm + 2 * epsilon,
-                FreeCAD.Vector(float(center[0]), float(center[1]), z_min - epsilon),
+                depth_mm,
+                FreeCAD.Vector(float(center[0]), float(center[1]), z_min),
             )
+            style = str(operation.get("style") or "simple")
+            cutter = shaft
+            style_metadata: dict[str, Any] = {"style": style}
+            if style == "counterbore":
+                outer_radius = float(operation["counterbore_diameter_mm"]) / 2.0
+                style_depth = float(operation["counterbore_depth_mm"])
+                if outer_radius <= radius_mm or style_depth <= 0 or style_depth > depth_mm:
+                    raise ValueError("Counterbore geometry is outside the supported hole bounds")
+                counterbore = Part.makeCylinder(
+                    outer_radius,
+                    style_depth,
+                    FreeCAD.Vector(float(center[0]), float(center[1]), z_max - style_depth),
+                )
+                cutter = cutter.fuse(counterbore)
+                style_metadata.update({"outer_diameter_mm": outer_radius * 2.0, "style_depth_mm": style_depth})
+            elif style == "countersink":
+                outer_radius = float(operation["countersink_diameter_mm"]) / 2.0
+                half_angle = math.radians(float(operation["countersink_angle_deg"]) / 2.0)
+                style_depth = (outer_radius - radius_mm) / math.tan(half_angle)
+                if outer_radius <= radius_mm or not math.isfinite(style_depth) or style_depth <= 0 or style_depth > depth_mm:
+                    raise ValueError("Countersink geometry is outside the supported hole bounds")
+                countersink = Part.makeCone(
+                    radius_mm,
+                    outer_radius,
+                    style_depth,
+                    FreeCAD.Vector(float(center[0]), float(center[1]), z_max - style_depth),
+                )
+                cutter = cutter.fuse(countersink)
+                style_metadata.update({
+                    "outer_diameter_mm": outer_radius * 2.0,
+                    "style_depth_mm": style_depth,
+                    "angle_deg": float(operation["countersink_angle_deg"]),
+                })
+            elif style != "simple":
+                raise ValueError(f"Unsupported hole style: {style}")
             solid = solid.cut(cutter)
             execution.append(
                 {
@@ -163,6 +197,7 @@ def _build_body(operations: list[dict[str, Any]]) -> tuple[Any, list[dict[str, A
                     "operation": "cut",
                     "diameter_mm": radius_mm * 2.0,
                     "depth_mm": depth_mm,
+                    **style_metadata,
                 }
             )
         else:

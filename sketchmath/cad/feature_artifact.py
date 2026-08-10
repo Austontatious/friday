@@ -236,10 +236,10 @@ def _edge_finish_step_payload(document: SketchMathDocument, feature: FeatureReco
     }
 
 
-def _extrusion_graph_step_payload(document: SketchMathDocument, feature: FeatureRecord) -> dict[str, Any]:
-    if feature.feature_type != "extrude" or not isinstance(feature.parameters, ExtrudeParameters):
+def _solid_graph_step_payload(document: SketchMathDocument, feature: FeatureRecord) -> dict[str, Any]:
+    if feature.feature_type not in {"extrude", "hole"}:
         raise CadExportError(
-            "Canonical solid STEP requires an extrusion terminal feature",
+            "Canonical solid STEP requires an extrusion or hole terminal feature",
             detail={"feature_id": feature.feature_id, "error_code": "unsupported_solid_graph"},
         )
     terminal_index = document.features.index(feature)
@@ -308,11 +308,6 @@ def _extrusion_graph_step_payload(document: SketchMathDocument, feature: Feature
                 }
             )
         elif item.feature_type == "hole" and isinstance(item.parameters, HoleParameters):
-            if item.parameters.style != "simple":
-                raise CadExportError(
-                    "Canonical solid STEP currently supports simple holes",
-                    detail={"feature_id": item.feature_id, "style": item.parameters.style, "error_code": "unsupported_solid_graph"},
-                )
             operations.append(
                 {
                     "feature_id": item.feature_id,
@@ -322,6 +317,11 @@ def _extrusion_graph_step_payload(document: SketchMathDocument, feature: Feature
                     "diameter_mm": item.parameters.diameter_mm,
                     "z_min_mm": z_min,
                     "z_max_mm": z_max,
+                    "style": item.parameters.style,
+                    "counterbore_diameter_mm": item.parameters.counterbore_diameter_mm,
+                    "counterbore_depth_mm": item.parameters.counterbore_depth_mm,
+                    "countersink_diameter_mm": item.parameters.countersink_diameter_mm,
+                    "countersink_angle_deg": item.parameters.countersink_angle_deg,
                 }
             )
         else:
@@ -517,14 +517,14 @@ def materialize_feature_artifact(
                 **(result.measurements.model_dump(mode="json") if result.measurements is not None else {}),
                 **result.metadata,
             }
-        elif (
+        elif feature.feature_type == "hole" or (
             feature.feature_type == "extrude"
             and isinstance(feature.parameters, ExtrudeParameters)
             and (feature.parameters.operation != "new_body" or bool(feature.dependencies))
         ):
             adapter = cad_adapter or CadAdapter(export_dir=feature_root)
             result = adapter.feature_graph(
-                _extrusion_graph_step_payload(document, feature),
+                _solid_graph_step_payload(document, feature),
                 selection_set_id=_safe_segment(document.document_id),
                 command_id=f"feature_{_safe_segment(feature.feature_id)}_r{document.revision}",
             )

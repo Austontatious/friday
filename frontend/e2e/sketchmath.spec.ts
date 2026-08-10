@@ -738,11 +738,13 @@ test.describe("SketchMath workspace", () => {
     expect(sessionId).toBeTruthy();
     type AdvancedHoleSnapshot = {
       document: {
+        revision: number;
         features: Array<{
           feature_id: string;
           feature_type: string;
           parameters: Record<string, any>;
         }>;
+        artifacts: Array<{ feature_id: string; format: string; revision: number }>;
       };
       feature_history_length: number;
     };
@@ -798,6 +800,22 @@ test.describe("SketchMath workspace", () => {
     const reloaded = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as AdvancedHoleSnapshot;
     expect(reloaded.feature_history_length).toBe(4);
     expect(reloaded.document.features.find((feature) => feature.feature_id === holeFeatureId)?.feature_id).toBe(holeFeatureId);
+    const holeRow = page.getByTestId(`sketchmath-feature-${holeFeatureId}`);
+    await holeRow.getByRole("button", { name: "Build STEP" }).click();
+    await expect(page.getByTestId(`sketchmath-artifact-status-${holeFeatureId}`)).toContainText(
+      `DONE · complete · revision ${reloaded.document.revision}`,
+      { timeout: 15000 },
+    );
+    const download = page.getByTestId(`sketchmath-artifact-download-${holeFeatureId}`);
+    const downloadPromise = page.waitForEvent("download");
+    await download.click();
+    expect((await downloadPromise).suggestedFilename()).toMatch(/\.step$/);
+    const withArtifact = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as AdvancedHoleSnapshot;
+    expect(withArtifact.document.artifacts).toContainEqual(expect.objectContaining({
+      feature_id: holeFeatureId,
+      format: "step",
+      revision: reloaded.document.revision,
+    }));
   });
 
   test("selects semantic model-tree nodes and persists a feature rename", async ({ page }) => {

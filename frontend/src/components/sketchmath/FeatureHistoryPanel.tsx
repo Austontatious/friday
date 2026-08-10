@@ -575,7 +575,7 @@ const FeatureHistoryPanel = ({
                 ? candidate.parameters.operation === (index === 0 ? "new_body" : "add")
                 : candidate.feature_type === "hole" && candidate.parameters.style === "simple"
             ));
-          const graphSupportsSolidStep = feature.feature_type === "extrude"
+          const graphSupportsSolidStep = (feature.feature_type === "extrude" || feature.feature_type === "hole")
             && bodyGraph.every((candidate, index) => (
               candidate.feature_type === "extrude"
                 ? candidate.parameters.extent === "one_sided" && (
@@ -590,7 +590,7 @@ const FeatureHistoryPanel = ({
                     && candidate.parameters.operation === "cut"
                     && candidate.parameters.direction === "negative")
                 )
-                : candidate.feature_type === "hole" && candidate.parameters.style === "simple"
+                : candidate.feature_type === "hole"
             ));
           const graphSupportsRevolveStep = feature.feature_type === "revolve"
             && bodyGraph.length === 1
@@ -601,7 +601,9 @@ const FeatureHistoryPanel = ({
             ? ["step"]
             : graphSupportsRevolveStep
               ? ["step"]
-              : ["stl", ...(graphSupportsSolidStep ? ["step" as const] : [])];
+              : graphSupportsSolidStep && !graphSupportsStl
+                ? ["step"]
+                : ["stl", ...(graphSupportsSolidStep ? ["step" as const] : [])];
           const activeArtifactFormat = artifactJob?.format || artifactFormats[0];
           const registeredArtifact = artifactJob?.result?.artifact
             || document.artifacts.find((artifact) => (

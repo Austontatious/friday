@@ -97,6 +97,61 @@ def _revolve_document() -> tuple[SketchMathDocument, FeatureRecord]:
     return document.model_copy(update={"revision": 1, "features": [revolve]}), revolve
 
 
+def _advanced_hole_document(style: str) -> tuple[SketchMathDocument, FeatureRecord]:
+    profile = _profile("hole_base", [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], 100, "counterclockwise")
+    document = wrap_legacy_selection_context(
+        SelectionContext(selection_set_id=f"{style}_artifact", units="mm", items=[profile]),
+        document_id=f"doc_{style}_artifact",
+    )
+    base = FeatureRecord.model_validate(
+        {
+            "feature_id": "feature_base",
+            "name": "Base",
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": profile.id,
+            "parameters": {"depth_mm": 10, "operation": "new_body"},
+        }
+    )
+    base_report = rebuild_document(document.model_copy(update={"features": [base]}))
+    top = next(item for item in base_report.records[0].generated_topology if item.role == "top")
+    parameters = {
+        "style": style,
+        "termination": "blind" if style == "counterbore" else "through",
+        "diameter_mm": 2,
+        "depth_mm": 6 if style == "counterbore" else None,
+        "position_mm": [5, 5],
+        "counterbore_diameter_mm": 4 if style == "counterbore" else None,
+        "counterbore_depth_mm": 2 if style == "counterbore" else None,
+        "countersink_diameter_mm": 4 if style == "countersink" else None,
+        "countersink_angle_deg": 90 if style == "countersink" else None,
+        "operation": "cut",
+    }
+    hole = FeatureRecord.model_validate(
+        {
+            "feature_id": f"feature_{style}",
+            "feature_type": "hole",
+            "name": style.title(),
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": None,
+            "dependencies": [base.feature_id],
+            "topology_references": [
+                {
+                    "reference_id": top.reference_id,
+                    "owner_feature_id": base.feature_id,
+                    "topology_type": "face",
+                    "role": top.role,
+                    "source_entity_id": top.source_entity_id,
+                    "expected_signature": top.geometric_signature,
+                }
+            ],
+            "parameters": parameters,
+        }
+    )
+    return document.model_copy(update={"revision": 2, "features": [base, hole]}), hole
+
+
 def test_canonical_stl_materialization_uses_revisioned_safe_path_and_validates_geometry(tmp_path) -> None:
     outer = _profile("plate", [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], 100, "counterclockwise")
     hole = _profile("hole", [(3, 3), (3, 7), (7, 7), (7, 3), (3, 3)], 16, "clockwise")
@@ -209,6 +264,40 @@ def test_canonical_step_materializes_a_full_revolve_with_kernel_validation(tmp_p
             "strategy": "face_with_holes",
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("style", "expected_volume"),
+    [
+        ("counterbore", 1000 - 12 * math.pi),
+        ("countersink", 1000 - (10 + 4 / 3) * math.pi),
+    ],
+)
+def test_canonical_step_materializes_advanced_holes_with_kernel_validation(
+    tmp_path,
+    style: str,
+    expected_volume: float,
+) -> None:
+    freecad_cmd = Path("/mnt/data/freecad/squashfs-root/usr/bin/freecadcmd")
+    if not freecad_cmd.exists():
+        pytest.skip("FreeCADCmd is unavailable")
+    document, hole = _advanced_hole_document(style)
+
+    artifact = materialize_feature_artifact(
+        document,
+        hole.feature_id,
+        "step",
+        output_root=tmp_path / "artifacts",
+        cad_adapter=CadAdapter(freecad_cmd=freecad_cmd, export_dir=tmp_path / "kernel"),
+    )
+
+    assert Path(artifact["path"]).exists()
+    assert artifact["measurements"]["is_valid_solid"] is True
+    assert artifact["measurements"]["volume_mm3"] == pytest.approx(expected_volume, abs=1e-6)
+    assert artifact["measurements"]["bbox"] == pytest.approx(
+        {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 10}
+    )
+    assert artifact["measurements"]["operation_execution"][-1]["style"] == style
 
 
 def test_layered_stl_rejects_revolve_until_a_supported_mesher_exists(tmp_path) -> None:
