@@ -1114,6 +1114,7 @@ describe("SketchMath workspace", () => {
     delete process.env.REACT_APP_SKETCHMATH_CHAMFER_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_PATTERN_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_MIRROR_FEATURES_ENABLED;
+    delete process.env.REACT_APP_SKETCHMATH_SHELL_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED;
     stamp.value = 1710000000000;
     jest.spyOn(Date, "now").mockImplementation(() => stamp.value);
@@ -1193,6 +1194,7 @@ describe("SketchMath workspace", () => {
       chamferFeaturesEnabled: false,
       patternFeaturesEnabled: false,
       mirrorFeaturesEnabled: false,
+      shellFeaturesEnabled: false,
       artifactJobsEnabled: false,
       artifactJobs: {},
       revolveAxes: [axis],
@@ -1211,6 +1213,8 @@ describe("SketchMath workspace", () => {
       onUpdateCircularPattern: jest.fn(),
       onAddFeatureMirror: jest.fn(),
       onUpdateFeatureMirror: jest.fn(),
+      onAddShell: jest.fn(),
+      onUpdateShell: jest.fn(),
       onUpdateFullRevolve,
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1339,6 +1343,7 @@ describe("SketchMath workspace", () => {
       chamferFeaturesEnabled: false,
       patternFeaturesEnabled: true,
       mirrorFeaturesEnabled: true,
+      shellFeaturesEnabled: false,
       artifactJobsEnabled: false,
       revolveAxes: [mirrorLine, secondMirrorLine],
       artifactJobs: {},
@@ -1357,6 +1362,8 @@ describe("SketchMath workspace", () => {
       onUpdateCircularPattern,
       onAddFeatureMirror,
       onUpdateFeatureMirror,
+      onAddShell: jest.fn(),
+      onUpdateShell: jest.fn(),
       onUpdateFullRevolve: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1439,6 +1446,97 @@ describe("SketchMath workspace", () => {
     });
   });
 
+  it("creates and edits a guarded rectangular top-open shell", async () => {
+    const profile = {
+      id: "profile_box",
+      type: "profile_2d" as const,
+      vertices: [[0, 0], [20, 0], [20, 10], [0, 10], [0, 0]] as [number, number][],
+      area: 200,
+      winding: "counterclockwise" as const,
+      closed: true,
+      holes: [],
+    };
+    const baseFeature = {
+      feature_id: "feature_base",
+      feature_type: "extrude" as const,
+      name: "Base box",
+      body_id: "body_1",
+      sketch_id: "sketch_1",
+      profile_id: profile.id,
+      dependencies: [],
+      topology_references: [],
+      parameters: { depth_mm: 10, extent: "one_sided" as const, direction: "positive" as const, operation: "new_body" as const },
+      suppressed: false,
+    };
+    const top = {
+      reference_id: "topo_top",
+      owner_feature_id: baseFeature.feature_id,
+      topology_type: "face" as const,
+      role: "top",
+      source_entity_id: profile.id,
+      ordinal: 1,
+      geometric_signature: "top_signature",
+      measurements: { area_mm2: 200, z_mm: 10 },
+    };
+    const document = {
+      schema_version: "1.1",
+      document_id: "doc_shell",
+      name: "Shell test",
+      units: "mm",
+      revision: 1,
+      bodies: [{ body_id: "body_1", name: "Body 1", sketch_ids: ["sketch_1"], feature_ids: [baseFeature.feature_id], visible: true }],
+      sketches: [{ sketch_id: "sketch_1", name: "Sketch 1", plane: "xy", state: { selection_set_id: "shell", units: "mm", frame: "canvas_2d", items: [profile], constraints: [], named_references: {} }, visible: true }],
+      features: [baseFeature],
+      design_parameters: [],
+      artifacts: [],
+      provenance: {},
+      last_rebuild: { schema_version: "1.0", document_id: "doc_shell", input_revision: 1, ok: true, rebuild_order: [baseFeature.feature_id], content_hash: "shell_hash", records: [{ feature_id: baseFeature.feature_id, order: 0, status: "succeeded", input_hash: "input", output_signature: "base_signature", measurements: { net_profile_area_mm2: 200, volume_delta_mm3: 2000, bounds_mm: [0, 20, 0, 10, 0, 10], hole_count: 0 }, generated_topology: [top], resolved_references: [], measurement_coverage: "exact" }] },
+    };
+    const onAddShell = jest.fn();
+    const onUpdateShell = jest.fn();
+    const onBuildArtifact = jest.fn();
+    const props: any = {
+      document, activeProfile: null, newDepthValue: "10", busy: false, canUndo: false, canRedo: false,
+      holeFeaturesEnabled: false, revolveFeaturesEnabled: false, filletFeaturesEnabled: false, chamferFeaturesEnabled: false,
+      patternFeaturesEnabled: false, mirrorFeaturesEnabled: false, shellFeaturesEnabled: true, artifactJobsEnabled: false,
+      revolveAxes: [], artifactJobs: {}, onNewDepthValueChange: jest.fn(), onAddExtrusion: jest.fn(), onAddFullRevolve: jest.fn(),
+      onAddOuterFillet: jest.fn(), onAddOuterChamfer: jest.fn(), onUpdateExtrusion: jest.fn(), onUpdateFilletRadius: jest.fn(),
+      onUpdateChamferDistance: jest.fn(), onUpdateHole: jest.fn(), onAddLinearPattern: jest.fn(), onUpdateLinearPattern: jest.fn(),
+      onAddCircularPattern: jest.fn(), onUpdateCircularPattern: jest.fn(), onAddFeatureMirror: jest.fn(), onUpdateFeatureMirror: jest.fn(),
+      onAddShell, onUpdateShell, onUpdateFullRevolve: jest.fn(), onSetDesignParameter: jest.fn(), onRenameFeature: jest.fn(),
+      onAddSimpleHole: jest.fn(), onBuildArtifact, onRetryArtifact: jest.fn(), artifactDownloadUrl: jest.fn(), onUndo: jest.fn(), onRedo: jest.fn(),
+    };
+
+    const { rerender } = render(<FeatureHistoryPanel {...props} />);
+    await userEvent.click(screen.getByRole("button", { name: "Shell top face" }));
+    expect(onAddShell).toHaveBeenCalledWith(baseFeature, top, { thickness_mm: 1, opening: "top", operation: "modify" });
+
+    const shellFeature = {
+      feature_id: "feature_shell",
+      feature_type: "shell" as const,
+      name: "Main shell",
+      body_id: "body_1",
+      sketch_id: "sketch_1",
+      profile_id: null,
+      dependencies: [baseFeature.feature_id],
+      topology_references: [],
+      parameters: { thickness_mm: 1, opening: "top" as const, operation: "modify" as const },
+      suppressed: false,
+    };
+    const shellRecord = { feature_id: shellFeature.feature_id, order: 1, status: "succeeded", input_hash: "shell_input", output_signature: "shell_signature", measurements: { net_profile_area_mm2: 144, volume_delta_mm3: -1296, bounds_mm: [1, 19, 1, 9, 1, 10], hole_count: 0 }, generated_topology: [], resolved_references: [], measurement_coverage: "exact" };
+    const shellDocument = { ...document, revision: 2, features: [baseFeature, shellFeature], last_rebuild: { ...document.last_rebuild, input_revision: 2, rebuild_order: [baseFeature.feature_id, shellFeature.feature_id], records: [...document.last_rebuild.records, shellRecord] } };
+    rerender(<FeatureHistoryPanel {...props} artifactJobsEnabled document={shellDocument} />);
+    const editor = screen.getByTestId("sketchmath-shell-editor-feature_shell");
+    await userEvent.clear(within(editor).getByRole("spinbutton", { name: "Shell thickness Main shell" }));
+    await userEvent.type(within(editor).getByRole("spinbutton", { name: "Shell thickness Main shell" }), "2");
+    await userEvent.click(within(editor).getByRole("button", { name: "Apply shell thickness" }));
+    expect(onUpdateShell).toHaveBeenCalledWith(shellFeature, { thickness_mm: 2, opening: "top", operation: "modify" });
+    const shellFeatureRow = screen.getByTestId("sketchmath-feature-feature_shell");
+    expect(within(shellFeatureRow).queryByRole("button", { name: "Build STL" })).toBeNull();
+    await userEvent.click(within(shellFeatureRow).getByRole("button", { name: "Build STEP" }));
+    expect(onBuildArtifact).toHaveBeenCalledWith(shellFeature, "step");
+  });
+
   it("creates a semantic outer-edge fillet and routes its terminal artifact to STEP", async () => {
     const edge = {
       reference_id: "topo_vertical_0",
@@ -1509,6 +1607,7 @@ describe("SketchMath workspace", () => {
       chamferFeaturesEnabled: false,
       patternFeaturesEnabled: false,
       mirrorFeaturesEnabled: false,
+      shellFeaturesEnabled: false,
       artifactJobsEnabled: true,
       revolveAxes: [],
       artifactJobs: {},
@@ -1527,6 +1626,8 @@ describe("SketchMath workspace", () => {
       onUpdateCircularPattern: jest.fn(),
       onAddFeatureMirror: jest.fn(),
       onUpdateFeatureMirror: jest.fn(),
+      onAddShell: jest.fn(),
+      onUpdateShell: jest.fn(),
       onUpdateFullRevolve: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1713,6 +1814,7 @@ describe("SketchMath workspace", () => {
       chamferFeaturesEnabled={false}
       patternFeaturesEnabled={false}
       mirrorFeaturesEnabled={false}
+      shellFeaturesEnabled={false}
       artifactJobsEnabled={false}
       revolveAxes={[]}
       artifactJobs={{}}
@@ -1731,6 +1833,8 @@ describe("SketchMath workspace", () => {
       onUpdateCircularPattern={jest.fn()}
       onAddFeatureMirror={jest.fn()}
       onUpdateFeatureMirror={jest.fn()}
+      onAddShell={jest.fn()}
+      onUpdateShell={jest.fn()}
       onUpdateFullRevolve={jest.fn()}
       onSetDesignParameter={onSetDesignParameter}
       onRenameFeature={onRenameFeature}

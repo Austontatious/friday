@@ -27,6 +27,7 @@ import type {
   SketchMathHoleParameters,
   SketchMathLinearPatternParameters,
   SketchMathMirrorParameters,
+  SketchMathShellParameters,
   SketchMathMode,
   SketchMathOperationResult,
   SketchMathPlanarTopology,
@@ -53,6 +54,7 @@ import {
   isSketchMathHoleFeaturesEnabled,
   isSketchMathPatternFeaturesEnabled,
   isSketchMathMirrorFeaturesEnabled,
+  isSketchMathShellFeaturesEnabled,
   isSketchMathRevolveFeaturesEnabled,
   previewSketchMathCommand,
   redoSketchMathSession,
@@ -465,6 +467,7 @@ const SketchMathWorkspace = () => {
   const [chamferFeaturesEnabled] = useState<boolean>(isSketchMathChamferFeaturesEnabled());
   const [patternFeaturesEnabled] = useState<boolean>(isSketchMathPatternFeaturesEnabled());
   const [mirrorFeaturesEnabled] = useState<boolean>(isSketchMathMirrorFeaturesEnabled());
+  const [shellFeaturesEnabled] = useState<boolean>(isSketchMathShellFeaturesEnabled());
   const [artifactJobsEnabled] = useState<boolean>(isSketchMathArtifactJobsEnabled());
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -2221,6 +2224,66 @@ const SketchMathWorkspace = () => {
     parameters: SketchMathMirrorParameters,
   ) => {
     if (!sketchDocument || !mirrorFeaturesEnabled) return;
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "replace_feature",
+      target_id: feature.feature_id,
+      parameters: { feature: { ...feature, parameters } },
+    });
+  };
+
+  const handleAddShell = async (
+    target: Extract<SketchMathFeature, { feature_type: "extrude" }>,
+    topReference: SketchMathSemanticTopologyReference,
+    parameters: SketchMathShellParameters,
+  ) => {
+    if (!sketchDocument || !shellFeaturesEnabled) return;
+    const stem = `shell_${target.feature_id.replace(/[^a-zA-Z0-9_-]+/g, "_")}`;
+    const existingIds = new Set(sketchDocument.features.map((feature) => feature.feature_id));
+    let featureId = stem;
+    let suffix = 2;
+    while (existingIds.has(featureId)) {
+      featureId = `${stem}_${suffix}`;
+      suffix += 1;
+    }
+    const feature: SketchMathFeature = {
+      feature_id: featureId,
+      feature_type: "shell",
+      name: `Shell ${sketchDocument.features.filter((item) => item.feature_type === "shell").length + 1}`,
+      body_id: target.body_id,
+      sketch_id: target.sketch_id,
+      profile_id: null,
+      source_region_id: null,
+      dependencies: [target.feature_id],
+      topology_references: [{
+        reference_id: topReference.reference_id,
+        owner_feature_id: target.feature_id,
+        topology_type: "face",
+        role: "top",
+        source_entity_id: topReference.source_entity_id || null,
+        expected_signature: topReference.geometric_signature,
+      }],
+      parameters,
+      suppressed: false,
+    };
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `add_${featureId}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "add_feature",
+      parameters: { feature },
+    });
+  };
+
+  const handleUpdateShell = async (
+    feature: Extract<SketchMathFeature, { feature_type: "shell" }>,
+    parameters: SketchMathShellParameters,
+  ) => {
+    if (!sketchDocument || !shellFeaturesEnabled) return;
     await commitFeatureOperation({
       version: "1.0",
       operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
@@ -4484,6 +4547,7 @@ const SketchMathWorkspace = () => {
                   chamferFeaturesEnabled={chamferFeaturesEnabled}
                   patternFeaturesEnabled={patternFeaturesEnabled}
                   mirrorFeaturesEnabled={mirrorFeaturesEnabled}
+                  shellFeaturesEnabled={shellFeaturesEnabled}
                   artifactJobsEnabled={artifactJobsEnabled}
                   revolveAxes={revolveAxes}
                   artifactJobs={artifactJobs}
@@ -4519,6 +4583,12 @@ const SketchMathWorkspace = () => {
                   )}
                   onUpdateFeatureMirror={(feature, parameters) => (
                     void handleUpdateFeatureMirror(feature, parameters)
+                  )}
+                  onAddShell={(feature, topReference, parameters) => (
+                    void handleAddShell(feature, topReference, parameters)
+                  )}
+                  onUpdateShell={(feature, parameters) => (
+                    void handleUpdateShell(feature, parameters)
                   )}
                   onUpdateFullRevolve={(feature, axisId, angle) => (
                     void handleUpdateFullRevolve(feature, axisId, angle)

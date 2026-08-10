@@ -338,6 +338,12 @@ export type SketchMathMirrorParameters = {
   operation: "modify";
 };
 
+export type SketchMathShellParameters = {
+  thickness_mm: number;
+  opening: "top";
+  operation: "modify";
+};
+
 export type SketchMathTopologyReferenceSelector = {
   reference_id: string;
   owner_feature_id: string;
@@ -417,7 +423,13 @@ export type SketchMathMirrorFeature = SketchMathFeatureBase & {
   parameters: SketchMathMirrorParameters;
 };
 
-export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature | SketchMathRevolveFeature | SketchMathFilletFeature | SketchMathChamferFeature | SketchMathLinearPatternFeature | SketchMathCircularPatternFeature | SketchMathMirrorFeature;
+export type SketchMathShellFeature = SketchMathFeatureBase & {
+  feature_type: "shell";
+  profile_id?: null;
+  parameters: SketchMathShellParameters;
+};
+
+export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature | SketchMathRevolveFeature | SketchMathFilletFeature | SketchMathChamferFeature | SketchMathLinearPatternFeature | SketchMathCircularPatternFeature | SketchMathMirrorFeature | SketchMathShellFeature;
 
 export type SketchMathFeatureBuildRecord = {
   feature_id: string;
@@ -860,6 +872,14 @@ export const isSketchMathPatternFeaturesEnabled = (): boolean => {
 
 export const isSketchMathMirrorFeaturesEnabled = (): boolean => {
   const raw = process.env.REACT_APP_SKETCHMATH_MIRROR_FEATURES_ENABLED;
+  if (raw == null || String(raw).trim() === "") {
+    return false;
+  }
+  return ["1", "true", "yes", "on"].includes(String(raw).trim().toLowerCase());
+};
+
+export const isSketchMathShellFeaturesEnabled = (): boolean => {
+  const raw = process.env.REACT_APP_SKETCHMATH_SHELL_FEATURES_ENABLED;
   if (raw == null || String(raw).trim() === "") {
     return false;
   }

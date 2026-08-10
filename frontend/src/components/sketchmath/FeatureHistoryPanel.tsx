@@ -14,6 +14,7 @@ import type {
   SketchMathMirrorParameters,
   SketchMathProfileEntity,
   SketchMathSemanticTopologyReference,
+  SketchMathShellParameters,
 } from "../../services/sketchmath";
 
 type HoleDraft = {
@@ -34,6 +35,7 @@ type ExtrusionDraft = { depth: string; extent: SketchMathExtrudeParameters["exte
 type LinearPatternDraft = { count: string; spacing: string; directionX: string; directionY: string };
 type CircularPatternDraft = { count: string; centerX: string; centerY: string; direction: SketchMathCircularPatternParameters["direction"] };
 type MirrorDraft = { lineId: string };
+type ShellDraft = { thickness: string };
 
 type FeatureHistoryPanelProps = {
   document: SketchMathDocument;
@@ -48,6 +50,7 @@ type FeatureHistoryPanelProps = {
   chamferFeaturesEnabled: boolean;
   patternFeaturesEnabled: boolean;
   mirrorFeaturesEnabled: boolean;
+  shellFeaturesEnabled: boolean;
   artifactJobsEnabled: boolean;
   revolveAxes: SketchMathLineEntity[];
   artifactJobs: Record<string, SketchMathArtifactJobManifest>;
@@ -95,6 +98,15 @@ type FeatureHistoryPanelProps = {
     feature: Extract<SketchMathFeature, { feature_type: "mirror" }>,
     parameters: SketchMathMirrorParameters,
   ) => void;
+  onAddShell: (
+    feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
+    topReference: SketchMathSemanticTopologyReference,
+    parameters: SketchMathShellParameters,
+  ) => void;
+  onUpdateShell: (
+    feature: Extract<SketchMathFeature, { feature_type: "shell" }>,
+    parameters: SketchMathShellParameters,
+  ) => void;
   onUpdateFullRevolve: (
     feature: Extract<SketchMathFeature, { feature_type: "revolve" }>,
     axisId: string,
@@ -141,6 +153,7 @@ const featureTypeLabel = (feature: SketchMathFeature): string => ({
   linear_pattern: "Linear pattern",
   circular_pattern: "Circular pattern",
   mirror: "Feature mirror",
+  shell: "Shell",
 })[feature.feature_type];
 
 const featurePropertySummary = (feature: SketchMathFeature): string => {
@@ -154,7 +167,8 @@ const featurePropertySummary = (feature: SketchMathFeature): string => {
   if (feature.feature_type === "chamfer") return `Distance ${feature.parameters.distance_mm} mm`;
   if (feature.feature_type === "linear_pattern") return `${feature.parameters.count} instances · ${feature.parameters.spacing_mm} mm spacing`;
   if (feature.feature_type === "circular_pattern") return `${feature.parameters.count} instances · full circle`;
-  return "Reflected feature · stable sketch line";
+  if (feature.feature_type === "mirror") return "Reflected feature · stable sketch line";
+  return `${feature.parameters.thickness_mm} mm walls · top open`;
 };
 
 const FeatureHistoryPanel = ({
@@ -170,6 +184,7 @@ const FeatureHistoryPanel = ({
   chamferFeaturesEnabled,
   patternFeaturesEnabled,
   mirrorFeaturesEnabled,
+  shellFeaturesEnabled,
   artifactJobsEnabled,
   revolveAxes,
   artifactJobs,
@@ -188,6 +203,8 @@ const FeatureHistoryPanel = ({
   onUpdateCircularPattern,
   onAddFeatureMirror,
   onUpdateFeatureMirror,
+  onAddShell,
+  onUpdateShell,
   onUpdateFullRevolve,
   onSetDesignParameter,
   onRenameFeature,
@@ -207,6 +224,7 @@ const FeatureHistoryPanel = ({
   const [linearPatternDrafts, setLinearPatternDrafts] = useState<Record<string, LinearPatternDraft>>({});
   const [circularPatternDrafts, setCircularPatternDrafts] = useState<Record<string, CircularPatternDraft>>({});
   const [mirrorDrafts, setMirrorDrafts] = useState<Record<string, MirrorDraft>>({});
+  const [shellDrafts, setShellDrafts] = useState<Record<string, ShellDraft>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
   const [newExtrusionOperation, setNewExtrusionOperation] = useState<"new_body" | "add" | "cut">(
     document.features.length === 0 ? "new_body" : "add",
@@ -376,6 +394,19 @@ const FeatureHistoryPanel = ({
         ]),
     ));
   }, [document.features, revolveAxes]);
+
+  useEffect(() => {
+    setShellDrafts((current) => Object.fromEntries(
+      document.features
+        .filter((feature) => feature.feature_type === "extrude" || feature.feature_type === "shell")
+        .map((feature) => [
+          feature.feature_id,
+          feature.feature_type === "shell"
+            ? { thickness: String(feature.parameters.thickness_mm) }
+            : current[feature.feature_id] || { thickness: "1" },
+        ]),
+    ));
+  }, [document.features]);
 
   const newDepth = validDepth(newDepthValue);
   const effectiveNewExtrusionOperation = document.features.length === 0
@@ -682,7 +713,7 @@ const FeatureHistoryPanel = ({
                 ? candidate.parameters.operation === (index === 0 ? "new_body" : "add")
                 : candidate.feature_type === "hole" && candidate.parameters.style === "simple"
             ));
-          const graphSupportsSolidStep = (feature.feature_type === "extrude" || feature.feature_type === "hole")
+          const graphSupportsSolidStep = (feature.feature_type === "extrude" || feature.feature_type === "hole" || feature.feature_type === "shell")
             && bodyGraph.every((candidate, index) => (
               candidate.feature_type === "extrude"
                 ? candidate.parameters.extent === "one_sided" && (
@@ -697,7 +728,7 @@ const FeatureHistoryPanel = ({
                     && candidate.parameters.operation === "cut"
                     && candidate.parameters.direction === "negative")
                 )
-                : candidate.feature_type === "hole"
+                : candidate.feature_type === "hole" || candidate.feature_type === "shell"
             ));
           const graphSupportsRevolveStep = feature.feature_type === "revolve"
             && bodyGraph.length === 1
@@ -829,6 +860,21 @@ const FeatureHistoryPanel = ({
           const nextMirrorParameters: SketchMathMirrorParameters | null = mirrorDraft?.lineId
             ? { mirror_line_entity_id: mirrorDraft.lineId, operation: "modify" }
             : null;
+          const shellDraft = shellDrafts[feature.feature_id];
+          const shellThickness = Number(shellDraft?.thickness);
+          const nextShellParameters: SketchMathShellParameters | null = Number.isFinite(shellThickness) && shellThickness > 0
+            ? { thickness_mm: shellThickness, opening: "top", operation: "modify" }
+            : null;
+          const shellSourceProfile = feature.feature_type === "extrude"
+            ? document.sketches
+              .find((sketch) => sketch.sketch_id === feature.sketch_id)
+              ?.state?.items?.find((candidate) => candidate.type === "profile_2d" && candidate.id === feature.profile_id)
+            : null;
+          const shellProfileVertices = shellSourceProfile?.type === "profile_2d" ? shellSourceProfile.vertices : [];
+          const shellProfileSupported = shellProfileVertices.length === 5
+            && (shellSourceProfile?.type !== "profile_2d" || (shellSourceProfile.holes || []).length === 0)
+            && new Set(shellProfileVertices.slice(0, -1).map((point) => point[0])).size === 2
+            && new Set(shellProfileVertices.slice(0, -1).map((point) => point[1])).size === 2;
           return (
             <Box
               key={feature.feature_id}
@@ -847,6 +893,7 @@ const FeatureHistoryPanel = ({
                 {feature.feature_type === "linear_pattern" ? ` · ${feature.parameters.count} instances at ${feature.parameters.spacing_mm} mm` : ""}
                 {feature.feature_type === "circular_pattern" ? ` · ${feature.parameters.count} instances around ${feature.parameters.center_mm.join(", ")}` : ""}
                 {feature.feature_type === "mirror" ? " · stable sketch line" : ""}
+                {feature.feature_type === "shell" ? ` · ${feature.parameters.thickness_mm} mm · top open` : ""}
                 {record ? ` · ${record.generated_topology.length} semantic refs` : ""}
               </Text>
               {record?.measurements ? (
@@ -910,6 +957,30 @@ const FeatureHistoryPanel = ({
                   >
                     Apply extrusion
                   </Button>
+                </HStack>
+              ) : null}
+              {shellFeaturesEnabled && feature.feature_type === "extrude" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-shell-create-${feature.feature_id}`}>
+                  <Input type="number" min="0.01" step="0.01" aria-label={`New shell thickness ${feature.name}`} value={shellDraft?.thickness || ""} onChange={(event) => setShellDrafts((current) => ({ ...current, [feature.feature_id]: { thickness: event.target.value } }))} width="110px" />
+                  <Button
+                    size="sm"
+                    onClick={() => nextShellParameters && topReference && onAddShell(feature, topReference, nextShellParameters)}
+                    isDisabled={
+                      !nextShellParameters
+                      || !topReference
+                      || !shellProfileSupported
+                      || feature.parameters.operation !== "new_body"
+                      || feature.parameters.extent !== "one_sided"
+                      || feature.parameters.direction !== "positive"
+                      || feature.dependencies.length > 0
+                      || laterBodyFeatures.length > 0
+                      || record?.status !== "succeeded"
+                      || busy
+                    }
+                  >
+                    Shell top face
+                  </Button>
+                  <Text fontSize="xs">Rectangular new body; top opening.</Text>
                 </HStack>
               ) : null}
               {filletFeaturesEnabled && feature.feature_type === "extrude" ? (
@@ -1053,6 +1124,19 @@ const FeatureHistoryPanel = ({
                     isDisabled={!nextMirrorParameters || JSON.stringify(nextMirrorParameters) === JSON.stringify(feature.parameters) || busy}
                   >
                     Apply mirror line
+                  </Button>
+                </HStack>
+              ) : null}
+              {shellFeaturesEnabled && feature.feature_type === "shell" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-shell-editor-${feature.feature_id}`}>
+                  <Input type="number" min="0.01" step="0.01" aria-label={`Shell thickness ${feature.name}`} value={shellDraft?.thickness || ""} onChange={(event) => setShellDrafts((current) => ({ ...current, [feature.feature_id]: { thickness: event.target.value } }))} width="110px" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => nextShellParameters && onUpdateShell(feature, nextShellParameters)}
+                    isDisabled={!nextShellParameters || JSON.stringify(nextShellParameters) === JSON.stringify(feature.parameters) || busy}
+                  >
+                    Apply shell thickness
                   </Button>
                 </HStack>
               ) : null}
