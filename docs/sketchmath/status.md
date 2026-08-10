@@ -130,14 +130,16 @@ On 2026-08-09 for guarded UI checkpoint `9f0621c`:
 - Five focused backend hole tests, TypeScript, all 44 workspace tests, and live counterbore→countersink undo/redo/reload Playwright pass. The browser workflow completed in 8.4 seconds with no console/page errors.
 - New-hole creation remains simple-only. Advanced hole STL/STEP is not claimed; the current artifact workers still refuse unsupported advanced-hole graphs structurally.
 
-## Current Extrusion Property Validation
+## Current Extrusion Creation and Property Validation
 
-On 2026-08-09 for guarded UI checkpoint `54bce47`:
+On 2026-08-09 for guarded UI checkpoints `54bce47` and `775df7d`:
 
 - Existing extrusion properties cover positive/negative direction and one-sided, symmetric, or two-sided extent with conditional second depth, in addition to primary depth.
 - Typed replacement preserves operation, dependencies, semantic references, and immutable feature ID.
 - Three focused backend tests, TypeScript, all 44 workspace tests, and live browser acceptance pass. The browser verifies exact symmetric `[-5,5]` and two-sided `[-4,10]` Z bounds, signature change, undo/redo, and reload in 7.4 seconds without console/page errors.
-- Add/cut attachment authoring and general kernel execution remain open; the editor does not invent target topology or boolean intent.
+- The new-extrusion editor forces the first feature to `new_body` and offers explicit `add`/`cut` downstream. The bounded cut path depends on the latest extrusion, selects its semantic top face, and directs a one-sided cut negative into the target.
+- The focused backend boolean invariant, TypeScript, all 44 workspace tests, and live base→cut acceptance pass. The browser verifies exact reference resolution, negative volume, `[6,10]` cut bounds, stable identity, undo/redo, and reload in 8.2 seconds.
+- Arbitrary face/body target picking, cut kernel execution, and cut STL/STEP remain open.
 
 ## Current Kernel-Fillet Validation
 
@@ -204,7 +206,7 @@ On 2026-08-09 for guarded UI checkpoint `bc650ca`:
 - Revision-checked add/replace/delete/suppress operations persist independently from sketch-command history; feature undo/redo assigns new monotonic revisions.
 - Pure rebuild topologically orders dependencies, detects missing references/cycles, propagates blocked status, validates source profiles/holes/region identity, and emits deterministic hashes, signatures, bounds, net area, signed volume, and structured errors.
 - Typed extrusion parameters cover new-body/add/cut, positive/negative direction, symmetric, and one-/two-sided measurement semantics. Existing features expose the supported depth/direction/extent property envelope; broad kernel-backed feature reconstruction is not claimed.
-- Add/cut extrusions attach through semantic top/bottom references and are placed at the resolved face Z; missing attachments and one-sided directions away from the target fail structurally.
+- Add/cut extrusions attach through semantic top/bottom references and are placed at the resolved face Z; missing attachments and one-sided directions away from the target fail structurally. The browser can now author a bounded latest-extrusion top-face add/cut, while arbitrary target picking remains open.
 - Typed holes cover simple/counterbore/countersink and through/blind analytic semantics. The guarded React panel exposes simple placement plus existing advanced-style conditional property editing, extrusion depth editing, rebuild/reference evidence, and dedicated feature undo/redo.
 - Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, guarded new-body creation, and existing-axis replacement with feature undo/redo/reload.
 - Typed fillet covers convex extrusion vertical edges, semantic adjacency/signature/endpoints, exact/recovered selection, finite radius editing, kernel-required measurement state, and a resumable validated FreeCAD STEP path with guarded browser creation/download.

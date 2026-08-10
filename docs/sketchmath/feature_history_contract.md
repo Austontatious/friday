@@ -85,7 +85,7 @@ When the frontend flag is enabled, the workspace shows Feature history with:
 - current document revision and rebuild status;
 - bounded user-facing design-parameter editors without raw binding IDs;
 - a minimum model tree for canonical body, sketch, and typed feature nodes, with selection, bounded properties, and immutable-ID feature rename;
-- selected-profile extrusion creation;
+- selected-profile extrusion creation, forcing the first feature to `new_body` and exposing `add`/`cut` for downstream profiles;
 - stable feature IDs, build status, measurements, and shortened output signatures;
 - in-place extrusion depth, one-/two-sided/symmetric extent, second-depth, and direction replacement while preserving operation/dependencies;
 - numeric simple-hole placement and existing simple/counterbore/countersink style, diameter, termination/depth, and conditional style-parameter replacement against the current semantic top face;
@@ -93,6 +93,8 @@ When the frontend flag is enabled, the workspace shows Feature history with:
 - default-off outer-vertical-edge fillet creation, radius replacement, kernel STEP build, and download for the supported bounded vertical feature graph;
 - default-off outer-vertical-edge chamfer creation, distance replacement, kernel STEP build, and download for its supported bounded vertical feature graph;
 - dedicated feature undo and redo.
+
+For the bounded downstream creation path, the browser attaches to the most recent extrusion's semantic top face. Add remains positive and a one-sided cut is automatically directed negative into that face, matching structural rebuild validation. This is not arbitrary face picking: other target selection, spatial kernel booleans, and cut STL/STEP remain outside the current envelope.
 
 Normal-mode tree labels use names and feature types rather than raw body/sketch/feature/profile/axis IDs. Persisted body/sketch visibility is shown read-only until renderer behavior supports a truthful mutation control. See `model_tree_contract.md`.
 

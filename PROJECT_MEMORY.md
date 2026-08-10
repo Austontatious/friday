@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-09 - SketchMath Semantic Cut Extrusion Authoring
+
+### What Changed
+- Added an explicit new-extrusion operation selector: the first body feature is forced to `new_body`, while downstream profiles can author `add` or `cut`.
+- Routed the requested operation through canonical feature creation. A cut targets the most recent extrusion's semantic top face and automatically uses the negative one-sided direction required to enter that target.
+- Added component and live-browser acceptance for typed dependency/reference creation, exact rebuild, negative volume, Z bounds, stable identity, undo/redo, and reload.
+
+### Why
+- Deterministic add/cut rebuild semantics already existed, but the product could not explicitly author a cut without constructing raw feature JSON.
+- The bounded browser path must encode target and direction intent rather than creating a structurally invalid boolean feature.
+
+### New Env Flags
+- None; the existing document-v1 and feature-history flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py -k "boolean_extrusion or direction_into_target"`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && CI=true npm test -- --runInBand --watchAll=false --runTestsByPath src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run test:e2e -- --grep "creates an explicit semantic cut" --timeout 60000`
+
+### Evidence and Boundary
+- Code checkpoint: `775df7d`; targeted Playwright passed in 8.2 seconds.
+- The browser proves a two-feature base/cut graph with exact top-face resolution, negative volume, cut bounds `[6,10]`, stable feature identity, undo/redo, and reload.
+- Target inference is deliberately limited to the latest extrusion's top face. Arbitrary face picking and kernel-backed cut STL/STEP remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Extrusion Direction and Extent Editing
 
 ### What Changed
@@ -30,7 +57,7 @@
 ### Evidence and Boundary
 - Code checkpoint: `54bce47`; targeted Playwright passed in 7.4 seconds.
 - The browser proves symmetric `[-5,5]` and two-sided `[-4,10]` Z bounds, stable ID, changed signature, undo/redo, and reload.
-- Add/cut attachment authoring and general kernel execution remain open; this slice does not infer target/dependency intent.
+- This checkpoint did not yet author attachments. Checkpoint `775df7d` subsequently added the bounded latest-extrusion top-face add/cut creation path; arbitrary target picking and general kernel execution remain open.
 
 ---
 
