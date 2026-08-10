@@ -1112,6 +1112,7 @@ describe("SketchMath workspace", () => {
     delete process.env.REACT_APP_SKETCHMATH_REVOLVE_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_FILLET_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_CHAMFER_FEATURES_ENABLED;
+    delete process.env.REACT_APP_SKETCHMATH_PATTERN_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED;
     stamp.value = 1710000000000;
     jest.spyOn(Date, "now").mockImplementation(() => stamp.value);
@@ -1189,6 +1190,7 @@ describe("SketchMath workspace", () => {
       holeFeaturesEnabled: false,
       filletFeaturesEnabled: false,
       chamferFeaturesEnabled: false,
+      patternFeaturesEnabled: false,
       artifactJobsEnabled: false,
       artifactJobs: {},
       revolveAxes: [axis],
@@ -1201,6 +1203,8 @@ describe("SketchMath workspace", () => {
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
       onUpdateHole: jest.fn(),
+      onAddLinearPattern: jest.fn(),
+      onUpdateLinearPattern: jest.fn(),
       onUpdateFullRevolve,
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1250,6 +1254,123 @@ describe("SketchMath workspace", () => {
     await userEvent.selectOptions(within(editor).getByRole("combobox", { name: "Revolve axis Turned body" }), secondAxis.id);
     await userEvent.click(within(editor).getByRole("button", { name: "Apply revolve" }));
     expect(onUpdateFullRevolve).toHaveBeenCalledWith(revolveFeature, secondAxis.id, 360);
+  });
+
+  it("creates and edits a guarded feature-level linear hole pattern", async () => {
+    const holeFeature = {
+      feature_id: "feature_hole_seed",
+      feature_type: "hole" as const,
+      name: "Mount hole",
+      body_id: "body_1",
+      sketch_id: "sketch_1",
+      profile_id: null,
+      dependencies: ["feature_base"],
+      topology_references: [],
+      parameters: {
+        style: "simple" as const,
+        termination: "through" as const,
+        position_mm: [4, 5] as [number, number],
+        diameter_mm: 2,
+        operation: "cut" as const,
+      },
+      suppressed: false,
+    };
+    const patternFeature = {
+      feature_id: "feature_pattern",
+      feature_type: "linear_pattern" as const,
+      name: "Mounting row",
+      body_id: "body_1",
+      sketch_id: "sketch_1",
+      profile_id: null,
+      dependencies: [holeFeature.feature_id],
+      topology_references: [],
+      parameters: { count: 3, spacing_mm: 6, direction_xy: [1, 0] as [number, number], operation: "modify" as const },
+      suppressed: false,
+    };
+    const record = {
+      feature_id: holeFeature.feature_id,
+      order: 1,
+      status: "succeeded",
+      input_hash: "hole_input",
+      output_signature: "hole_output",
+      measurements: { net_profile_area_mm2: Math.PI, volume_delta_mm3: -10 * Math.PI, bounds_mm: [3, 5, 4, 6, 0, 10], hole_count: 1 },
+      generated_topology: [],
+      resolved_references: [],
+      measurement_coverage: "exact",
+    };
+    const document = {
+      schema_version: "1.1",
+      document_id: "doc_pattern",
+      name: "Pattern test",
+      units: "mm",
+      revision: 2,
+      bodies: [{ body_id: "body_1", name: "Body 1", sketch_ids: ["sketch_1"], feature_ids: [holeFeature.feature_id], visible: true }],
+      sketches: [],
+      features: [holeFeature],
+      design_parameters: [],
+      artifacts: [],
+      provenance: {},
+      last_rebuild: { schema_version: "1.0", document_id: "doc_pattern", input_revision: 2, ok: true, rebuild_order: [holeFeature.feature_id], records: [record], content_hash: "pattern_hash" },
+    };
+    const onAddLinearPattern = jest.fn();
+    const onUpdateLinearPattern = jest.fn();
+    const props: any = {
+      document,
+      activeProfile: null,
+      newDepthValue: "10",
+      busy: false,
+      canUndo: true,
+      canRedo: false,
+      holeFeaturesEnabled: true,
+      revolveFeaturesEnabled: false,
+      filletFeaturesEnabled: false,
+      chamferFeaturesEnabled: false,
+      patternFeaturesEnabled: true,
+      artifactJobsEnabled: false,
+      revolveAxes: [],
+      artifactJobs: {},
+      onNewDepthValueChange: jest.fn(),
+      onAddExtrusion: jest.fn(),
+      onAddFullRevolve: jest.fn(),
+      onAddOuterFillet: jest.fn(),
+      onAddOuterChamfer: jest.fn(),
+      onUpdateExtrusion: jest.fn(),
+      onUpdateFilletRadius: jest.fn(),
+      onUpdateChamferDistance: jest.fn(),
+      onUpdateHole: jest.fn(),
+      onAddLinearPattern,
+      onUpdateLinearPattern,
+      onUpdateFullRevolve: jest.fn(),
+      onSetDesignParameter: jest.fn(),
+      onRenameFeature: jest.fn(),
+      onAddSimpleHole: jest.fn(),
+      onBuildArtifact: jest.fn(),
+      onRetryArtifact: jest.fn(),
+      artifactDownloadUrl: jest.fn(),
+      onUndo: jest.fn(),
+      onRedo: jest.fn(),
+    };
+
+    const { rerender } = render(<FeatureHistoryPanel {...props} />);
+    await userEvent.clear(screen.getByRole("spinbutton", { name: "New linear pattern spacing Mount hole" }));
+    await userEvent.type(screen.getByRole("spinbutton", { name: "New linear pattern spacing Mount hole" }), "6");
+    await userEvent.click(screen.getByRole("button", { name: "Pattern hole" }));
+    expect(onAddLinearPattern).toHaveBeenCalledWith(holeFeature, {
+      count: 3,
+      spacing_mm: 6,
+      direction_xy: [1, 0],
+      operation: "modify",
+    });
+
+    rerender(<FeatureHistoryPanel {...props} document={{ ...document, revision: 3, features: [holeFeature, patternFeature] }} />);
+    const editor = screen.getByTestId("sketchmath-linear-pattern-editor-feature_pattern");
+    await userEvent.clear(within(editor).getByRole("spinbutton", { name: "Linear pattern count Mounting row" }));
+    await userEvent.type(within(editor).getByRole("spinbutton", { name: "Linear pattern count Mounting row" }), "2");
+    await userEvent.click(within(editor).getByRole("button", { name: "Apply pattern" }));
+    expect(onUpdateLinearPattern).toHaveBeenCalledWith(patternFeature, {
+      ...patternFeature.parameters,
+      count: 2,
+    });
   });
 
   it("creates a semantic outer-edge fillet and routes its terminal artifact to STEP", async () => {
@@ -1320,6 +1441,7 @@ describe("SketchMath workspace", () => {
       revolveFeaturesEnabled: false,
       filletFeaturesEnabled: true,
       chamferFeaturesEnabled: false,
+      patternFeaturesEnabled: false,
       artifactJobsEnabled: true,
       revolveAxes: [],
       artifactJobs: {},
@@ -1332,6 +1454,8 @@ describe("SketchMath workspace", () => {
       onUpdateFilletRadius: jest.fn(),
       onUpdateChamferDistance: jest.fn(),
       onUpdateHole: jest.fn(),
+      onAddLinearPattern: jest.fn(),
+      onUpdateLinearPattern: jest.fn(),
       onUpdateFullRevolve: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1516,6 +1640,7 @@ describe("SketchMath workspace", () => {
       revolveFeaturesEnabled={false}
       filletFeaturesEnabled={false}
       chamferFeaturesEnabled={false}
+      patternFeaturesEnabled={false}
       artifactJobsEnabled={false}
       revolveAxes={[]}
       artifactJobs={{}}
@@ -1528,6 +1653,8 @@ describe("SketchMath workspace", () => {
       onUpdateFilletRadius={jest.fn()}
       onUpdateChamferDistance={jest.fn()}
       onUpdateHole={onUpdateHole}
+      onAddLinearPattern={jest.fn()}
+      onUpdateLinearPattern={jest.fn()}
       onUpdateFullRevolve={jest.fn()}
       onSetDesignParameter={onSetDesignParameter}
       onRenameFeature={onRenameFeature}

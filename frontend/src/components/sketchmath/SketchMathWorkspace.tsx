@@ -24,6 +24,7 @@ import type {
   SketchMathHistoryEntry,
   SketchMathExtrudeParameters,
   SketchMathHoleParameters,
+  SketchMathLinearPatternParameters,
   SketchMathMode,
   SketchMathOperationResult,
   SketchMathPlanarTopology,
@@ -48,6 +49,7 @@ import {
   isSketchMathFeatureHistoryEnabled,
   isSketchMathFilletFeaturesEnabled,
   isSketchMathHoleFeaturesEnabled,
+  isSketchMathPatternFeaturesEnabled,
   isSketchMathRevolveFeaturesEnabled,
   previewSketchMathCommand,
   redoSketchMathSession,
@@ -458,6 +460,7 @@ const SketchMathWorkspace = () => {
   const [revolveFeaturesEnabled] = useState<boolean>(isSketchMathRevolveFeaturesEnabled());
   const [filletFeaturesEnabled] = useState<boolean>(isSketchMathFilletFeaturesEnabled());
   const [chamferFeaturesEnabled] = useState<boolean>(isSketchMathChamferFeaturesEnabled());
+  const [patternFeaturesEnabled] = useState<boolean>(isSketchMathPatternFeaturesEnabled());
   const [artifactJobsEnabled] = useState<boolean>(isSketchMathArtifactJobsEnabled());
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -2066,6 +2069,58 @@ const SketchMathWorkspace = () => {
           parameters,
         },
       },
+    });
+  };
+
+  const handleAddLinearPattern = async (
+    seed: Extract<SketchMathFeature, { feature_type: "hole" }>,
+    parameters: SketchMathLinearPatternParameters,
+  ) => {
+    if (!sketchDocument || !patternFeaturesEnabled) return;
+    const stem = `linear_pattern_${seed.feature_id.replace(/[^a-zA-Z0-9_-]+/g, "_")}`;
+    const existingIds = new Set(sketchDocument.features.map((feature) => feature.feature_id));
+    let featureId = stem;
+    let suffix = 2;
+    while (existingIds.has(featureId)) {
+      featureId = `${stem}_${suffix}`;
+      suffix += 1;
+    }
+    const feature: SketchMathFeature = {
+      feature_id: featureId,
+      feature_type: "linear_pattern",
+      name: `Linear pattern ${sketchDocument.features.filter((item) => item.feature_type === "linear_pattern").length + 1}`,
+      body_id: seed.body_id,
+      sketch_id: seed.sketch_id,
+      profile_id: null,
+      source_region_id: null,
+      dependencies: [seed.feature_id],
+      topology_references: [],
+      parameters,
+      suppressed: false,
+    };
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `add_${featureId}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "add_feature",
+      parameters: { feature },
+    });
+  };
+
+  const handleUpdateLinearPattern = async (
+    feature: Extract<SketchMathFeature, { feature_type: "linear_pattern" }>,
+    parameters: SketchMathLinearPatternParameters,
+  ) => {
+    if (!sketchDocument || !patternFeaturesEnabled) return;
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "replace_feature",
+      target_id: feature.feature_id,
+      parameters: { feature: { ...feature, parameters } },
     });
   };
 
@@ -4319,6 +4374,7 @@ const SketchMathWorkspace = () => {
                   revolveFeaturesEnabled={revolveFeaturesEnabled}
                   filletFeaturesEnabled={filletFeaturesEnabled}
                   chamferFeaturesEnabled={chamferFeaturesEnabled}
+                  patternFeaturesEnabled={patternFeaturesEnabled}
                   artifactJobsEnabled={artifactJobsEnabled}
                   revolveAxes={revolveAxes}
                   artifactJobs={artifactJobs}
@@ -4336,6 +4392,12 @@ const SketchMathWorkspace = () => {
                   onUpdateChamferDistance={(feature, distance) => void handleUpdateChamferDistance(feature, distance)}
                   onUpdateHole={(feature, parameters) => (
                     void handleUpdateHole(feature, parameters)
+                  )}
+                  onAddLinearPattern={(feature, parameters) => (
+                    void handleAddLinearPattern(feature, parameters)
+                  )}
+                  onUpdateLinearPattern={(feature, parameters) => (
+                    void handleUpdateLinearPattern(feature, parameters)
                   )}
                   onUpdateFullRevolve={(feature, axisId, angle) => (
                     void handleUpdateFullRevolve(feature, axisId, angle)

@@ -8,6 +8,7 @@ import type {
   SketchMathFeatureBuildRecord,
   SketchMathExtrudeParameters,
   SketchMathHoleParameters,
+  SketchMathLinearPatternParameters,
   SketchMathLineEntity,
   SketchMathProfileEntity,
   SketchMathSemanticTopologyReference,
@@ -28,6 +29,7 @@ type HoleDraft = {
 
 type RevolveDraft = { axisId: string; angle: string };
 type ExtrusionDraft = { depth: string; extent: SketchMathExtrudeParameters["extent"]; secondDepth: string; direction: SketchMathExtrudeParameters["direction"] };
+type LinearPatternDraft = { count: string; spacing: string; directionX: string; directionY: string };
 
 type FeatureHistoryPanelProps = {
   document: SketchMathDocument;
@@ -40,6 +42,7 @@ type FeatureHistoryPanelProps = {
   revolveFeaturesEnabled: boolean;
   filletFeaturesEnabled: boolean;
   chamferFeaturesEnabled: boolean;
+  patternFeaturesEnabled: boolean;
   artifactJobsEnabled: boolean;
   revolveAxes: SketchMathLineEntity[];
   artifactJobs: Record<string, SketchMathArtifactJobManifest>;
@@ -62,6 +65,14 @@ type FeatureHistoryPanelProps = {
   onUpdateHole: (
     feature: Extract<SketchMathFeature, { feature_type: "hole" }>,
     parameters: SketchMathHoleParameters,
+  ) => void;
+  onAddLinearPattern: (
+    feature: Extract<SketchMathFeature, { feature_type: "hole" }>,
+    parameters: SketchMathLinearPatternParameters,
+  ) => void;
+  onUpdateLinearPattern: (
+    feature: Extract<SketchMathFeature, { feature_type: "linear_pattern" }>,
+    parameters: SketchMathLinearPatternParameters,
   ) => void;
   onUpdateFullRevolve: (
     feature: Extract<SketchMathFeature, { feature_type: "revolve" }>,
@@ -106,6 +117,7 @@ const featureTypeLabel = (feature: SketchMathFeature): string => ({
   revolve: "Revolve",
   fillet: "Fillet",
   chamfer: "Chamfer",
+  linear_pattern: "Linear pattern",
 })[feature.feature_type];
 
 const featurePropertySummary = (feature: SketchMathFeature): string => {
@@ -116,7 +128,8 @@ const featurePropertySummary = (feature: SketchMathFeature): string => {
   }
   if (feature.feature_type === "revolve") return `Angle ${feature.parameters.angle_deg}° · construction axis`;
   if (feature.feature_type === "fillet") return `Radius ${feature.parameters.radius_mm} mm`;
-  return `Distance ${feature.parameters.distance_mm} mm`;
+  if (feature.feature_type === "chamfer") return `Distance ${feature.parameters.distance_mm} mm`;
+  return `${feature.parameters.count} instances · ${feature.parameters.spacing_mm} mm spacing`;
 };
 
 const FeatureHistoryPanel = ({
@@ -130,6 +143,7 @@ const FeatureHistoryPanel = ({
   revolveFeaturesEnabled,
   filletFeaturesEnabled,
   chamferFeaturesEnabled,
+  patternFeaturesEnabled,
   artifactJobsEnabled,
   revolveAxes,
   artifactJobs,
@@ -142,6 +156,8 @@ const FeatureHistoryPanel = ({
   onUpdateFilletRadius,
   onUpdateChamferDistance,
   onUpdateHole,
+  onAddLinearPattern,
+  onUpdateLinearPattern,
   onUpdateFullRevolve,
   onSetDesignParameter,
   onRenameFeature,
@@ -158,6 +174,7 @@ const FeatureHistoryPanel = ({
   const [chamferDrafts, setChamferDrafts] = useState<Record<string, string>>({});
   const [parameterDrafts, setParameterDrafts] = useState<Record<string, string>>({});
   const [revolveDrafts, setRevolveDrafts] = useState<Record<string, RevolveDraft>>({});
+  const [linearPatternDrafts, setLinearPatternDrafts] = useState<Record<string, LinearPatternDraft>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
   const [newExtrusionOperation, setNewExtrusionOperation] = useState<"new_body" | "add" | "cut">(
     document.features.length === 0 ? "new_body" : "add",
@@ -267,6 +284,27 @@ const FeatureHistoryPanel = ({
           axisId: feature.parameters.axis_entity_id,
           angle: String(feature.parameters.angle_deg),
         }]),
+    ));
+  }, [document.features]);
+
+  useEffect(() => {
+    setLinearPatternDrafts((current) => Object.fromEntries(
+      document.features
+        .filter((feature) => feature.feature_type === "hole" || feature.feature_type === "linear_pattern")
+        .map((feature) => [
+          feature.feature_id,
+          feature.feature_type === "linear_pattern" ? {
+            count: String(feature.parameters.count),
+            spacing: String(feature.parameters.spacing_mm),
+            directionX: String(feature.parameters.direction_xy[0]),
+            directionY: String(feature.parameters.direction_xy[1]),
+          } : current[feature.feature_id] || {
+            count: "3",
+            spacing: "10",
+            directionX: "1",
+            directionY: "0",
+          },
+        ]),
     ));
   }, [document.features]);
 
@@ -679,6 +717,27 @@ const FeatureHistoryPanel = ({
           const featureParameterBound = boundFeatureIds.has(feature.feature_id);
           const revolveDraft = revolveDrafts[feature.feature_id];
           const revolveAngle = Number(revolveDraft?.angle);
+          const linearPatternDraft = linearPatternDrafts[feature.feature_id];
+          const linearPatternCount = Number(linearPatternDraft?.count);
+          const linearPatternSpacing = Number(linearPatternDraft?.spacing);
+          const linearPatternDirectionX = Number(linearPatternDraft?.directionX);
+          const linearPatternDirectionY = Number(linearPatternDraft?.directionY);
+          const nextLinearPatternParameters: SketchMathLinearPatternParameters | null = linearPatternDraft
+            && Number.isInteger(linearPatternCount)
+            && linearPatternCount >= 2
+            && linearPatternCount <= 128
+            && Number.isFinite(linearPatternSpacing)
+            && linearPatternSpacing > 0
+            && Number.isFinite(linearPatternDirectionX)
+            && Number.isFinite(linearPatternDirectionY)
+            && Math.hypot(linearPatternDirectionX, linearPatternDirectionY) > 0
+            ? {
+              count: linearPatternCount,
+              spacing_mm: linearPatternSpacing,
+              direction_xy: [linearPatternDirectionX, linearPatternDirectionY],
+              operation: "modify",
+            }
+            : null;
           return (
             <Box
               key={feature.feature_id}
@@ -694,6 +753,7 @@ const FeatureHistoryPanel = ({
                 {feature.feature_type === "revolve" ? ` · ${feature.parameters.angle_deg}° about construction axis` : ""}
                 {feature.feature_type === "fillet" ? ` · radius ${feature.parameters.radius_mm} mm` : ""}
                 {feature.feature_type === "chamfer" ? ` · distance ${feature.parameters.distance_mm} mm` : ""}
+                {feature.feature_type === "linear_pattern" ? ` · ${feature.parameters.count} instances at ${feature.parameters.spacing_mm} mm` : ""}
                 {record ? ` · ${record.generated_topology.length} semantic refs` : ""}
               </Text>
               {record?.measurements ? (
@@ -851,6 +911,22 @@ const FeatureHistoryPanel = ({
                   </Button>
                 </HStack>
               ) : null}
+              {patternFeaturesEnabled && feature.feature_type === "linear_pattern" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-linear-pattern-editor-${feature.feature_id}`}>
+                  <Input type="number" min="2" max="128" step="1" aria-label={`Linear pattern count ${feature.name}`} value={linearPatternDraft?.count || ""} onChange={(event) => setLinearPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], count: event.target.value } }))} width="90px" />
+                  <Input type="number" min="0.01" step="0.01" aria-label={`Linear pattern spacing ${feature.name}`} value={linearPatternDraft?.spacing || ""} onChange={(event) => setLinearPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], spacing: event.target.value } }))} width="100px" />
+                  <Input type="number" step="0.01" aria-label={`Linear pattern direction X ${feature.name}`} value={linearPatternDraft?.directionX || ""} onChange={(event) => setLinearPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], directionX: event.target.value } }))} width="90px" />
+                  <Input type="number" step="0.01" aria-label={`Linear pattern direction Y ${feature.name}`} value={linearPatternDraft?.directionY || ""} onChange={(event) => setLinearPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], directionY: event.target.value } }))} width="90px" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => nextLinearPatternParameters && onUpdateLinearPattern(feature, nextLinearPatternParameters)}
+                    isDisabled={!nextLinearPatternParameters || JSON.stringify(nextLinearPatternParameters) === JSON.stringify(feature.parameters) || busy}
+                  >
+                    Apply pattern
+                  </Button>
+                </HStack>
+              ) : null}
               {holeFeaturesEnabled && feature.feature_type === "hole" ? (
                 <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-existing-hole-editor-${feature.feature_id}`}>
                   <Select
@@ -979,6 +1055,22 @@ const FeatureHistoryPanel = ({
                     Apply hole
                   </Button>
                   {featureParameterBound ? <Text fontSize="xs">Controlled by a design parameter.</Text> : null}
+                </HStack>
+              ) : null}
+              {patternFeaturesEnabled && feature.feature_type === "hole" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-linear-pattern-create-${feature.feature_id}`}>
+                  <Input type="number" min="2" max="128" step="1" aria-label={`New linear pattern count ${feature.name}`} value={linearPatternDraft?.count || ""} onChange={(event) => setLinearPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], count: event.target.value } }))} width="90px" />
+                  <Input type="number" min="0.01" step="0.01" aria-label={`New linear pattern spacing ${feature.name}`} value={linearPatternDraft?.spacing || ""} onChange={(event) => setLinearPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], spacing: event.target.value } }))} width="100px" />
+                  <Input type="number" step="0.01" aria-label={`New linear pattern direction X ${feature.name}`} value={linearPatternDraft?.directionX || ""} onChange={(event) => setLinearPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], directionX: event.target.value } }))} width="90px" />
+                  <Input type="number" step="0.01" aria-label={`New linear pattern direction Y ${feature.name}`} value={linearPatternDraft?.directionY || ""} onChange={(event) => setLinearPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], directionY: event.target.value } }))} width="90px" />
+                  <Button
+                    size="sm"
+                    onClick={() => nextLinearPatternParameters && onAddLinearPattern(feature, nextLinearPatternParameters)}
+                    isDisabled={!nextLinearPatternParameters || laterBodyFeatures.length > 0 || record?.status !== "succeeded" || busy}
+                  >
+                    Pattern hole
+                  </Button>
+                  <Text fontSize="xs">Count includes the seed hole.</Text>
                 </HStack>
               ) : null}
               {revolveFeaturesEnabled && feature.feature_type === "revolve" ? (
