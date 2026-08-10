@@ -293,6 +293,35 @@ def _linear_pattern_feature(
     )
 
 
+def _circular_pattern_feature(
+    feature_id: str,
+    seed: FeatureRecord,
+    *,
+    count: int = 4,
+    center: tuple[float, float] = (5, 5),
+    direction: str = "counterclockwise",
+) -> FeatureRecord:
+    return FeatureRecord.model_validate(
+        {
+            "feature_id": feature_id,
+            "feature_type": "circular_pattern",
+            "name": feature_id.replace("_", " ").title(),
+            "body_id": seed.body_id,
+            "sketch_id": seed.sketch_id,
+            "profile_id": None,
+            "dependencies": [seed.feature_id],
+            "topology_references": [],
+            "parameters": {
+                "count": count,
+                "center_mm": center,
+                "angle_deg": 360,
+                "direction": direction,
+                "operation": "modify",
+            },
+        }
+    )
+
+
 def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch() -> None:
     document = _document()
 
@@ -440,6 +469,65 @@ def test_linear_pattern_refuses_overlap_and_instances_outside_target_atomically(
     assert outside_report.ok is False
     assert outside_report.records[2].error is not None
     assert outside_report.records[2].error.code == "linear_pattern_instance_outside_target"
+
+
+def test_circular_hole_pattern_rebuild_is_exact_deterministic_and_topology_stable() -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    seed = _hole_feature("hole_seed", base, position=(7, 5), diameter=1)
+    pattern = _circular_pattern_feature("pattern_holes", seed)
+    document = _document().model_copy(update={"features": [pattern, seed, base]})
+
+    first = rebuild_document(document)
+    second = rebuild_document(document.model_copy(deep=True))
+
+    assert first == second
+    assert first.ok is True
+    assert first.rebuild_order == ["feature_base", "hole_seed", "pattern_holes"]
+    record = first.records[2]
+    assert record.measurements is not None
+    assert record.measurements.net_profile_area_mm2 == pytest.approx(3 * math.pi / 4)
+    assert record.measurements.volume_delta_mm3 == pytest.approx(-7.5 * math.pi)
+    assert record.measurements.bounds_mm == pytest.approx((2.5, 5.5, 2.5, 7.5, 0, 10))
+    assert record.measurements.hole_count == 3
+    assert len(record.generated_topology) == 6
+    assert {item.measurements["instance_index"] for item in record.generated_topology} == {1, 2, 3}
+    assert {item.measurements["rotation_deg"] for item in record.generated_topology} == {90.0, 180.0, 270.0}
+
+
+def test_circular_pattern_direction_changes_ordered_instance_topology() -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    seed = _hole_feature("hole_seed", base, position=(7, 5), diameter=1)
+    clockwise = _circular_pattern_feature("pattern_holes", seed, direction="clockwise")
+
+    report = rebuild_document(_document().model_copy(update={"features": [base, seed, clockwise]}))
+
+    assert report.ok is True
+    assert report.records[2].generated_topology[0].measurements["rotation_deg"] == pytest.approx(-90)
+
+
+@pytest.mark.parametrize(
+    ("seed_position", "center", "count", "expected_code"),
+    [
+        ((5, 5), (5, 5), 4, "circular_pattern_seed_on_axis"),
+        ((7, 5), (2, 5), 4, "circular_pattern_instance_outside_target"),
+        ((7, 5), (5, 5), 128, "circular_pattern_instances_overlap"),
+    ],
+)
+def test_circular_pattern_refuses_degenerate_overlap_and_outside_instances(
+    seed_position: tuple[float, float],
+    center: tuple[float, float],
+    count: int,
+    expected_code: str,
+) -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    seed = _hole_feature("hole_seed", base, position=seed_position, diameter=1)
+    pattern = _circular_pattern_feature("pattern_holes", seed, center=center, count=count)
+
+    report = rebuild_document(_document().model_copy(update={"features": [base, seed, pattern]}))
+
+    assert report.ok is False
+    assert report.records[2].error is not None
+    assert report.records[2].error.code == expected_code
 
 
 def test_boolean_extrusion_requires_semantic_attachment_and_direction_into_target() -> None:

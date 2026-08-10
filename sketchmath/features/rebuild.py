@@ -8,6 +8,7 @@ from shapely.geometry import Point, Polygon
 
 from sketchmath.models.document import (
     ChamferParameters,
+    CircularPatternParameters,
     FeatureBuildError,
     FeatureBuildRecord,
     FeatureMeasurements,
@@ -781,6 +782,166 @@ def _linear_pattern_contract(
     return measurements, generated_topology, source_geometry, None
 
 
+def _circular_pattern_contract(
+    feature: FeatureRecord,
+    records_by_id: dict[str, FeatureBuildRecord],
+    feature_map: dict[str, FeatureRecord],
+    document: SketchMathDocument,
+) -> tuple[FeatureMeasurements | None, list[SemanticTopologyReference], dict[str, object], FeatureBuildError | None]:
+    parameters = feature.parameters
+    if not isinstance(parameters, CircularPatternParameters):
+        return None, [], {}, FeatureBuildError(
+            code="invalid_circular_pattern_parameters",
+            message="Circular pattern feature requires matching parameters.",
+        )
+    if len(feature.dependencies) != 1:
+        return None, [], {}, FeatureBuildError(
+            code="circular_pattern_seed_dependency_required",
+            message="A circular pattern requires exactly one seed feature dependency.",
+            detail={"dependency_ids": feature.dependencies},
+        )
+    seed_id = feature.dependencies[0]
+    seed_feature = feature_map.get(seed_id)
+    seed_record = records_by_id.get(seed_id)
+    if (
+        seed_feature is None
+        or seed_record is None
+        or seed_record.measurements is None
+        or seed_feature.feature_type != "hole"
+        or not isinstance(seed_feature.parameters, HoleParameters)
+    ):
+        return None, [], {}, FeatureBuildError(
+            code="unsupported_circular_pattern_seed",
+            message="Canonical circular pattern currently supports a built hole seed.",
+            detail={"seed_feature_id": seed_id, "feature_type": seed_feature.feature_type if seed_feature else None},
+        )
+    if not seed_feature.dependencies:
+        return None, [], {}, FeatureBuildError(
+            code="circular_pattern_seed_target_missing",
+            message="The hole seed must retain its target dependency.",
+            detail={"seed_feature_id": seed_id},
+        )
+    target_feature = feature_map.get(seed_feature.dependencies[0])
+    if target_feature is None or target_feature.feature_type != "extrude":
+        return None, [], {}, FeatureBuildError(
+            code="unsupported_circular_pattern_target",
+            message="Canonical circular hole patterns currently require an extrusion target.",
+            detail={"target_feature_id": seed_feature.dependencies[0], "feature_type": target_feature.feature_type if target_feature else None},
+        )
+    target_profile, target_holes, target_error = _profile_for_feature(document, target_feature)
+    if target_error is not None or target_profile is None:
+        return None, [], {}, target_error
+
+    seed_center = seed_feature.parameters.position_mm
+    center = parameters.center_mm
+    radial_vector = (seed_center[0] - center[0], seed_center[1] - center[1])
+    radial_distance = math.hypot(*radial_vector)
+    if radial_distance <= 1e-9:
+        return None, [], {}, FeatureBuildError(
+            code="circular_pattern_seed_on_axis",
+            message="Circular pattern seed must remain away from the pattern center.",
+            detail={"seed_center_mm": seed_center, "pattern_center_mm": center},
+        )
+    direction_sign = 1.0 if parameters.direction == "counterclockwise" else -1.0
+    angle_step = direction_sign * 2.0 * math.pi / parameters.count
+    centers: list[tuple[float, float]] = []
+    for index in range(parameters.count):
+        angle = angle_step * index
+        cosine, sine = math.cos(angle), math.sin(angle)
+        centers.append(
+            (
+                center[0] + radial_vector[0] * cosine - radial_vector[1] * sine,
+                center[1] + radial_vector[0] * sine + radial_vector[1] * cosine,
+            )
+        )
+
+    target_polygon = Polygon(target_profile.vertices, holes=[hole.vertices for hole in target_holes])
+    radius = max(
+        seed_feature.parameters.diameter_mm,
+        float(seed_feature.parameters.counterbore_diameter_mm or 0.0),
+        float(seed_feature.parameters.countersink_diameter_mm or 0.0),
+    ) / 2.0
+    for index, instance_center in enumerate(centers[1:], start=1):
+        point = Point(instance_center)
+        if not target_polygon.covers(point) or target_polygon.boundary.distance(point) + 1e-9 < radius:
+            return None, [], {}, FeatureBuildError(
+                code="circular_pattern_instance_outside_target",
+                message="Every patterned hole must remain inside target material.",
+                detail={"instance_index": index, "center_mm": instance_center, "radius_mm": radius},
+            )
+        if any(math.dist(instance_center, previous) < 2.0 * radius - 1e-9 for previous in centers[:index]):
+            return None, [], {}, FeatureBuildError(
+                code="circular_pattern_instances_overlap",
+                message="Patterned holes cannot overlap.",
+                detail={"instance_index": index, "center_mm": instance_center, "radius_mm": radius},
+            )
+
+    seed_measurements = seed_record.measurements
+    new_centers = centers[1:]
+    translated_bounds = [
+        (
+            instance_center[0] - radius,
+            instance_center[0] + radius,
+            instance_center[1] - radius,
+            instance_center[1] + radius,
+            seed_measurements.bounds_mm[4],
+            seed_measurements.bounds_mm[5],
+        )
+        for instance_center in new_centers
+    ]
+    measurements = FeatureMeasurements(
+        net_profile_area_mm2=seed_measurements.net_profile_area_mm2 * len(new_centers),
+        volume_delta_mm3=seed_measurements.volume_delta_mm3 * len(new_centers),
+        bounds_mm=(
+            min(bounds[0] for bounds in translated_bounds),
+            max(bounds[1] for bounds in translated_bounds),
+            min(bounds[2] for bounds in translated_bounds),
+            max(bounds[3] for bounds in translated_bounds),
+            min(bounds[4] for bounds in translated_bounds),
+            max(bounds[5] for bounds in translated_bounds),
+        ),
+        hole_count=seed_measurements.hole_count * len(new_centers),
+    )
+    generated_topology: list[SemanticTopologyReference] = []
+    for instance_index, instance_center in enumerate(new_centers, start=1):
+        rotation_deg = math.degrees(angle_step * instance_index)
+        offset = (instance_center[0] - seed_center[0], instance_center[1] - seed_center[1])
+        for seed_topology in seed_record.generated_topology:
+            generated_topology.append(
+                _semantic_reference(
+                    feature,
+                    topology_type=seed_topology.topology_type,
+                    role=seed_topology.role,
+                    source_entity_id=seed_topology.reference_id,
+                    ordinal=len(generated_topology),
+                    geometry={
+                        "seed_reference_id": seed_topology.reference_id,
+                        "instance_index": instance_index,
+                        "pattern_center_mm": center,
+                        "rotation_deg": rotation_deg,
+                        "center_mm": instance_center,
+                    },
+                    measurements={
+                        **seed_topology.measurements,
+                        "instance_index": instance_index,
+                        "rotation_deg": rotation_deg,
+                        "offset_x_mm": offset[0],
+                        "offset_y_mm": offset[1],
+                    },
+                )
+            )
+    source_geometry = {
+        "seed_feature_id": seed_id,
+        "seed_signature": seed_record.output_signature,
+        "count": parameters.count,
+        "center_mm": center,
+        "direction": parameters.direction,
+        "angle_deg": parameters.angle_deg,
+        "centers_mm": centers,
+    }
+    return measurements, generated_topology, source_geometry, None
+
+
 def _resolve_topology_references(
     feature: FeatureRecord,
     records_by_id: dict[str, FeatureBuildRecord],
@@ -1041,6 +1202,13 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                 feature_map,
                 document,
             )
+        if error is None and feature.feature_type == "circular_pattern":
+            pattern_measurements, pattern_topology, pattern_source_geometry, error = _circular_pattern_contract(
+                feature,
+                records_by_id,
+                feature_map,
+                document,
+            )
         if error is None and feature.feature_type == "revolve":
             assert isinstance(feature.parameters, RevolveParameters)
             if not math.isclose(feature.parameters.angle_deg, 360.0, abs_tol=1e-9):
@@ -1227,7 +1395,7 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                         "target_signature": records_by_id[feature.dependencies[0]].output_signature,
                         "distance_mm": feature.parameters.distance_mm,
                     }
-                elif feature.feature_type == "linear_pattern":
+                elif feature.feature_type in {"linear_pattern", "circular_pattern"}:
                     assert pattern_measurements is not None
                     measurements = pattern_measurements
                     generated_topology = pattern_topology

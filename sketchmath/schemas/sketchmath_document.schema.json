@@ -435,6 +435,58 @@
       "title": "Circle2DEntity",
       "type": "object"
     },
+    "CircularPatternParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "angle_deg": {
+          "const": 360.0,
+          "default": 360.0,
+          "title": "Angle Deg",
+          "type": "number"
+        },
+        "center_mm": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center Mm",
+          "type": "array"
+        },
+        "count": {
+          "maximum": 128,
+          "minimum": 2,
+          "title": "Count",
+          "type": "integer"
+        },
+        "direction": {
+          "default": "counterclockwise",
+          "enum": [
+            "counterclockwise",
+            "clockwise"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "operation": {
+          "const": "modify",
+          "default": "modify",
+          "title": "Operation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "count",
+        "center_mm"
+      ],
+      "title": "CircularPatternParameters",
+      "type": "object"
+    },
     "CoincidentConstraint": {
       "additionalProperties": false,
       "properties": {
@@ -1329,7 +1381,8 @@
             "revolve",
             "fillet",
             "chamfer",
-            "linear_pattern"
+            "linear_pattern",
+            "circular_pattern"
           ],
           "title": "Feature Type",
           "type": "string"
@@ -1357,6 +1410,9 @@
             },
             {
               "$ref": "#/$defs/LinearPatternParameters"
+            },
+            {
+              "$ref": "#/$defs/CircularPatternParameters"
             }
           ],
           "title": "Parameters"

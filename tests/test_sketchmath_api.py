@@ -1270,6 +1270,40 @@ def test_sketchmath_linear_hole_pattern_commits_edits_undoes_redoes_and_reloads(
     assert redone.status_code == 200
     assert redone.json()["document"]["features"][2]["parameters"]["count"] == 2
 
+    circular = {
+        "feature_id": "feature_circular_pattern",
+        "feature_type": "circular_pattern",
+        "name": "Opposed mounting pair",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": None,
+        "dependencies": ["feature_pattern_seed"],
+        "topology_references": [],
+        "parameters": {
+            "count": 2,
+            "center_mm": [10, 5],
+            "angle_deg": 360,
+            "direction": "counterclockwise",
+            "operation": "modify",
+        },
+    }
+    circular_response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={
+            "command": _feature_command(
+                "add_feature",
+                "add_circular_pattern",
+                redone.json()["document"]["revision"],
+                feature=circular,
+                mode="commit",
+            )
+        },
+    )
+    assert circular_response.status_code == 200, circular_response.text
+    circular_record = circular_response.json()["document"]["last_rebuild"]["records"][3]
+    assert circular_record["measurements"]["volume_delta_mm3"] == pytest.approx(-10 * math.pi)
+    assert circular_record["measurements"]["bounds_mm"] == pytest.approx([15, 17, 4, 6, 0, 10])
+
     SESSION_STORE._sessions.pop(session_id, None)
     reloaded = client.get(f"/api/sketchmath/sessions/{session_id}")
     assert reloaded.status_code == 200
@@ -1277,8 +1311,10 @@ def test_sketchmath_linear_hole_pattern_commits_edits_undoes_redoes_and_reloads(
         "extrude",
         "hole",
         "linear_pattern",
+        "circular_pattern",
     ]
     assert reloaded.json()["document"]["features"][2]["parameters"]["count"] == 2
+    assert reloaded.json()["document"]["features"][3]["parameters"]["center_mm"] == [10.0, 5.0]
     client.close()
 
 

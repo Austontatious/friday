@@ -125,7 +125,7 @@ def _require_enabled_feature_family(command: Dict[str, Any]) -> None:
                 False,
             ),
         )
-    if isinstance(feature, dict) and feature.get("feature_type") == "linear_pattern" and not SketchMathConfig.from_env().pattern_features_enabled:
+    if isinstance(feature, dict) and feature.get("feature_type") in {"linear_pattern", "circular_pattern"} and not SketchMathConfig.from_env().pattern_features_enabled:
         raise HTTPException(
             status_code=503,
             detail=_error_payload(

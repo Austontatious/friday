@@ -155,6 +155,22 @@ class LinearPatternParameters(BaseModel):
         return self
 
 
+class CircularPatternParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    count: int = Field(ge=2, le=128)
+    center_mm: tuple[float, float]
+    angle_deg: Literal[360.0] = 360.0
+    direction: Literal["counterclockwise", "clockwise"] = "counterclockwise"
+    operation: Literal["modify"] = "modify"
+
+    @model_validator(mode="after")
+    def validate_circular_pattern_parameters(self) -> "CircularPatternParameters":
+        if not all(math.isfinite(value) for value in self.center_mm):
+            raise ValueError("circular pattern center must be finite")
+        return self
+
+
 class TopologyReferenceSelector(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -197,7 +213,7 @@ class FeatureRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     feature_id: str
-    feature_type: Literal["extrude", "hole", "revolve", "fillet", "chamfer", "linear_pattern"] = "extrude"
+    feature_type: Literal["extrude", "hole", "revolve", "fillet", "chamfer", "linear_pattern", "circular_pattern"] = "extrude"
     name: str
     body_id: str
     sketch_id: str
@@ -205,7 +221,7 @@ class FeatureRecord(BaseModel):
     source_region_id: str | None = None
     dependencies: list[str] = Field(default_factory=list)
     topology_references: list[TopologyReferenceSelector] = Field(default_factory=list)
-    parameters: ExtrudeParameters | HoleParameters | RevolveParameters | FilletParameters | ChamferParameters | LinearPatternParameters
+    parameters: ExtrudeParameters | HoleParameters | RevolveParameters | FilletParameters | ChamferParameters | LinearPatternParameters | CircularPatternParameters
     suppressed: bool = False
 
     @model_validator(mode="after")
@@ -235,11 +251,16 @@ class FeatureRecord(BaseModel):
                 raise ValueError("chamfer feature requires chamfer parameters")
             if self.profile_id is not None:
                 raise ValueError("chamfer feature does not use profile_id")
-        else:
+        elif self.feature_type == "linear_pattern":
             if not isinstance(self.parameters, LinearPatternParameters):
                 raise ValueError("linear pattern feature requires linear pattern parameters")
             if self.profile_id is not None:
                 raise ValueError("linear pattern feature does not use profile_id")
+        else:
+            if not isinstance(self.parameters, CircularPatternParameters):
+                raise ValueError("circular pattern feature requires circular pattern parameters")
+            if self.profile_id is not None:
+                raise ValueError("circular pattern feature does not use profile_id")
         return self
 
 
