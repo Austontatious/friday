@@ -129,7 +129,8 @@ On 2026-08-09 for guarded UI checkpoint `9f0621c`:
 - The existing-hole property editor covers simple, counterbore, and countersink styles with through/blind depth plus conditional counterbore diameter/depth and countersink diameter/angle.
 - All edits remain revision-checked typed `replace_feature` commits and retain backend style geometry, containment, depth, volume, and generated-topology validation.
 - Five focused backend hole tests, TypeScript, all 44 workspace tests, and live counterbore→countersink undo/redo/reload Playwright pass. The browser workflow completed in 8.4 seconds with no console/page errors.
-- New-hole creation remains simple-only. Advanced hole STL/STEP is not claimed; the current artifact workers still refuse unsupported advanced-hole graphs structurally.
+- Native FreeCAD counterbore/countersink fixtures match analytic removed volume and unchanged base bounds. The extended countersink browser lifecycle registers/downloads STEP in 11.1 seconds.
+- New-hole creation remains simple-only; advanced-hole STL and advanced-hole-before-edge-finish graphs remain refused.
 
 ## Current Extrusion Creation and Property Validation
 
@@ -210,7 +211,7 @@ On 2026-08-09 for guarded UI checkpoint `bc650ca`:
 - Pure rebuild topologically orders dependencies, detects missing references/cycles, propagates blocked status, validates source profiles/holes/region identity, and emits deterministic hashes, signatures, bounds, net area, signed volume, and structured errors.
 - Typed extrusion parameters cover new-body/add/cut, positive/negative direction, symmetric, and one-/two-sided measurement semantics. Existing features expose the supported depth/direction/extent property envelope; broad kernel-backed feature reconstruction is not claimed.
 - Add/cut extrusions attach through semantic top/bottom references and are placed at the resolved face Z; missing attachments and one-sided directions away from the target fail structurally. The browser can now author a bounded latest-extrusion top-face add/cut, while arbitrary target picking remains open.
-- Typed holes cover simple/counterbore/countersink and through/blind analytic semantics. The guarded React panel exposes simple placement plus existing advanced-style conditional property editing, extrusion depth editing, rebuild/reference evidence, and dedicated feature undo/redo.
+- Typed holes cover simple/counterbore/countersink and through/blind semantics, guarded editing, rebuild/reference evidence, undo/redo, and validated terminal STEP.
 - Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, guarded new-body creation, existing-axis replacement, feature undo/redo/reload, and validated new-body STEP.
 - Typed fillet covers convex extrusion vertical edges, semantic adjacency/signature/endpoints, exact/recovered selection, finite radius editing, kernel-required measurement state, and a resumable validated FreeCAD STEP path with guarded browser creation/download.
 - Typed chamfer reuses the stable edge contract with finite distance editing, deterministic `chamfer_surface` identity, native FreeCAD STEP validation, and guarded browser creation/download.
@@ -239,7 +240,7 @@ Completed and published:
 - Canonical document v1 remains a single-sketch, single-worker compatibility path. The minimum single-body/sketch feature tree passes, while multi-sketch/body workspace behavior and visibility mutation are not implemented.
 - Generated extrusion/hole semantic face/edge references are stable and recoverable, but browser face/edge picking and raw kernel-topology reconciliation are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
-- Layered STL supports vertical new-body/add/cut extrusion and simple-hole graphs. STEP supports bounded terminal extrusion solids, one independent full revolve, and the prior positive graph with one terminal fillet/chamfer. Counterbore/countersink/revolve/edge-finish STL, partial revolve, revolve booleans, cut-before-edge-finish and other intermediate STEP graphs, shell/pattern features, and general full-graph STEP remain open.
+- Layered STL supports vertical extrusion/simple-hole graphs. STEP supports bounded terminal extrusion/typed-hole solids, one independent full revolve, and positive graphs with one terminal fillet/chamfer. Advanced-hole/revolve/edge-finish STL, partial/revolve booleans, advanced-hole/cut-before-edge-finish, shell/pattern, and general STEP remain open.
 - Artifact cancellation, automatic TTL/quota cleanup, and worker-process isolation are not implemented.
 - 3D camera mechanics pass automation, but CAD-like pan/tilt feel requires explicit manual acceptance.
 - AI translation covers a small command subset and does not yet plan over a canonical feature model.

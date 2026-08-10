@@ -135,7 +135,7 @@ The default workspace is canvas-first and hides raw command JSON, proposed comma
 - Build STL submits a persistent asynchronous request for the selected terminal feature and current document revision.
 - The layered materializer supports vertical new-body/add/cut extrusion graphs and simple typed holes. The guarded FreeCAD worker also supports bounded terminal solid STEP for positive adds/simple holes/negative top-face cuts. Both validate canonical bounds/volume and safe revisioned registration; the live semantic-cut workflow proves STL then STEP polling, download, and reload.
 - STL files are downloaded through `GET /api/sketchmath/artifacts/stl?path=...`, restricted to `.stl` below the configured CAD export root.
-- Counterbore/countersink/fillet/chamfer/revolve STL, partial/revolve-boolean STEP, cut-before-edge-finish and other general STEP graphs, cancellation, and automatic artifact cleanup remain outside this UI envelope. See `artifact_job_contract.md`.
+- Existing counterbore/countersink holes expose validated STEP; their STL remains refused. Fillet/chamfer/revolve STL, partial/revolve-boolean STEP, advanced-hole/cut-before-edge-finish, cancellation, and cleanup remain outside this envelope.
 
 ## Runtime Dependencies
 

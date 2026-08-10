@@ -7,6 +7,33 @@
 
 ---
 
+## 2026-08-09 - SketchMath Kernel-Validated Advanced-Hole STEP
+
+### What Changed
+- Extended the guarded FreeCAD solid graph with exact simple, counterbore, and countersink cutters.
+- Routed terminal typed-hole graphs through revision-bound STEP while retaining explicit advanced-hole STL refusal.
+- Added native volume/bounds fixtures plus live countersink edit, undo/redo, reload, build, registration, and download acceptance.
+
+### Why
+- Advanced-hole property/rebuild semantics passed, but `SM-FEAT-004` lacked physical kernel and artifact evidence.
+
+### New Env Flags
+- None; existing hole/artifact flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_cad_adapter.py tests/test_sketchmath_feature_history.py tests/test_sketchmath_feature_artifact.py tests/test_sketchmath_artifact_jobs.py tests/test_sketchmath_golden_mounting_plate.py`
+- `python3 -m sketchmath.schemas.generate --check`
+- `cd frontend && npx tsc --noEmit && CI=true npm test -- --runInBand --watchAll=false --runTestsByPath src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run test:e2e -- --grep "edits counterbore and countersink" --timeout 90000`
+- `cd frontend && npm run build`
+
+### Evidence and Boundary
+- Code checkpoint: `1e8a064`; 60 targeted Python/kernel tests, 44 workspace tests, schemas, TypeScript, and build pass. Live Playwright passed in 11.1 seconds.
+- Native counterbore and countersink volumes match the analytic ledger with unchanged base bounds.
+- New advanced-hole creation, advanced-hole STL, arbitrary face placement, and advanced holes before edge finishes remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Kernel-Validated Full-Revolve STEP
 
 ### What Changed

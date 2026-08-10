@@ -6,7 +6,7 @@ SketchMath uses narrow, headless FreeCAD workers for legacy `extrude_profile` an
 
 - Input stays typed and deterministic inside SketchMath.
 - The extrusion worker receives a single closed outer `profile_2d` plus optional closed hole profiles.
-- The feature-graph worker receives ordered canonical positive base/additive extrusions, simple holes, bounded negative top-face cut extrusions, or one independent full revolve with stable in-plane axis geometry. Edge-finish graphs additionally carry a typed terminal fillet radius or chamfer distance plus semantic outer-vertical-edge descriptors.
+- The feature-graph worker receives ordered canonical extrusions, typed simple/counterbore/countersink holes, bounded top-face cuts, or one independent full revolve. Edge-finish graphs additionally carry typed finish parameters and semantic edge descriptors.
 - The worker exports STEP and writes validation metadata back to the SketchMath adapter.
 - No GUI, no MCP wrapper, no arbitrary Python execution, and no general feature-tree interpreter.
 
@@ -31,6 +31,7 @@ For terminal solid graphs, reconstruct the bounded body in canonical order with 
 - The solid bbox must match the outer profile bbox plus extrusion depth.
 - The solid volume must match outer area minus hole area within tolerance.
 - A supported cut must produce one valid positive solid whose volume and bounds match the canonical analytic ledger.
+- Supported counterbores/countersinks must match analytic shaft/style depth and removed volume.
 - A supported full revolve must match the analytic Pappus volume and six-axis bounds for its stable sketch axis.
 - A supported convex edge finish must produce one valid positive solid, preserve the pre-finish bbox, and remove measurable material.
 
