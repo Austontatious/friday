@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-08-09 - SketchMath Canonical Circular Hole Pattern
+
+### What Changed
+- Added `circular_pattern` as a typed full-circle feature with explicit center, count, ordered direction, and terminal hole-seed dependency.
+- Added exact rotated centers, removed volume, bounds, copied topology, and structured refusal for axis degeneracy, overlap, and target-boundary escape.
+- Added guarded browser create/edit controls and API persistence/reload coverage under the existing paired pattern flags.
+
+### Why
+- The first pattern checkpoint covered only linear instances; `SM-FEAT-005` also requires a canonical circular feature family.
+
+### New Env Flags
+- None; the existing default-off pattern flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py tests/test_sketchmath_api.py`
+- `python3 -m sketchmath.schemas.generate --check`
+- `cd frontend && CI=true npm test -- --runInBand --watchAll=false --runTestsByPath src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run build`
+
+### Evidence and Boundary
+- Full-circle count includes the seed; clockwise/counterclockwise order is encoded in signed instance rotations.
+- Partial arcs, 3D axes, broader seed families, mirror, shell, and pattern STL/STEP remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Canonical Linear Hole Pattern
 
 ### What Changed

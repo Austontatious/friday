@@ -41,7 +41,7 @@ The guarded feature-history panel exposes count, spacing, and direction X/Y on a
 
 ## Current Boundary
 
-This checkpoint does not claim circular pattern, feature mirror, shell, patterns of add/cut extrusions or revolves, arbitrary 3D axes, overlapping boolean reconciliation, STL, or STEP. Those remain open in `SM-FEAT-005`.
+This checkpoint does not claim feature mirror, shell, patterns of add/cut extrusions or revolves, arbitrary 3D axes, overlapping boolean reconciliation, STL, or STEP. Full-circle hole patterns are covered separately by `circular_pattern_feature_contract.md`; partial circular arcs remain open.
 
 ## Verification
 

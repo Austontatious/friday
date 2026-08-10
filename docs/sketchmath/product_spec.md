@@ -106,7 +106,7 @@ Phase 2 status: passed for the documented v0.9 regular-line, circle, and finite-
 - `SM-REF-001`: downstream references use semantic source/signature/recovery data rather than permanent raw kernel indices.
 - `SM-REF-002`: upstream edits either preserve references correctly or fail explicitly and repairably.
 
-Phase 3 status: `SM-FEAT-001` passes. `SM-FEAT-002` passes for bounded terminal vertical solids with cut STL/STEP. `SM-FEAT-003` passes for independent full-revolve STEP while partial/booleans remain open. `SM-FEAT-004` passes for bounded property/rebuild/terminal-STEP semantics across simple/counterbore/countersink and through/blind, while advanced creation/STL remain open. `SM-FEAT-005` includes bounded kernel fillet/chamfer plus a canonical analytic/browser linear hole-pattern subset; circular pattern, feature mirror, shell, broader seeds/graphs, pattern artifacts, arbitrary picking, and general kernel-topology reconciliation remain open.
+Phase 3 status: `SM-FEAT-001` passes. `SM-FEAT-002` passes for bounded terminal vertical solids with cut STL/STEP. `SM-FEAT-003` passes for independent full-revolve STEP while partial/booleans remain open. `SM-FEAT-004` passes for bounded property/rebuild/terminal-STEP semantics across simple/counterbore/countersink and through/blind, while advanced creation/STL remain open. `SM-FEAT-005` includes bounded kernel fillet/chamfer plus canonical analytic/browser linear and full-circle hole-pattern subsets; feature mirror, shell, broader seeds/graphs, partial circular patterns, pattern artifacts, arbitrary picking, and general kernel-topology reconciliation remain open.
 
 ## Workspace and Document Requirements
 

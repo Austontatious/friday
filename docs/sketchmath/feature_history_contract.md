@@ -77,7 +77,9 @@ Typed fillet parameters carry a positive radius and semantic convex outer-vertic
 
 Typed chamfer parameters carry a positive distance and reuse that exact edge selector/recovery contract. Rebuild generates `chamfer_surface` references, enforces the same adjacent-edge bound, and leaves measurements `kernel_required`. The bounded job invokes native FreeCAD `makeChamfer`; see `chamfer_feature_contract.md`.
 
-Typed linear-pattern parameters carry a bounded count, positive spacing, non-zero 2D direction, and `modify` operation. The current stable envelope patterns one terminal hole across its extrusion target, computes exact additional volume/bounds/topology, refuses overlap or target-boundary crossings atomically, and supports browser creation/replacement plus undo/redo/reload. See `linear_pattern_feature_contract.md`. Circular pattern, feature mirror, shell, broader seeds, and kernel artifacts remain open.
+Typed linear-pattern parameters carry a bounded count, positive spacing, non-zero 2D direction, and `modify` operation. The current stable envelope patterns one terminal hole across its extrusion target, computes exact additional volume/bounds/topology, refuses overlap or target-boundary crossings atomically, and supports browser creation/replacement plus undo/redo/reload. See `linear_pattern_feature_contract.md`. Feature mirror, shell, broader seeds, and kernel artifacts remain open.
+
+Typed circular-pattern parameters carry a bounded count, finite sketch-plane center, fixed 360-degree sweep, ordered direction, and `modify` operation. The bounded hole-seed envelope rotates exact instance centers, records signed rotation/offset topology, refuses a seed on the axis plus overlap/boundary violations, and uses the same history/UI lifecycle. See `circular_pattern_feature_contract.md`. Partial arcs, 3D axes, feature mirror, shell, broader seeds, and kernel artifacts remain open.
 
 Preview is side-effect free. Feature commits, rebuild, undo, redo, and reload never invoke FreeCAD. Kernel work runs only through an explicit revision-bound artifact job; the legacy `extrude_profile` preview/STEP workflow remains a separate compatibility path.
 
