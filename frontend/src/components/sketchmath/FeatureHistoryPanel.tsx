@@ -11,6 +11,7 @@ import type {
   SketchMathHoleParameters,
   SketchMathLinearPatternParameters,
   SketchMathLineEntity,
+  SketchMathMirrorParameters,
   SketchMathProfileEntity,
   SketchMathSemanticTopologyReference,
 } from "../../services/sketchmath";
@@ -32,6 +33,7 @@ type RevolveDraft = { axisId: string; angle: string };
 type ExtrusionDraft = { depth: string; extent: SketchMathExtrudeParameters["extent"]; secondDepth: string; direction: SketchMathExtrudeParameters["direction"] };
 type LinearPatternDraft = { count: string; spacing: string; directionX: string; directionY: string };
 type CircularPatternDraft = { count: string; centerX: string; centerY: string; direction: SketchMathCircularPatternParameters["direction"] };
+type MirrorDraft = { lineId: string };
 
 type FeatureHistoryPanelProps = {
   document: SketchMathDocument;
@@ -45,6 +47,7 @@ type FeatureHistoryPanelProps = {
   filletFeaturesEnabled: boolean;
   chamferFeaturesEnabled: boolean;
   patternFeaturesEnabled: boolean;
+  mirrorFeaturesEnabled: boolean;
   artifactJobsEnabled: boolean;
   revolveAxes: SketchMathLineEntity[];
   artifactJobs: Record<string, SketchMathArtifactJobManifest>;
@@ -83,6 +86,14 @@ type FeatureHistoryPanelProps = {
   onUpdateCircularPattern: (
     feature: Extract<SketchMathFeature, { feature_type: "circular_pattern" }>,
     parameters: SketchMathCircularPatternParameters,
+  ) => void;
+  onAddFeatureMirror: (
+    feature: Extract<SketchMathFeature, { feature_type: "hole" }>,
+    parameters: SketchMathMirrorParameters,
+  ) => void;
+  onUpdateFeatureMirror: (
+    feature: Extract<SketchMathFeature, { feature_type: "mirror" }>,
+    parameters: SketchMathMirrorParameters,
   ) => void;
   onUpdateFullRevolve: (
     feature: Extract<SketchMathFeature, { feature_type: "revolve" }>,
@@ -129,6 +140,7 @@ const featureTypeLabel = (feature: SketchMathFeature): string => ({
   chamfer: "Chamfer",
   linear_pattern: "Linear pattern",
   circular_pattern: "Circular pattern",
+  mirror: "Feature mirror",
 })[feature.feature_type];
 
 const featurePropertySummary = (feature: SketchMathFeature): string => {
@@ -141,7 +153,8 @@ const featurePropertySummary = (feature: SketchMathFeature): string => {
   if (feature.feature_type === "fillet") return `Radius ${feature.parameters.radius_mm} mm`;
   if (feature.feature_type === "chamfer") return `Distance ${feature.parameters.distance_mm} mm`;
   if (feature.feature_type === "linear_pattern") return `${feature.parameters.count} instances · ${feature.parameters.spacing_mm} mm spacing`;
-  return `${feature.parameters.count} instances · full circle`;
+  if (feature.feature_type === "circular_pattern") return `${feature.parameters.count} instances · full circle`;
+  return "Reflected feature · stable sketch line";
 };
 
 const FeatureHistoryPanel = ({
@@ -156,6 +169,7 @@ const FeatureHistoryPanel = ({
   filletFeaturesEnabled,
   chamferFeaturesEnabled,
   patternFeaturesEnabled,
+  mirrorFeaturesEnabled,
   artifactJobsEnabled,
   revolveAxes,
   artifactJobs,
@@ -172,6 +186,8 @@ const FeatureHistoryPanel = ({
   onUpdateLinearPattern,
   onAddCircularPattern,
   onUpdateCircularPattern,
+  onAddFeatureMirror,
+  onUpdateFeatureMirror,
   onUpdateFullRevolve,
   onSetDesignParameter,
   onRenameFeature,
@@ -190,6 +206,7 @@ const FeatureHistoryPanel = ({
   const [revolveDrafts, setRevolveDrafts] = useState<Record<string, RevolveDraft>>({});
   const [linearPatternDrafts, setLinearPatternDrafts] = useState<Record<string, LinearPatternDraft>>({});
   const [circularPatternDrafts, setCircularPatternDrafts] = useState<Record<string, CircularPatternDraft>>({});
+  const [mirrorDrafts, setMirrorDrafts] = useState<Record<string, MirrorDraft>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
   const [newExtrusionOperation, setNewExtrusionOperation] = useState<"new_body" | "add" | "cut">(
     document.features.length === 0 ? "new_body" : "add",
@@ -346,6 +363,19 @@ const FeatureHistoryPanel = ({
         }),
     ));
   }, [buildRecords, document.features]);
+
+  useEffect(() => {
+    setMirrorDrafts((current) => Object.fromEntries(
+      document.features
+        .filter((feature) => feature.feature_type === "hole" || feature.feature_type === "mirror")
+        .map((feature) => [
+          feature.feature_id,
+          feature.feature_type === "mirror"
+            ? { lineId: feature.parameters.mirror_line_entity_id }
+            : current[feature.feature_id] || { lineId: revolveAxes[0]?.id || "" },
+        ]),
+    ));
+  }, [document.features, revolveAxes]);
 
   const newDepth = validDepth(newDepthValue);
   const effectiveNewExtrusionOperation = document.features.length === 0
@@ -795,6 +825,10 @@ const FeatureHistoryPanel = ({
               operation: "modify",
             }
             : null;
+          const mirrorDraft = mirrorDrafts[feature.feature_id];
+          const nextMirrorParameters: SketchMathMirrorParameters | null = mirrorDraft?.lineId
+            ? { mirror_line_entity_id: mirrorDraft.lineId, operation: "modify" }
+            : null;
           return (
             <Box
               key={feature.feature_id}
@@ -812,6 +846,7 @@ const FeatureHistoryPanel = ({
                 {feature.feature_type === "chamfer" ? ` · distance ${feature.parameters.distance_mm} mm` : ""}
                 {feature.feature_type === "linear_pattern" ? ` · ${feature.parameters.count} instances at ${feature.parameters.spacing_mm} mm` : ""}
                 {feature.feature_type === "circular_pattern" ? ` · ${feature.parameters.count} instances around ${feature.parameters.center_mm.join(", ")}` : ""}
+                {feature.feature_type === "mirror" ? " · stable sketch line" : ""}
                 {record ? ` · ${record.generated_topology.length} semantic refs` : ""}
               </Text>
               {record?.measurements ? (
@@ -1004,6 +1039,23 @@ const FeatureHistoryPanel = ({
                   </Button>
                 </HStack>
               ) : null}
+              {mirrorFeaturesEnabled && feature.feature_type === "mirror" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-mirror-editor-${feature.feature_id}`}>
+                  <Select aria-label={`Feature mirror line ${feature.name}`} value={mirrorDraft?.lineId || ""} onChange={(event) => setMirrorDrafts((current) => ({ ...current, [feature.feature_id]: { lineId: event.target.value } }))} width="190px">
+                    {revolveAxes.map((axis, index) => (
+                      <option key={axis.id} value={axis.id}>{axis.label || `Construction line ${index + 1}`}</option>
+                    ))}
+                  </Select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => nextMirrorParameters && onUpdateFeatureMirror(feature, nextMirrorParameters)}
+                    isDisabled={!nextMirrorParameters || JSON.stringify(nextMirrorParameters) === JSON.stringify(feature.parameters) || busy}
+                  >
+                    Apply mirror line
+                  </Button>
+                </HStack>
+              ) : null}
               {holeFeaturesEnabled && feature.feature_type === "hole" ? (
                 <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-existing-hole-editor-${feature.feature_id}`}>
                   <Select
@@ -1148,6 +1200,23 @@ const FeatureHistoryPanel = ({
                     Pattern hole
                   </Button>
                   <Text fontSize="xs">Count includes the seed hole.</Text>
+                </HStack>
+              ) : null}
+              {mirrorFeaturesEnabled && feature.feature_type === "hole" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-mirror-create-${feature.feature_id}`}>
+                  <Select aria-label={`New feature mirror line ${feature.name}`} value={mirrorDraft?.lineId || ""} onChange={(event) => setMirrorDrafts((current) => ({ ...current, [feature.feature_id]: { lineId: event.target.value } }))} width="190px">
+                    {revolveAxes.map((axis, index) => (
+                      <option key={axis.id} value={axis.id}>{axis.label || `Construction line ${index + 1}`}</option>
+                    ))}
+                  </Select>
+                  <Button
+                    size="sm"
+                    onClick={() => nextMirrorParameters && onAddFeatureMirror(feature, nextMirrorParameters)}
+                    isDisabled={!nextMirrorParameters || laterBodyFeatures.length > 0 || record?.status !== "succeeded" || busy}
+                  >
+                    Mirror hole feature
+                  </Button>
+                  <Text fontSize="xs">Uses a stable sketch line reference.</Text>
                 </HStack>
               ) : null}
               {patternFeaturesEnabled && feature.feature_type === "hole" ? (

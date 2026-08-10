@@ -1113,6 +1113,7 @@ describe("SketchMath workspace", () => {
     delete process.env.REACT_APP_SKETCHMATH_FILLET_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_CHAMFER_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_PATTERN_FEATURES_ENABLED;
+    delete process.env.REACT_APP_SKETCHMATH_MIRROR_FEATURES_ENABLED;
     delete process.env.REACT_APP_SKETCHMATH_ARTIFACT_JOBS_ENABLED;
     stamp.value = 1710000000000;
     jest.spyOn(Date, "now").mockImplementation(() => stamp.value);
@@ -1191,6 +1192,7 @@ describe("SketchMath workspace", () => {
       filletFeaturesEnabled: false,
       chamferFeaturesEnabled: false,
       patternFeaturesEnabled: false,
+      mirrorFeaturesEnabled: false,
       artifactJobsEnabled: false,
       artifactJobs: {},
       revolveAxes: [axis],
@@ -1207,6 +1209,8 @@ describe("SketchMath workspace", () => {
       onUpdateLinearPattern: jest.fn(),
       onAddCircularPattern: jest.fn(),
       onUpdateCircularPattern: jest.fn(),
+      onAddFeatureMirror: jest.fn(),
+      onUpdateFeatureMirror: jest.fn(),
       onUpdateFullRevolve,
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1258,7 +1262,7 @@ describe("SketchMath workspace", () => {
     expect(onUpdateFullRevolve).toHaveBeenCalledWith(revolveFeature, secondAxis.id, 360);
   });
 
-  it("creates and edits guarded feature-level linear and circular hole patterns", async () => {
+  it("creates and edits guarded feature-level patterns and a hole mirror", async () => {
     const holeFeature = {
       feature_id: "feature_hole_seed",
       feature_type: "hole" as const,
@@ -1318,6 +1322,10 @@ describe("SketchMath workspace", () => {
     const onUpdateLinearPattern = jest.fn();
     const onAddCircularPattern = jest.fn();
     const onUpdateCircularPattern = jest.fn();
+    const onAddFeatureMirror = jest.fn();
+    const onUpdateFeatureMirror = jest.fn();
+    const mirrorLine = { id: "axis_x5", type: "construction_line_2d" as const, start: [5, 0] as [number, number], end: [5, 10] as [number, number] };
+    const secondMirrorLine = { ...mirrorLine, id: "axis_x6", start: [6, 0] as [number, number], end: [6, 10] as [number, number] };
     const props: any = {
       document,
       activeProfile: null,
@@ -1330,8 +1338,9 @@ describe("SketchMath workspace", () => {
       filletFeaturesEnabled: false,
       chamferFeaturesEnabled: false,
       patternFeaturesEnabled: true,
+      mirrorFeaturesEnabled: true,
       artifactJobsEnabled: false,
-      revolveAxes: [],
+      revolveAxes: [mirrorLine, secondMirrorLine],
       artifactJobs: {},
       onNewDepthValueChange: jest.fn(),
       onAddExtrusion: jest.fn(),
@@ -1346,6 +1355,8 @@ describe("SketchMath workspace", () => {
       onUpdateLinearPattern,
       onAddCircularPattern,
       onUpdateCircularPattern,
+      onAddFeatureMirror,
+      onUpdateFeatureMirror,
       onUpdateFullRevolve: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1379,6 +1390,11 @@ describe("SketchMath workspace", () => {
       direction: "counterclockwise",
       operation: "modify",
     });
+    await userEvent.click(screen.getByRole("button", { name: "Mirror hole feature" }));
+    expect(onAddFeatureMirror).toHaveBeenCalledWith(holeFeature, {
+      mirror_line_entity_id: mirrorLine.id,
+      operation: "modify",
+    });
 
     rerender(<FeatureHistoryPanel {...props} document={{ ...document, revision: 3, features: [holeFeature, patternFeature] }} />);
     const editor = screen.getByTestId("sketchmath-linear-pattern-editor-feature_pattern");
@@ -1404,6 +1420,22 @@ describe("SketchMath workspace", () => {
     expect(onUpdateCircularPattern).toHaveBeenCalledWith(circularFeature, {
       ...circularFeature.parameters,
       direction: "clockwise",
+    });
+
+    const mirrorFeature = {
+      ...patternFeature,
+      feature_id: "feature_mirror",
+      feature_type: "mirror" as const,
+      name: "Opposed hole",
+      parameters: { mirror_line_entity_id: mirrorLine.id, operation: "modify" as const },
+    };
+    rerender(<FeatureHistoryPanel {...props} document={{ ...document, revision: 5, features: [holeFeature, mirrorFeature] }} />);
+    const mirrorEditor = screen.getByTestId("sketchmath-mirror-editor-feature_mirror");
+    await userEvent.selectOptions(within(mirrorEditor).getByRole("combobox", { name: "Feature mirror line Opposed hole" }), secondMirrorLine.id);
+    await userEvent.click(within(mirrorEditor).getByRole("button", { name: "Apply mirror line" }));
+    expect(onUpdateFeatureMirror).toHaveBeenCalledWith(mirrorFeature, {
+      mirror_line_entity_id: secondMirrorLine.id,
+      operation: "modify",
     });
   });
 
@@ -1476,6 +1508,7 @@ describe("SketchMath workspace", () => {
       filletFeaturesEnabled: true,
       chamferFeaturesEnabled: false,
       patternFeaturesEnabled: false,
+      mirrorFeaturesEnabled: false,
       artifactJobsEnabled: true,
       revolveAxes: [],
       artifactJobs: {},
@@ -1492,6 +1525,8 @@ describe("SketchMath workspace", () => {
       onUpdateLinearPattern: jest.fn(),
       onAddCircularPattern: jest.fn(),
       onUpdateCircularPattern: jest.fn(),
+      onAddFeatureMirror: jest.fn(),
+      onUpdateFeatureMirror: jest.fn(),
       onUpdateFullRevolve: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1677,6 +1712,7 @@ describe("SketchMath workspace", () => {
       filletFeaturesEnabled={false}
       chamferFeaturesEnabled={false}
       patternFeaturesEnabled={false}
+      mirrorFeaturesEnabled={false}
       artifactJobsEnabled={false}
       revolveAxes={[]}
       artifactJobs={{}}
@@ -1693,6 +1729,8 @@ describe("SketchMath workspace", () => {
       onUpdateLinearPattern={jest.fn()}
       onAddCircularPattern={jest.fn()}
       onUpdateCircularPattern={jest.fn()}
+      onAddFeatureMirror={jest.fn()}
+      onUpdateFeatureMirror={jest.fn()}
       onUpdateFullRevolve={jest.fn()}
       onSetDesignParameter={onSetDesignParameter}
       onRenameFeature={onRenameFeature}
