@@ -1213,6 +1213,10 @@ describe("SketchMath workspace", () => {
     };
 
     const { rerender } = render(<FeatureHistoryPanel {...props} revolveFeaturesEnabled={false} />);
+    expect(screen.getByRole("combobox", { name: "New extrusion operation" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "New extrusion operation" })).toHaveValue("new_body");
+    await userEvent.click(screen.getByRole("button", { name: "Add extrusion feature" }));
+    expect(props.onAddExtrusion).toHaveBeenCalledWith(activeProfile, 10, "new_body");
     expect(screen.queryByTestId("sketchmath-revolve-editor")).toBeNull();
 
     rerender(<FeatureHistoryPanel {...props} revolveFeaturesEnabled />);
@@ -1238,6 +1242,10 @@ describe("SketchMath workspace", () => {
       revolveAxes={[axis, secondAxis]}
       document={{ ...document, revision: 1, features: [revolveFeature] }}
     />);
+    expect(screen.getByRole("combobox", { name: "New extrusion operation" })).toHaveValue("add");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "New extrusion operation" }), "cut");
+    await userEvent.click(screen.getByRole("button", { name: "Add extrusion feature" }));
+    expect(props.onAddExtrusion).toHaveBeenLastCalledWith(activeProfile, 10, "cut");
     const editor = screen.getByTestId("sketchmath-existing-revolve-editor-feature_revolve");
     await userEvent.selectOptions(within(editor).getByRole("combobox", { name: "Revolve axis Turned body" }), secondAxis.id);
     await userEvent.click(within(editor).getByRole("button", { name: "Apply revolve" }));

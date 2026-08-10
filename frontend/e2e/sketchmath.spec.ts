@@ -545,6 +545,54 @@ test.describe("SketchMath workspace", () => {
     expect(reloaded.document.features[0].feature_id).toBe(featureId);
   });
 
+  test("creates an explicit semantic cut extrusion into the target body", async ({ page }) => {
+    await openSketchMath(page);
+    await page.getByRole("button", { name: "Rectangle" }).first().click();
+    await clickSvgViewBoxPoint(page, 160, 120);
+    await clickSvgViewBoxPoint(page, 360, 220);
+    const panel = page.getByTestId("sketchmath-feature-history-panel");
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+    await page.getByLabel("Feature extrusion depth").fill("10");
+    await expect(panel.getByRole("button", { name: "Add extrusion feature" })).toBeEnabled();
+    await panel.getByRole("button", { name: "Add extrusion feature" }).click();
+
+    await page.getByRole("button", { name: "Rectangle" }).first().click();
+    await dispatchCanvasViewBoxPoint(page, 220, 150);
+    await dispatchCanvasViewBoxPoint(page, 300, 210);
+    await expect(page.getByTestId("sketchmath-selection-summary")).toContainText("Selected: Profile");
+    await page.getByLabel("Feature extrusion depth").fill("4");
+    await page.getByLabel("New extrusion operation").selectOption("cut");
+    await panel.getByRole("button", { name: "Add extrusion feature" }).click();
+
+    const sessionId = await page.evaluate(() => window.localStorage.getItem("friday_sketchmath_session_id"));
+    expect(sessionId).toBeTruthy();
+    type CutSnapshot = {
+      document: {
+        features: Array<{ feature_id: string; dependencies: string[]; parameters: Record<string, any> }>;
+        last_rebuild: { records: Array<{ status: string; measurements: { volume_delta_mm3: number; bounds_mm: number[] }; resolved_references: Array<{ recovery_state: string }> }> };
+      };
+    };
+    const cut = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as CutSnapshot;
+    expect(cut.document.features).toHaveLength(2);
+    expect(cut.document.features[1]).toMatchObject({
+      dependencies: [cut.document.features[0].feature_id],
+      parameters: { operation: "cut", direction: "negative", extent: "one_sided", depth_mm: 4 },
+    });
+    expect(cut.document.last_rebuild.records[1].status).toBe("succeeded");
+    expect(cut.document.last_rebuild.records[1].measurements.volume_delta_mm3).toBeLessThan(0);
+    expect(cut.document.last_rebuild.records[1].measurements.bounds_mm.slice(-2)).toEqual([6, 10]);
+    expect(cut.document.last_rebuild.records[1].resolved_references[0].recovery_state).toBe("exact");
+
+    await panel.getByRole("button", { name: "Undo feature" }).click();
+    await expect(page.getByTestId("sketchmath-model-tree")).not.toContainText("Extrude 2");
+    await panel.getByRole("button", { name: "Redo feature" }).click();
+    await expect(page.getByTestId("sketchmath-model-tree")).toContainText("Extrude 2");
+    await page.reload();
+    const reloaded = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as CutSnapshot;
+    expect(reloaded.document.features[1].parameters.operation).toBe("cut");
+    expect(reloaded.document.features[1].feature_id).toBe(cut.document.features[1].feature_id);
+  });
+
   test("edits a full revolve axis with stable history and reload identity", async ({ page }) => {
     await openSketchMath(page);
     await page.getByRole("button", { name: "Rectangle" }).first().click();

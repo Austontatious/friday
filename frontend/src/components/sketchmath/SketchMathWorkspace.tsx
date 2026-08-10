@@ -1684,6 +1684,7 @@ const SketchMathWorkspace = () => {
   const handleAddFeatureExtrusion = async (
     profile: Extract<SketchMathEntity, { type: "profile_2d" }>,
     depth: number,
+    requestedOperation: "new_body" | "add" | "cut",
   ) => {
     if (!sketchDocument) return;
     const body = sketchDocument.bodies[0];
@@ -1735,8 +1736,8 @@ const SketchMathWorkspace = () => {
       parameters: {
         depth_mm: depth,
         extent: "one_sided",
-        direction: "positive",
-        operation: dependency ? "add" : "new_body",
+        direction: dependency && requestedOperation === "cut" ? "negative" : "positive",
+        operation: dependency ? (requestedOperation === "cut" ? "cut" : "add") : "new_body",
       },
       suppressed: false,
     };
@@ -4322,7 +4323,7 @@ const SketchMathWorkspace = () => {
                   revolveAxes={revolveAxes}
                   artifactJobs={artifactJobs}
                   onNewDepthValueChange={setExtrudeDepthValue}
-                  onAddExtrusion={(profile, depth) => void handleAddFeatureExtrusion(profile, depth)}
+                  onAddExtrusion={(profile, depth, operation) => void handleAddFeatureExtrusion(profile, depth, operation)}
                   onAddFullRevolve={(profile, axis) => void handleAddFullRevolve(profile, axis)}
                   onAddOuterFillet={(feature, edgeReferences, radius) => (
                     void handleAddOuterFillet(feature, edgeReferences, radius)

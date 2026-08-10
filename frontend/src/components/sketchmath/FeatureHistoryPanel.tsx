@@ -44,7 +44,7 @@ type FeatureHistoryPanelProps = {
   revolveAxes: SketchMathLineEntity[];
   artifactJobs: Record<string, SketchMathArtifactJobManifest>;
   onNewDepthValueChange: (value: string) => void;
-  onAddExtrusion: (profile: SketchMathProfileEntity, depth: number) => void;
+  onAddExtrusion: (profile: SketchMathProfileEntity, depth: number, operation: "new_body" | "add" | "cut") => void;
   onAddFullRevolve: (profile: SketchMathProfileEntity, axis: SketchMathLineEntity) => void;
   onAddOuterFillet: (
     feature: Extract<SketchMathFeature, { feature_type: "extrude" }>,
@@ -159,6 +159,9 @@ const FeatureHistoryPanel = ({
   const [parameterDrafts, setParameterDrafts] = useState<Record<string, string>>({});
   const [revolveDrafts, setRevolveDrafts] = useState<Record<string, RevolveDraft>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
+  const [newExtrusionOperation, setNewExtrusionOperation] = useState<"new_body" | "add" | "cut">(
+    document.features.length === 0 ? "new_body" : "add",
+  );
   const defaultSelection = useMemo<ModelTreeSelection | null>(() => {
     const feature = document.features[document.features.length - 1];
     if (feature) return { kind: "feature", id: feature.feature_id };
@@ -268,6 +271,9 @@ const FeatureHistoryPanel = ({
   }, [document.features]);
 
   const newDepth = validDepth(newDepthValue);
+  const effectiveNewExtrusionOperation = document.features.length === 0
+    ? "new_body"
+    : newExtrusionOperation === "new_body" ? "add" : newExtrusionOperation;
   const revolveAxis = revolveAxes.find((axis) => axis.id === revolveAxisId) || revolveAxes[0] || null;
   const selectedBody = treeSelection?.kind === "body"
     ? document.bodies.find((body) => body.body_id === treeSelection.id) || null
@@ -467,12 +473,23 @@ const FeatureHistoryPanel = ({
           />
           <Button
             size="sm"
-            onClick={() => activeProfile && newDepth != null && onAddExtrusion(activeProfile, newDepth)}
+            onClick={() => activeProfile && newDepth != null && onAddExtrusion(activeProfile, newDepth, effectiveNewExtrusionOperation)}
             isDisabled={!activeProfile || newDepth == null || busy}
             data-testid="sketchmath-add-feature"
           >
             Add extrusion feature
           </Button>
+          <Select
+            aria-label="New extrusion operation"
+            value={effectiveNewExtrusionOperation}
+            onChange={(event) => setNewExtrusionOperation(event.target.value as "new_body" | "add" | "cut")}
+            width="120px"
+            isDisabled={document.features.length === 0}
+          >
+            {document.features.length === 0 ? <option value="new_body">New body</option> : null}
+            {document.features.length > 0 ? <option value="add">Add</option> : null}
+            {document.features.length > 0 ? <option value="cut">Cut</option> : null}
+          </Select>
         </HStack>
       </Box>
 
