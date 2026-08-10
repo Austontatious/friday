@@ -140,7 +140,8 @@ On 2026-08-09 for guarded UI checkpoints `54bce47` and `775df7d`:
 - The new-extrusion editor forces the first feature to `new_body` and offers explicit `add`/`cut` downstream. The bounded cut path depends on the latest extrusion, selects its semantic top face, and directs a one-sided cut negative into the target.
 - The focused backend boolean invariant, TypeScript, all 44 workspace tests, and live base→cut acceptance pass. The browser verifies exact reference resolution, negative volume, `[6,10]` cut bounds, stable identity, undo/redo, and reload in 8.2 seconds.
 - Eight artifact/materializer/job tests pass. The same browser workflow now builds, registers, downloads, and reloads a terminal cut STL; the permanent 10 × 10 × 10 base with a 4 × 4 × 4 top pocket is closed and measures exactly 936 mm³.
-- Arbitrary face/body target picking and cut kernel STEP execution remain open.
+- Native FreeCAD now validates the same pocket at exactly 936 mm³ with unchanged bounds and ordered `new_body`/`cut` execution. The browser exposes both revision-bound STL and STEP build/download paths and completes the combined lifecycle in 13.4 seconds.
+- Arbitrary face/body target picking and cut-before-edge-finish/general feature-graph execution remain open.
 
 ## Current Kernel-Fillet Validation
 
@@ -212,7 +213,7 @@ On 2026-08-09 for guarded UI checkpoint `bc650ca`:
 - Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, guarded new-body creation, and existing-axis replacement with feature undo/redo/reload.
 - Typed fillet covers convex extrusion vertical edges, semantic adjacency/signature/endpoints, exact/recovered selection, finite radius editing, kernel-required measurement state, and a resumable validated FreeCAD STEP path with guarded browser creation/download.
 - Typed chamfer reuses the stable edge contract with finite distance editing, deterministic `chamfer_surface` identity, native FreeCAD STEP validation, and guarded browser creation/download.
-- Revision-bound artifact jobs persist READY/RUNNING/DONE/FAILED manifests and resumable step markers. Supported terminal vertical new-body/add/cut extrusion and simple-hole graphs produce validated layered STL, bounded terminal-fillet/chamfer graphs produce validated STEP, and stale results never register.
+- Revision-bound artifact jobs persist READY/RUNNING/DONE/FAILED manifests and resumable step markers. Supported terminal vertical new-body/add/cut extrusion and simple-hole graphs produce validated layered STL; bounded terminal solid and terminal-fillet/chamfer graphs produce validated STEP; stale results never register.
 - Legacy FreeCAD `extrude_profile` preview/export remains separate; canonical feature commits never replay external CAD work. See `feature_history_contract.md`, `artifact_job_contract.md`, and `golden_mounting_plate_v1.md`.
 
 ## Gate A Outcome
@@ -237,7 +238,7 @@ Completed and published:
 - Canonical document v1 remains a single-sketch, single-worker compatibility path. The minimum single-body/sketch feature tree passes, while multi-sketch/body workspace behavior and visibility mutation are not implemented.
 - Generated extrusion/hole semantic face/edge references are stable and recoverable, but browser face/edge picking and raw kernel-topology reconciliation are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
-- Layered STL supports vertical new-body/add/cut extrusion and simple-hole graphs; STEP supports bounded positive base/additive-extrusion/simple-hole graphs with one terminal fillet/chamfer. Counterbore/countersink/revolve/edge-finish STL, partial revolve, spatial revolve booleans, cut/intermediate STEP graphs, shell/pattern features, and general full-graph STEP remain open.
+- Layered STL supports vertical new-body/add/cut extrusion and simple-hole graphs. STEP supports bounded terminal solid graphs with positive adds/simple holes/negative top-face cuts, plus the prior positive graph with one terminal fillet/chamfer. Counterbore/countersink/revolve/edge-finish STL, partial revolve, revolve booleans, cut-before-edge-finish and other intermediate STEP graphs, shell/pattern features, and general full-graph STEP remain open.
 - Artifact cancellation, automatic TTL/quota cleanup, and worker-process isolation are not implemented.
 - 3D camera mechanics pass automation, but CAD-like pan/tilt feel requires explicit manual acceptance.
 - AI translation covers a small command subset and does not yet plan over a canonical feature model.

@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-08-09 - SketchMath Kernel-Validated Semantic Cut STEP
+
+### What Changed
+- Generalized the guarded FreeCAD feature-graph adapter/worker to export validated terminal solid graphs and execute subtractive extrusion operations.
+- Added a bounded STEP payload for one positive base followed by positive additions, simple holes, or negative top-face cuts, with analytic volume/bounds checked against the native solid before export.
+- Exposed both STL and STEP jobs for supported terminal extrusion graphs while retaining the edge-finish compatibility entry point.
+
+### Why
+- Semantic cut authoring and layered STL were already proven, but `SM-FEAT-002` still lacked a kernel-validated spatial boolean and STEP artifact for the same canonical graph.
+
+### New Env Flags
+- None; the existing document, feature-history, and artifact-job flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_cad_adapter.py tests/test_sketchmath_feature_history.py tests/test_sketchmath_feature_artifact.py tests/test_sketchmath_artifact_jobs.py tests/test_sketchmath_golden_mounting_plate.py`
+- `python3 -m sketchmath.schemas.generate --check`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && CI=true npm test -- --runInBand --watchAll=false --runTestsByPath src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run test:e2e -- --grep "creates an explicit semantic cut" --timeout 90000`
+- `cd frontend && npm run build`
+
+### Evidence and Boundary
+- Code checkpoint: `435b2e4`; 57 targeted Python/kernel tests, 44 workspace tests, schema drift, TypeScript, and production build pass. Combined STL/STEP Playwright passed in 13.4 seconds.
+- Native FreeCAD validates the pocketed solid at exactly 936 mm³ with unchanged 10 × 10 × 10 mm bounds and records ordered `new_body`, `cut` execution.
+- This closes bounded latest-top-face cut STEP, not arbitrary face/body picking, cut-before-edge-finish graphs, partial revolve, or general feature-tree execution.
+
+---
+
 ## 2026-08-09 - SketchMath Semantic Cut STL Acceptance
 
 ### What Changed
@@ -53,7 +81,7 @@
 ### Evidence and Boundary
 - Code checkpoint: `775df7d`; targeted Playwright passed in 8.2 seconds.
 - The browser proves a two-feature base/cut graph with exact top-face resolution, negative volume, cut bounds `[6,10]`, stable feature identity, undo/redo, and reload.
-- Target inference is deliberately limited to the latest extrusion's top face. Checkpoint `c0a773a` subsequently proved layered cut STL; arbitrary face picking and kernel-backed cut STEP remain open.
+- Target inference is deliberately limited to the latest extrusion's top face. Checkpoints `c0a773a` and `435b2e4` subsequently proved layered STL and kernel STEP for that bounded cut; arbitrary face picking remains open.
 
 ---
 
