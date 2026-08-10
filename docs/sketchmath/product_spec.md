@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `435b2e4` (golden/feature property acceptance, advanced-hole and extrusion extent editing, clean production build, and bounded semantic cut authoring with validated STL/STEP lifecycles; see `golden_mounting_plate_v1.md` and `status.md`)
+Last validated SketchMath code milestone: `469882a` (golden/feature property acceptance, advanced-hole and extrusion extent editing, clean production build, bounded semantic cut STL/STEP, and full-revolve STEP; see `golden_mounting_plate_v1.md` and `status.md`)
 
 ## Mission
 
@@ -106,7 +106,7 @@ Phase 2 status: passed for the documented v0.9 regular-line, circle, and finite-
 - `SM-REF-001`: downstream references use semantic source/signature/recovery data rather than permanent raw kernel indices.
 - `SM-REF-002`: upstream edits either preserve references correctly or fail explicitly and repairably.
 
-Phase 3 status: `SM-FEAT-001` passes for the default-off v1 extrusion/hole/full-revolve/terminal-fillet-or-chamfer envelope. `SM-FEAT-002` passes for its bounded vertical terminal-solid envelope: the UI authors a deterministic latest-extrusion top-face cut with undo/redo/reload plus validated layered STL and native FreeCAD STEP; arbitrary targets and broader graphs remain open. `SM-FEAT-003/004` remain bounded as recorded in traceability. The supported full-revolve UI includes stable-ID construction-axis replacement while retaining its truthful 360-degree-only limit, and existing holes expose validated simple/counterbore/countersink conditional property replacement without claiming advanced-hole artifacts. `SM-FEAT-005` includes kernel-backed convex outer-vertical-edge fillet and equal-distance chamfer with semantic endpoint reconciliation, editable parameters, asynchronous STEP, live browser evidence, and a terminal fillet after the golden plate's bounded additive-extrusion/simple-hole graph. Other intermediate graphs, pattern/mirror, and shell remain open. `SM-REF-001/002` pass for the documented generated-reference envelope, while arbitrary viewport picking and general kernel-topology reconciliation remain open.
+Phase 3 status: `SM-FEAT-001` passes for the default-off v1 extrusion/hole/full-revolve/terminal-fillet-or-chamfer envelope. `SM-FEAT-002` passes for its bounded vertical terminal-solid envelope: the UI authors a deterministic latest-extrusion top-face cut with undo/redo/reload plus validated layered STL and native FreeCAD STEP; arbitrary targets and broader graphs remain open. `SM-FEAT-003` passes for an independent 360-degree new-body envelope with stable-axis editing and validated FreeCAD STEP; partial/revolve booleans remain open. `SM-FEAT-004` remains bounded as recorded in traceability; existing holes expose validated simple/counterbore/countersink conditional property replacement without claiming advanced-hole artifacts. `SM-FEAT-005` includes kernel-backed convex outer-vertical-edge fillet and equal-distance chamfer with semantic endpoint reconciliation, editable parameters, asynchronous STEP, live browser evidence, and a terminal fillet after the golden plate's bounded additive-extrusion/simple-hole graph. Other intermediate graphs, pattern/mirror, and shell remain open. `SM-REF-001/002` pass for the documented generated-reference envelope, while arbitrary viewport picking and general kernel-topology reconciliation remain open.
 
 ## Workspace and Document Requirements
 

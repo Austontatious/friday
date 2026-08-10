@@ -2,7 +2,7 @@
 
 Updated: 2026-08-09
 
-Status: passed for default-off STL jobs over supported vertical analytic graphs and STEP jobs over bounded terminal solid or edge-finish graphs
+Status: passed for default-off STL jobs over supported vertical analytic graphs and STEP jobs over bounded terminal solid, full-revolve, or edge-finish graphs
 
 ## Enablement
 
@@ -53,7 +53,7 @@ Each job owns exactly one directory:
 
 Deterministic STL materialization consumes the canonical feature graph through the requested terminal body feature. It supports vertically layered new-body/add/cut extrusions and simple typed holes, performs Shapely union/difference per Z slab, triangulates transition faces, checks every mesh edge has incidence two, and compares mesh bounds/volume against the analytic rebuild ledger. Circles use a deterministic 360-segment approximation; analytic and mesh volume plus their difference are retained in artifact metadata. A permanent base-plus-top-pocket fixture proves a closed 936 mm³ cut STL through both direct materialization and the browser job/register/download path.
 
-Counterbore/countersink canonical rebuild is implemented, but layered STL for those styles is intentionally refused. Canonical solid STEP materialization supports one positive one-sided new-body extrusion followed by positive adds, simple holes, or negative one-sided top-face cuts when an extrusion is terminal. The FreeCAD worker executes canonical order and refuses the export unless native solid validity, bounds, and volume match the analytic ledger. Edge-finish STEP separately supports the bounded positive base/additive-extrusion/simple-hole graph followed by one terminal convex outer-vertical-edge fillet or chamfer. Exact source circles are passed as analytic primitives; semantic edge endpoints are uniquely matched before the native finish. Cut-before-edge-finish and other intermediate feature types remain rejected.
+Counterbore/countersink canonical rebuild is implemented, but layered STL for those styles is intentionally refused. Canonical solid STEP materialization supports one positive one-sided new-body extrusion followed by positive adds, simple holes, or negative one-sided top-face cuts when an extrusion is terminal. It also supports one independent 360-degree new-body revolve around a stable in-plane sketch axis. The FreeCAD worker executes canonical order and refuses export unless native solid validity, bounds, and volume match the analytic ledger. Edge-finish STEP separately supports the bounded positive base/additive-extrusion/simple-hole graph followed by one terminal convex outer-vertical-edge fillet or chamfer. Exact source circles are passed as analytic primitives; semantic edge endpoints are uniquely matched before the native finish. Partial/revolve booleans, cut-before-edge-finish, and other intermediate feature types remain rejected.
 
 ## Retention and Cleanup
 
@@ -67,4 +67,4 @@ There is no automatic deletion in this slice. Job manifests and revisioned artif
 - `tests/test_sketchmath_api.py`: default-off gate, submit/poll/register/download/replay contract.
 - Targeted Playwright acceptance: terminal feature-graph and semantic-cut build, visible polling state, revision registration, reload persistence, and browser download.
 
-Implementation checkpoints: `718ee6b`, `0ef759c`, `9860570`, `217e741`, `b88b1be`, `a3d705c`, `0979dfe`, `30af86a`, `53a39ed`, `3be0baa`, `f1b0b2c`, `5973c89`, `3e309de`, cut STL evidence `c0a773a`, and kernel cut STEP `435b2e4`.
+Implementation checkpoints: `718ee6b`, `0ef759c`, `9860570`, `217e741`, `b88b1be`, `a3d705c`, `0979dfe`, `30af86a`, `53a39ed`, `3be0baa`, `f1b0b2c`, `5973c89`, `3e309de`, cut STL evidence `c0a773a`, kernel cut STEP `435b2e4`, and full-revolve STEP `469882a`.

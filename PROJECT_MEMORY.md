@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-08-09 - SketchMath Kernel-Validated Full-Revolve STEP
+
+### What Changed
+- Added a guarded native FreeCAD full-revolve operation for one independent 360-degree new-body feature around a stable sketch axis/line.
+- Routed the supported revolve through revision-bound STEP build, registration, download, and reload in the existing feature-history UI.
+- Validated native solid volume/bounds against the analytic Pappus rebuild ledger before export.
+
+### Why
+- Full-revolve creation and stable-axis replacement passed, but `SM-FEAT-003` still lacked a real kernel solid and artifact lifecycle.
+
+### New Env Flags
+- None; the existing revolve and artifact-job flags apply.
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_cad_adapter.py tests/test_sketchmath_feature_history.py tests/test_sketchmath_feature_artifact.py tests/test_sketchmath_artifact_jobs.py tests/test_sketchmath_golden_mounting_plate.py`
+- `python3 -m sketchmath.schemas.generate --check`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && CI=true npm test -- --runInBand --watchAll=false --runTestsByPath src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run test:e2e -- --grep "edits a full revolve axis" --timeout 90000`
+- `cd frontend && npm run build`
+
+### Evidence and Boundary
+- Code checkpoint: `469882a`; 58 targeted Python/kernel tests, 44 workspace tests, schema drift, TypeScript, and production build pass. Live Playwright passed in 13.8 seconds.
+- Native FreeCAD matches the analytic fixture at `60π mm³` with bounds `[-4,4] × [0,5] × [-4,4]` and a valid solid.
+- Partial sweeps, revolve add/cut booleans, revolve STL, and multi-feature revolve graphs remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Kernel-Validated Semantic Cut STEP
 
 ### What Changed
@@ -397,7 +425,7 @@
 
 ### Checkpoints and Remaining Work
 - Code checkpoints: `a851d99`, `3481f16`, `07e9880`.
-- Partial revolve, spatial add/cut boolean proof, revolve STL/STEP, fillet/chamfer/shell/pattern families, multi-sketch/model tree, and final release hardening remain open.
+- At this checkpoint, revolve STL/STEP was open. Checkpoint `469882a` later closed independent full-revolve STEP; partial sweeps, revolve add/cut, revolve STL, shell/pattern families, broader workspace behavior, and final release hardening remain open.
 
 ---
 
