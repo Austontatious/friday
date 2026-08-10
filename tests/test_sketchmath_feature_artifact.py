@@ -70,6 +70,33 @@ def _semantic_cut_document() -> tuple[SketchMathDocument, FeatureRecord, Feature
     return document.model_copy(update={"revision": 2, "features": [base, cut]}), base, cut
 
 
+def _revolve_document() -> tuple[SketchMathDocument, FeatureRecord]:
+    profile = _profile("revolve_profile", [(2, 0), (4, 0), (4, 5), (2, 5), (2, 0)], 10, "counterclockwise")
+    selection = SelectionContext.model_validate(
+        {
+            "selection_set_id": "revolve_artifact",
+            "units": "mm",
+            "items": [
+                profile.model_dump(mode="json"),
+                {"id": "axis_y", "type": "axis_2d", "origin": [0, 0], "direction": [0, 1]},
+            ],
+        }
+    )
+    document = wrap_legacy_selection_context(selection, document_id="doc_revolve_artifact")
+    revolve = FeatureRecord.model_validate(
+        {
+            "feature_id": "feature_revolve",
+            "feature_type": "revolve",
+            "name": "Turned body",
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": profile.id,
+            "parameters": {"axis_entity_id": "axis_y", "angle_deg": 360, "operation": "new_body"},
+        }
+    )
+    return document.model_copy(update={"revision": 1, "features": [revolve]}), revolve
+
+
 def test_canonical_stl_materialization_uses_revisioned_safe_path_and_validates_geometry(tmp_path) -> None:
     outer = _profile("plate", [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], 100, "counterclockwise")
     hole = _profile("hole", [(3, 3), (3, 7), (7, 7), (7, 3), (3, 3)], 16, "clockwise")
@@ -153,31 +180,39 @@ def test_canonical_step_materializes_a_terminal_semantic_cut_with_kernel_validat
     assert artifact["measurements"]["operation_execution"][0]["feature_id"] == base.feature_id
 
 
-def test_layered_stl_rejects_revolve_until_a_supported_mesher_exists(tmp_path) -> None:
-    profile = _profile("revolve_profile", [(2, 0), (4, 0), (4, 5), (2, 5), (2, 0)], 10, "counterclockwise")
-    selection = SelectionContext.model_validate(
-        {
-            "selection_set_id": "revolve_artifact",
-            "units": "mm",
-            "items": [
-                profile.model_dump(mode="json"),
-                {"id": "axis_y", "type": "axis_2d", "origin": [0, 0], "direction": [0, 1]},
-            ],
-        }
+def test_canonical_step_materializes_a_full_revolve_with_kernel_validation(tmp_path) -> None:
+    freecad_cmd = Path("/mnt/data/freecad/squashfs-root/usr/bin/freecadcmd")
+    if not freecad_cmd.exists():
+        pytest.skip("FreeCADCmd is unavailable")
+    document, revolve = _revolve_document()
+
+    artifact = materialize_feature_artifact(
+        document,
+        revolve.feature_id,
+        "step",
+        output_root=tmp_path / "artifacts",
+        cad_adapter=CadAdapter(freecad_cmd=freecad_cmd, export_dir=tmp_path / "kernel"),
     )
-    document = wrap_legacy_selection_context(selection, document_id="doc_revolve_artifact")
-    revolve = FeatureRecord.model_validate(
+
+    assert Path(artifact["path"]).exists()
+    assert artifact["measurements"]["is_valid_solid"] is True
+    assert artifact["measurements"]["volume_mm3"] == pytest.approx(60 * math.pi, abs=1e-6)
+    assert artifact["measurements"]["bbox"] == pytest.approx(
+        {"xmin": -4, "xmax": 4, "ymin": 0, "ymax": 5, "zmin": -4, "zmax": 4}
+    )
+    assert artifact["measurements"]["operation_execution"] == [
         {
-            "feature_id": "feature_revolve",
+            "feature_id": revolve.feature_id,
             "feature_type": "revolve",
-            "name": "Revolve",
-            "body_id": "body_main",
-            "sketch_id": "sketch_main",
-            "profile_id": profile.id,
-            "parameters": {"axis_entity_id": "axis_y", "angle_deg": 360, "operation": "new_body"},
+            "operation": "new_body",
+            "angle_deg": 360,
+            "strategy": "face_with_holes",
         }
-    )
-    document = document.model_copy(update={"revision": 1, "features": [revolve]})
+    ]
+
+
+def test_layered_stl_rejects_revolve_until_a_supported_mesher_exists(tmp_path) -> None:
+    document, revolve = _revolve_document()
 
     with pytest.raises(CadExportError) as exc_info:
         materialize_feature_artifact(

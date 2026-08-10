@@ -74,6 +74,26 @@ def _build_extrusion(operation: dict[str, Any]) -> tuple[Any, str]:
     return solid, strategy
 
 
+def _build_revolve(operation: dict[str, Any]) -> tuple[Any, str]:
+    angle_deg = float(operation["angle_deg"])
+    if not math.isfinite(angle_deg) or abs(angle_deg - 360.0) > 1e-9:
+        raise ValueError("Feature-graph revolve currently requires exactly 360 degrees")
+    origin = operation["axis_origin_mm"]
+    direction = operation["axis_direction"]
+    direction_x = float(direction[0])
+    direction_y = float(direction[1])
+    magnitude = math.hypot(direction_x, direction_y)
+    if not all(math.isfinite(value) for value in (float(origin[0]), float(origin[1]), magnitude)) or magnitude <= 1e-9:
+        raise ValueError("Revolve axis must be finite and non-zero")
+    face, strategy = _profile_face(operation["profile"], operation.get("holes") or [])
+    solid = face.revolve(
+        FreeCAD.Vector(float(origin[0]), float(origin[1]), 0.0),
+        FreeCAD.Vector(direction_x / magnitude, direction_y / magnitude, 0.0),
+        angle_deg,
+    )
+    return solid, strategy
+
+
 def _build_body(operations: list[dict[str, Any]]) -> tuple[Any, list[dict[str, Any]]]:
     if not operations:
         raise ValueError("Feature graph requires at least one pre-finish operation")
@@ -99,6 +119,21 @@ def _build_body(operations: list[dict[str, Any]]) -> tuple[Any, list[dict[str, A
                     "feature_id": operation.get("feature_id"),
                     "feature_type": feature_type,
                     "operation": mode,
+                    "strategy": strategy,
+                }
+            )
+        elif feature_type == "revolve":
+            candidate, strategy = _build_revolve(operation)
+            mode = operation.get("operation")
+            if index != 0 or mode != "new_body":
+                raise ValueError("Feature-graph revolve currently supports one new-body operation")
+            solid = candidate
+            execution.append(
+                {
+                    "feature_id": operation.get("feature_id"),
+                    "feature_type": feature_type,
+                    "operation": mode,
+                    "angle_deg": float(operation["angle_deg"]),
                     "strategy": strategy,
                 }
             )

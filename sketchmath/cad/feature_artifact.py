@@ -11,8 +11,8 @@ from sketchmath.cad.solid_validation import validate_solid_measurements
 from sketchmath.cad.stl_export import write_ascii_stl
 from sketchmath.executor.errors import CadExportError, FeatureRebuildError, MissingEntityError, UnsupportedCadFormatError
 from sketchmath.features.rebuild import rebuild_document
-from sketchmath.models.document import ChamferParameters, ExtrudeParameters, FeatureBuildRecord, FeatureRecord, FilletParameters, HoleParameters, SketchMathDocument
-from sketchmath.models.entities import Circle2DEntity, Profile2DEntity
+from sketchmath.models.document import ChamferParameters, ExtrudeParameters, FeatureBuildRecord, FeatureRecord, FilletParameters, HoleParameters, RevolveParameters, SketchMathDocument
+from sketchmath.models.entities import Axis2DEntity, Circle2DEntity, ConstructionLine2DEntity, Line2DEntity, Profile2DEntity
 
 
 def _safe_segment(value: str) -> str:
@@ -363,6 +363,79 @@ def _extrusion_graph_step_payload(document: SketchMathDocument, feature: Feature
     }
 
 
+def _revolve_step_payload(document: SketchMathDocument, feature: FeatureRecord) -> dict[str, Any]:
+    if feature.feature_type != "revolve" or not isinstance(feature.parameters, RevolveParameters):
+        raise CadExportError(
+            "Canonical revolve STEP requires a revolve feature",
+            detail={"feature_id": feature.feature_id, "error_code": "unsupported_revolve_graph"},
+        )
+    body_features = [item for item in document.features if item.body_id == feature.body_id and not item.suppressed]
+    if (
+        body_features != [feature]
+        or feature.dependencies
+        or feature.parameters.operation != "new_body"
+        or abs(feature.parameters.angle_deg - 360.0) > 1e-9
+    ):
+        raise CadExportError(
+            "Canonical revolve STEP currently supports one independent 360-degree new-body revolve",
+            detail={"feature_id": feature.feature_id, "error_code": "unsupported_revolve_graph"},
+        )
+    sketch = next((item for item in document.sketches if item.sketch_id == feature.sketch_id), None)
+    if sketch is None:
+        raise CadExportError(
+            "Canonical revolve STEP source sketch does not exist",
+            detail={"feature_id": feature.feature_id, "error_code": "unsupported_revolve_graph"},
+        )
+    axis = sketch.state.get_entity(feature.parameters.axis_entity_id)
+    if isinstance(axis, Axis2DEntity):
+        origin = axis.origin
+        direction = axis.direction
+    elif isinstance(axis, (Line2DEntity, ConstructionLine2DEntity)):
+        origin = axis.start
+        direction = (axis.end[0] - axis.start[0], axis.end[1] - axis.start[1])
+    else:
+        raise CadExportError(
+            "Canonical revolve STEP requires an axis or line entity",
+            detail={"feature_id": feature.feature_id, "axis_entity_id": feature.parameters.axis_entity_id, "error_code": "unsupported_revolve_graph"},
+        )
+    profile, holes = _source_geometry(document, feature)
+    report = rebuild_document(document)
+    record = next(item for item in report.records if item.feature_id == feature.feature_id)
+    if record.measurements is None:
+        raise CadExportError(
+            "Canonical revolve STEP requires exact analytic measurements",
+            detail={"feature_id": feature.feature_id, "error_code": "unsupported_revolve_graph"},
+        )
+    bounds = record.measurements.bounds_mm
+    return {
+        "feature_type": "solid",
+        "operations": [
+            {
+                "feature_id": feature.feature_id,
+                "feature_type": "revolve",
+                "operation": "new_body",
+                "profile": _profile_payload(document, feature.sketch_id, profile),
+                "holes": [_profile_payload(document, feature.sketch_id, hole) for hole in holes],
+                "axis_origin_mm": list(origin),
+                "axis_direction": list(direction),
+                "angle_deg": feature.parameters.angle_deg,
+            }
+        ],
+        "expected_pre_finish": {
+            "bbox": {
+                "xmin": bounds[0],
+                "xmax": bounds[1],
+                "ymin": bounds[2],
+                "ymax": bounds[3],
+                "zmin": bounds[4],
+                "zmax": bounds[5],
+            },
+            "volume_mm3": record.measurements.volume_delta_mm3,
+            "hole_count": record.measurements.hole_count,
+        },
+    }
+
+
 def _content_hash(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -452,6 +525,20 @@ def materialize_feature_artifact(
             adapter = cad_adapter or CadAdapter(export_dir=feature_root)
             result = adapter.feature_graph(
                 _extrusion_graph_step_payload(document, feature),
+                selection_set_id=_safe_segment(document.document_id),
+                command_id=f"feature_{_safe_segment(feature.feature_id)}_r{document.revision}",
+            )
+            if result.artifacts is None:
+                raise CadExportError("STEP worker did not return an artifact path", detail={"feature_id": feature_id})
+            path = Path(result.artifacts.step_path).resolve()
+            measurements = {
+                **(result.measurements.model_dump(mode="json") if result.measurements is not None else {}),
+                **result.metadata,
+            }
+        elif feature.feature_type == "revolve" and isinstance(feature.parameters, RevolveParameters):
+            adapter = cad_adapter or CadAdapter(export_dir=feature_root)
+            result = adapter.feature_graph(
+                _revolve_step_payload(document, feature),
                 selection_set_id=_safe_segment(document.document_id),
                 command_id=f"feature_{_safe_segment(feature.feature_id)}_r{document.revision}",
             )

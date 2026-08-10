@@ -670,6 +670,7 @@ test.describe("SketchMath workspace", () => {
           feature_type: string;
           parameters: { axis_entity_id: string; angle_deg: number };
         }>;
+        artifacts: Array<{ feature_id: string; format: string; revision: number }>;
         last_rebuild: { records: Array<{ feature_id: string; output_signature: string }> };
       };
       feature_history_length: number;
@@ -706,6 +707,22 @@ test.describe("SketchMath workspace", () => {
     expect(reloaded.document.last_rebuild.records[0].output_signature).toBe(replaced.document.last_rebuild.records[0].output_signature);
     expect(reloaded.feature_history_length).toBe(2);
     await expect(page.getByLabel("Revolve axis Revolve 1")).toHaveValue(constructionAxisIds[1]);
+    const featureRow = page.getByTestId(`sketchmath-feature-${featureId}`);
+    await featureRow.getByRole("button", { name: "Build STEP" }).click();
+    await expect(page.getByTestId(`sketchmath-artifact-status-${featureId}`)).toContainText(
+      `DONE · complete · revision ${reloaded.document.revision}`,
+      { timeout: 15000 },
+    );
+    const download = page.getByTestId(`sketchmath-artifact-download-${featureId}`);
+    const downloadPromise = page.waitForEvent("download");
+    await download.click();
+    expect((await downloadPromise).suggestedFilename()).toMatch(/\.step$/);
+    const withArtifact = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as RevolveSnapshot;
+    expect(withArtifact.document.artifacts).toContainEqual(expect.objectContaining({
+      feature_id: featureId,
+      format: "step",
+      revision: reloaded.document.revision,
+    }));
   });
 
   test("edits counterbore and countersink hole properties through durable history", async ({ page }) => {

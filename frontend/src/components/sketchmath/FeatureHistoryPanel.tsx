@@ -592,9 +592,16 @@ const FeatureHistoryPanel = ({
                 )
                 : candidate.feature_type === "hole" && candidate.parameters.style === "simple"
             ));
+          const graphSupportsRevolveStep = feature.feature_type === "revolve"
+            && bodyGraph.length === 1
+            && feature.parameters.operation === "new_body"
+            && feature.parameters.angle_deg === 360
+            && feature.dependencies.length === 0;
           const artifactFormats: Array<"step" | "stl"> = ["fillet", "chamfer"].includes(feature.feature_type)
             ? ["step"]
-            : ["stl", ...(graphSupportsSolidStep ? ["step" as const] : [])];
+            : graphSupportsRevolveStep
+              ? ["step"]
+              : ["stl", ...(graphSupportsSolidStep ? ["step" as const] : [])];
           const activeArtifactFormat = artifactJob?.format || artifactFormats[0];
           const registeredArtifact = artifactJob?.result?.artifact
             || document.artifacts.find((artifact) => (
@@ -604,7 +611,9 @@ const FeatureHistoryPanel = ({
             ));
           const canBuildArtifact = (format: "step" | "stl") => record?.status === "succeeded"
             && laterBodyFeatures.length === 0
-            && (format === "stl" ? graphSupportsStl : graphSupportsEdgeFinishStep || graphSupportsSolidStep);
+            && (format === "stl"
+              ? graphSupportsStl
+              : graphSupportsEdgeFinishStep || graphSupportsSolidStep || graphSupportsRevolveStep);
           const artifactBusy = artifactJob?.state === "READY" || artifactJob?.state === "RUNNING";
           const topReference = record?.generated_topology.find((reference) => reference.topology_type === "face" && reference.role === "top");
           const verticalOuterEdges = record?.generated_topology.filter(
