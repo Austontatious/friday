@@ -953,6 +953,35 @@ def test_sketchmath_mirror_features_default_off_and_gate_feature_route(monkeypat
     client.close()
 
 
+def test_sketchmath_shell_features_default_off_and_gate_feature_route(monkeypatch, tmp_path):
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.delenv("FRIDAY_SKETCHMATH_SHELL_FEATURES_ENABLED", raising=False)
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={})
+    shell = {
+        "feature_id": "feature_gated_shell",
+        "feature_type": "shell",
+        "name": "Gated shell",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": None,
+        "dependencies": ["feature_missing"],
+        "topology_references": [],
+        "parameters": {"thickness_mm": 1, "opening": "top", "operation": "modify"},
+    }
+
+    response = client.post(
+        f"/api/sketchmath/sessions/{created.json()['session_id']}/features/preview",
+        json={"command": _feature_command("add_feature", "gated_shell", 0, feature=shell)},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "sketchmath_shell_features_disabled"
+    client.close()
+
+
 def test_sketchmath_artifact_job_build_poll_register_download_and_replay(monkeypatch, tmp_path):
     monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
     monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
@@ -1379,6 +1408,82 @@ def test_sketchmath_linear_hole_pattern_commits_edits_undoes_redoes_and_reloads(
     assert reloaded.json()["document"]["features"][2]["parameters"]["count"] == 2
     assert reloaded.json()["document"]["features"][3]["parameters"]["center_mm"] == [10.0, 5.0]
     assert reloaded.json()["document"]["features"][4]["parameters"]["mirror_line_entity_id"] == "axis_x6"
+    client.close()
+
+
+def test_sketchmath_rectangular_shell_commits_edits_and_reloads(monkeypatch, tmp_path):
+    from backend.sketchmath.service import SESSION_STORE
+
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_DOCUMENT_V1_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SHELL_FEATURES_ENABLED", "1")
+    monkeypatch.setenv("FRIDAY_SKETCHMATH_SESSION_DIR", str(tmp_path / "sessions"))
+    client = TestClient(create_app())
+    created = client.post("/api/sketchmath/sessions", json={"selection_context": _profile_selection_context()})
+    session_id = created.json()["session_id"]
+    base = _extrude_feature(10)
+    base_response = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={"command": _feature_command("add_feature", "add_shell_base", 0, feature=base, mode="commit")},
+    )
+    assert base_response.status_code == 200, base_response.text
+    top = next(
+        item
+        for item in base_response.json()["document"]["last_rebuild"]["records"][0]["generated_topology"]
+        if item["role"] == "top"
+    )
+    shell = {
+        "feature_id": "feature_shell",
+        "feature_type": "shell",
+        "name": "Main shell",
+        "body_id": "body_main",
+        "sketch_id": "sketch_main",
+        "profile_id": None,
+        "dependencies": ["feature_plate"],
+        "topology_references": [{
+            "reference_id": top["reference_id"],
+            "owner_feature_id": "feature_plate",
+            "topology_type": "face",
+            "role": "top",
+            "source_entity_id": "profile_box",
+            "expected_signature": top["geometric_signature"],
+        }],
+        "parameters": {"thickness_mm": 1, "opening": "top", "operation": "modify"},
+    }
+    committed = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={"command": _feature_command("add_feature", "add_shell", 1, feature=shell, mode="commit")},
+    )
+    assert committed.status_code == 200, committed.text
+    record = committed.json()["document"]["last_rebuild"]["records"][1]
+    assert record["measurements"]["volume_delta_mm3"] == pytest.approx(-1296)
+    assert record["measurements"]["bounds_mm"] == pytest.approx([1, 19, 1, 9, 1, 10])
+    assert [item["role"] for item in record["generated_topology"]] == ["shell_floor", *("shell_inner_wall" for _ in range(4))]
+
+    edited_shell = {**shell, "parameters": {**shell["parameters"], "thickness_mm": 2}}
+    edited = client.post(
+        f"/api/sketchmath/sessions/{session_id}/features/commit",
+        json={
+            "command": _feature_command(
+                "replace_feature",
+                "edit_shell",
+                2,
+                feature=edited_shell,
+                target_id="feature_shell",
+                mode="commit",
+            )
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    edited_record = edited.json()["document"]["last_rebuild"]["records"][1]
+    assert edited_record["measurements"]["volume_delta_mm3"] == pytest.approx(-768)
+    assert edited_record["measurements"]["bounds_mm"] == pytest.approx([2, 18, 2, 8, 2, 10])
+
+    SESSION_STORE._sessions.pop(session_id, None)
+    reloaded = client.get(f"/api/sketchmath/sessions/{session_id}")
+    assert reloaded.status_code == 200
+    assert [feature["feature_type"] for feature in reloaded.json()["document"]["features"]] == ["extrude", "shell"]
+    assert reloaded.json()["document"]["features"][1]["parameters"]["thickness_mm"] == 2.0
     client.close()
 
 

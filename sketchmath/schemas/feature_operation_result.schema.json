@@ -1451,7 +1451,8 @@
             "chamfer",
             "linear_pattern",
             "circular_pattern",
-            "mirror"
+            "mirror",
+            "shell"
           ],
           "title": "Feature Type",
           "type": "string"
@@ -1485,6 +1486,9 @@
             },
             {
               "$ref": "#/$defs/MirrorParameters"
+            },
+            {
+              "$ref": "#/$defs/ShellParameters"
             }
           ],
           "title": "Parameters"
@@ -2773,6 +2777,33 @@
         "geometric_signature"
       ],
       "title": "SemanticTopologyReference",
+      "type": "object"
+    },
+    "ShellParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "opening": {
+          "const": "top",
+          "default": "top",
+          "title": "Opening",
+          "type": "string"
+        },
+        "operation": {
+          "const": "modify",
+          "default": "modify",
+          "title": "Operation",
+          "type": "string"
+        },
+        "thickness_mm": {
+          "exclusiveMinimum": 0,
+          "title": "Thickness Mm",
+          "type": "number"
+        }
+      },
+      "required": [
+        "thickness_mm"
+      ],
+      "title": "ShellParameters",
       "type": "object"
     },
     "SketchMathDocument": {

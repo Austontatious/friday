@@ -9,6 +9,7 @@ from shapely.geometry import Point, Polygon
 from sketchmath.models.document import (
     ChamferParameters,
     CircularPatternParameters,
+    ExtrudeParameters,
     FeatureBuildError,
     FeatureBuildRecord,
     FeatureMeasurements,
@@ -21,6 +22,7 @@ from sketchmath.models.document import (
     RevolveParameters,
     ResolvedTopologyReference,
     SemanticTopologyReference,
+    ShellParameters,
     SketchMathDocument,
 )
 from sketchmath.models.entities import Axis2DEntity, ConstructionLine2DEntity, Line2DEntity, Profile2DEntity
@@ -1108,6 +1110,158 @@ def _mirror_contract(
     return measurements, generated_topology, source_geometry, None
 
 
+def _shell_contract(
+    feature: FeatureRecord,
+    records_by_id: dict[str, FeatureBuildRecord],
+    feature_map: dict[str, FeatureRecord],
+    document: SketchMathDocument,
+    resolved_references: list[ResolvedTopologyReference],
+) -> tuple[FeatureMeasurements | None, list[SemanticTopologyReference], dict[str, object], FeatureBuildError | None]:
+    parameters = feature.parameters
+    if not isinstance(parameters, ShellParameters):
+        return None, [], {}, FeatureBuildError(
+            code="invalid_shell_parameters",
+            message="Shell feature requires matching parameters.",
+        )
+    if len(feature.dependencies) != 1:
+        return None, [], {}, FeatureBuildError(
+            code="shell_target_dependency_required",
+            message="A shell requires exactly one target feature dependency.",
+            detail={"dependency_ids": feature.dependencies},
+        )
+    target_id = feature.dependencies[0]
+    target_feature = feature_map.get(target_id)
+    target_record = records_by_id.get(target_id)
+    if (
+        target_feature is None
+        or target_record is None
+        or target_record.measurements is None
+        or target_feature.feature_type != "extrude"
+    ):
+        return None, [], {}, FeatureBuildError(
+            code="unsupported_shell_target",
+            message="Canonical shell currently supports a built extrusion target.",
+            detail={"target_feature_id": target_id, "feature_type": target_feature.feature_type if target_feature else None},
+        )
+    target_parameters = target_feature.parameters
+    if (
+        not isinstance(target_parameters, ExtrudeParameters)
+        or target_parameters.operation != "new_body"
+        or target_parameters.extent != "one_sided"
+        or target_parameters.direction != "positive"
+        or target_feature.dependencies
+    ):
+        return None, [], {}, FeatureBuildError(
+            code="unsupported_shell_target_graph",
+            message="Canonical shell requires one positive one-sided new-body extrusion.",
+            detail={"target_feature_id": target_id},
+        )
+    active_body_features = [
+        item.feature_id
+        for item in document.features
+        if item.body_id == feature.body_id and not item.suppressed
+    ]
+    if set(active_body_features) != {target_id, feature.feature_id}:
+        return None, [], {}, FeatureBuildError(
+            code="unsupported_shell_body_graph",
+            message="Canonical shell currently requires a body containing only its base extrusion and shell.",
+            detail={"feature_ids": active_body_features},
+        )
+    target_profile, target_holes, target_error = _profile_for_feature(document, target_feature)
+    if target_error is not None or target_profile is None:
+        return None, [], {}, target_error
+    ring = target_profile.vertices[:-1] if target_profile.vertices[0] == target_profile.vertices[-1] else target_profile.vertices
+    xs = sorted({round(point[0], 12) for point in ring})
+    ys = sorted({round(point[1], 12) for point in ring})
+    if len(ring) != 4 or len(xs) != 2 or len(ys) != 2 or target_holes:
+        return None, [], {}, FeatureBuildError(
+            code="unsupported_shell_profile",
+            message="Canonical shell currently requires a solid axis-aligned rectangular profile.",
+            detail={"profile_id": target_profile.id, "vertex_count": len(ring), "hole_count": len(target_holes)},
+        )
+    top_selectors = [
+        selector
+        for selector in feature.topology_references
+        if selector.owner_feature_id == target_id and selector.topology_type == "face" and selector.role == "top"
+    ]
+    if len(top_selectors) != 1:
+        return None, [], {}, FeatureBuildError(
+            code="shell_opening_reference_required",
+            message="A top-open shell requires exactly one semantic top-face reference.",
+            detail={"target_feature_id": target_id, "reference_ids": [item.reference_id for item in top_selectors]},
+        )
+    resolved = next(
+        (item for item in resolved_references if item.requested_reference_id == top_selectors[0].reference_id),
+        None,
+    )
+    if resolved is None:
+        return None, [], {}, FeatureBuildError(
+            code="shell_opening_reference_unresolved",
+            message="Shell opening face could not be resolved.",
+            detail={"reference_id": top_selectors[0].reference_id},
+        )
+
+    x_min, x_max, y_min, y_max, z_min, z_max = target_record.measurements.bounds_mm
+    thickness = parameters.thickness_mm
+    width, height, depth = x_max - x_min, y_max - y_min, z_max - z_min
+    maximum = min(width / 2.0, height / 2.0, depth)
+    if thickness >= maximum - 1e-9:
+        return None, [], {}, FeatureBuildError(
+            code="shell_thickness_exceeds_target",
+            message="Shell thickness must leave positive inner width, height, and cavity depth.",
+            detail={"thickness_mm": thickness, "maximum_exclusive_mm": maximum},
+        )
+    cavity_bounds = (x_min + thickness, x_max - thickness, y_min + thickness, y_max - thickness, z_min + thickness, z_max)
+    cavity_width = cavity_bounds[1] - cavity_bounds[0]
+    cavity_height = cavity_bounds[3] - cavity_bounds[2]
+    cavity_depth = cavity_bounds[5] - cavity_bounds[4]
+    cavity_area = cavity_width * cavity_height
+    measurements = FeatureMeasurements(
+        net_profile_area_mm2=cavity_area,
+        volume_delta_mm3=-(cavity_area * cavity_depth),
+        bounds_mm=cavity_bounds,
+        hole_count=0,
+    )
+    generated_topology = [
+        _semantic_reference(
+            feature,
+            topology_type="face",
+            role="shell_floor",
+            source_entity_id=target_profile.id,
+            ordinal=0,
+            geometry={"cavity_bounds_mm": cavity_bounds, "z_mm": cavity_bounds[4]},
+            measurements={"area_mm2": cavity_area, "z_mm": cavity_bounds[4], "thickness_mm": thickness},
+        )
+    ]
+    wall_geometry = [
+        ("left", cavity_bounds[0]),
+        ("right", cavity_bounds[1]),
+        ("front", cavity_bounds[2]),
+        ("back", cavity_bounds[3]),
+    ]
+    generated_topology.extend(
+        _semantic_reference(
+            feature,
+            topology_type="face",
+            role="shell_inner_wall",
+            source_entity_id=f"{target_profile.id}:{side}",
+            ordinal=ordinal,
+            geometry={"side": side, "position_mm": position, "cavity_bounds_mm": cavity_bounds},
+            measurements={"thickness_mm": thickness, "cavity_depth_mm": cavity_depth, "side": side},
+        )
+        for ordinal, (side, position) in enumerate(wall_geometry)
+    )
+    source_geometry = {
+        "target_feature_id": target_id,
+        "target_signature": target_record.output_signature,
+        "opening_reference_id": resolved.resolved_reference_id,
+        "thickness_mm": thickness,
+        "outer_bounds_mm": target_record.measurements.bounds_mm,
+        "cavity_bounds_mm": cavity_bounds,
+    }
+    return measurements, generated_topology, source_geometry, None
+
+
 def _resolve_topology_references(
     feature: FeatureRecord,
     records_by_id: dict[str, FeatureBuildRecord],
@@ -1382,6 +1536,14 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                 feature_map,
                 document,
             )
+        if error is None and feature.feature_type == "shell":
+            pattern_measurements, pattern_topology, pattern_source_geometry, error = _shell_contract(
+                feature,
+                records_by_id,
+                feature_map,
+                document,
+                resolved_references,
+            )
         if error is None and feature.feature_type == "revolve":
             assert isinstance(feature.parameters, RevolveParameters)
             if not math.isclose(feature.parameters.angle_deg, 360.0, abs_tol=1e-9):
@@ -1568,7 +1730,7 @@ def rebuild_document(document: SketchMathDocument) -> FeatureRebuildReport:
                         "target_signature": records_by_id[feature.dependencies[0]].output_signature,
                         "distance_mm": feature.parameters.distance_mm,
                     }
-                elif feature.feature_type in {"linear_pattern", "circular_pattern", "mirror"}:
+                elif feature.feature_type in {"linear_pattern", "circular_pattern", "mirror", "shell"}:
                     assert pattern_measurements is not None
                     measurements = pattern_measurements
                     generated_topology = pattern_topology

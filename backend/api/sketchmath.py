@@ -145,6 +145,16 @@ def _require_enabled_feature_family(command: Dict[str, Any]) -> None:
                 False,
             ),
         )
+    if isinstance(feature, dict) and feature.get("feature_type") == "shell" and not SketchMathConfig.from_env().shell_features_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=_error_payload(
+                "sketchmath_shell_features_disabled",
+                "SketchMath shell features are disabled",
+                "Set FRIDAY_SKETCHMATH_SHELL_FEATURES_ENABLED=1",
+                False,
+            ),
+        )
 
 
 def _cad_export_root() -> Path:

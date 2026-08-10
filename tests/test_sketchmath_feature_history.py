@@ -344,6 +344,31 @@ def _mirror_feature(feature_id: str, seed: FeatureRecord, *, line_id: str = "axi
     )
 
 
+def _shell_feature(feature_id: str, target: FeatureRecord, *, thickness: float = 1, include_top: bool = True) -> FeatureRecord:
+    target_report = rebuild_document(_document().model_copy(update={"features": [target]}))
+    top = next(item for item in target_report.records[0].generated_topology if item.role == "top")
+    return FeatureRecord.model_validate(
+        {
+            "feature_id": feature_id,
+            "feature_type": "shell",
+            "name": feature_id.replace("_", " ").title(),
+            "body_id": target.body_id,
+            "sketch_id": target.sketch_id,
+            "profile_id": None,
+            "dependencies": [target.feature_id],
+            "topology_references": ([{
+                "reference_id": top.reference_id,
+                "owner_feature_id": target.feature_id,
+                "topology_type": "face",
+                "role": "top",
+                "source_entity_id": top.source_entity_id,
+                "expected_signature": top.geometric_signature,
+            }] if include_top else []),
+            "parameters": {"thickness_mm": thickness, "opening": "top", "operation": "modify"},
+        }
+    )
+
+
 def test_legacy_selection_wrap_preserves_entity_ids_and_creates_one_body_sketch() -> None:
     document = _document()
 
@@ -599,6 +624,65 @@ def test_feature_mirror_refuses_degenerate_overlap_outside_and_missing_lines(
     assert report.ok is False
     assert report.records[2].error is not None
     assert report.records[2].error.code == expected_code
+
+
+def test_rectangular_top_open_shell_rebuild_is_exact_deterministic_and_topology_stable() -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    shell = _shell_feature("shell_body", base, thickness=1)
+    document = _document().model_copy(update={"features": [shell, base]})
+
+    first = rebuild_document(document)
+    second = rebuild_document(document.model_copy(deep=True))
+
+    assert first == second
+    assert first.ok is True
+    assert first.rebuild_order == ["feature_base", "shell_body"]
+    record = first.records[1]
+    assert record.measurements is not None
+    assert record.measurements.net_profile_area_mm2 == pytest.approx(16)
+    assert record.measurements.volume_delta_mm3 == pytest.approx(-144)
+    assert record.measurements.bounds_mm == pytest.approx((3, 7, 3, 7, 1, 10))
+    assert record.measurements.hole_count == 0
+    assert [item.role for item in record.generated_topology] == ["shell_floor", *("shell_inner_wall" for _ in range(4))]
+    assert record.resolved_references[0].recovery_state == "exact"
+
+
+def test_shell_thickness_edit_changes_exact_cavity_and_output_signature() -> None:
+    base = _feature("feature_base", profile_id="profile_boss")
+    thin = _shell_feature("shell_body", base, thickness=1)
+    thick = _shell_feature("shell_body", base, thickness=2)
+
+    thin_record = rebuild_document(_document().model_copy(update={"features": [base, thin]})).records[1]
+    thick_record = rebuild_document(_document().model_copy(update={"features": [base, thick]})).records[1]
+
+    assert thin_record.output_signature != thick_record.output_signature
+    assert thick_record.measurements is not None
+    assert thick_record.measurements.volume_delta_mm3 == pytest.approx(-32)
+    assert thick_record.measurements.bounds_mm == pytest.approx((4, 6, 4, 6, 2, 10))
+
+
+@pytest.mark.parametrize(
+    ("profile_id", "thickness", "include_top", "expected_code"),
+    [
+        ("profile_boss", 3, True, "shell_thickness_exceeds_target"),
+        ("profile_boss", 1, False, "shell_opening_reference_required"),
+        ("profile_plate", 1, True, "unsupported_shell_profile"),
+    ],
+)
+def test_shell_refuses_oversized_missing_opening_and_unsupported_profiles(
+    profile_id: str,
+    thickness: float,
+    include_top: bool,
+    expected_code: str,
+) -> None:
+    base = _feature("feature_base", profile_id=profile_id)
+    shell = _shell_feature("shell_body", base, thickness=thickness, include_top=include_top)
+
+    report = rebuild_document(_document().model_copy(update={"features": [base, shell]}))
+
+    assert report.ok is False
+    assert report.records[1].error is not None
+    assert report.records[1].error.code == expected_code
 
 
 def test_boolean_extrusion_requires_semantic_attachment_and_direction_into_target() -> None:

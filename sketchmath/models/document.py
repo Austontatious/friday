@@ -184,6 +184,20 @@ class MirrorParameters(BaseModel):
         return self
 
 
+class ShellParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    thickness_mm: float = Field(gt=0)
+    opening: Literal["top"] = "top"
+    operation: Literal["modify"] = "modify"
+
+    @model_validator(mode="after")
+    def validate_shell_parameters(self) -> "ShellParameters":
+        if not math.isfinite(self.thickness_mm):
+            raise ValueError("shell thickness must be finite")
+        return self
+
+
 class TopologyReferenceSelector(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -226,7 +240,7 @@ class FeatureRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     feature_id: str
-    feature_type: Literal["extrude", "hole", "revolve", "fillet", "chamfer", "linear_pattern", "circular_pattern", "mirror"] = "extrude"
+    feature_type: Literal["extrude", "hole", "revolve", "fillet", "chamfer", "linear_pattern", "circular_pattern", "mirror", "shell"] = "extrude"
     name: str
     body_id: str
     sketch_id: str
@@ -234,7 +248,7 @@ class FeatureRecord(BaseModel):
     source_region_id: str | None = None
     dependencies: list[str] = Field(default_factory=list)
     topology_references: list[TopologyReferenceSelector] = Field(default_factory=list)
-    parameters: ExtrudeParameters | HoleParameters | RevolveParameters | FilletParameters | ChamferParameters | LinearPatternParameters | CircularPatternParameters | MirrorParameters
+    parameters: ExtrudeParameters | HoleParameters | RevolveParameters | FilletParameters | ChamferParameters | LinearPatternParameters | CircularPatternParameters | MirrorParameters | ShellParameters
     suppressed: bool = False
 
     @model_validator(mode="after")
@@ -274,11 +288,16 @@ class FeatureRecord(BaseModel):
                 raise ValueError("circular pattern feature requires circular pattern parameters")
             if self.profile_id is not None:
                 raise ValueError("circular pattern feature does not use profile_id")
-        else:
+        elif self.feature_type == "mirror":
             if not isinstance(self.parameters, MirrorParameters):
                 raise ValueError("mirror feature requires mirror parameters")
             if self.profile_id is not None:
                 raise ValueError("mirror feature does not use profile_id")
+        else:
+            if not isinstance(self.parameters, ShellParameters):
+                raise ValueError("shell feature requires shell parameters")
+            if self.profile_id is not None:
+                raise ValueError("shell feature does not use profile_id")
         return self
 
 
