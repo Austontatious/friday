@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-08-09 - SketchMath Kernel-Validated Rectangular Shell
+
+### What Changed
+- Added `shell` as a typed feature with positive thickness, top opening, semantic top-face selector, and bounded base-only rectangular graph.
+- Added exact cavity volume/bounds, floor/inner-wall topology, and structured profile/graph/reference/thickness refusal.
+- Added paired default-off flags, guarded browser create/edit, API persistence/reload, and native FreeCAD STEP validation; shell STL stays refused.
+
+### Why
+- Shell was the final entirely absent family in `SM-FEAT-005`; a bounded rectangular cavity provides exact analytic and physical kernel evidence without claiming general face offsetting.
+
+### New Env Flags
+- `FRIDAY_SKETCHMATH_SHELL_FEATURES_ENABLED=0`
+- `REACT_APP_SKETCHMATH_SHELL_FEATURES_ENABLED=0`
+
+### How To Test
+- `python3 -m pytest -q tests/test_sketchmath_feature_history.py tests/test_sketchmath_api.py tests/test_sketchmath_feature_artifact.py`
+- `python3 -m sketchmath.schemas.generate --check`
+- `cd frontend && CI=true npm test -- --runInBand --watchAll=false --runTestsByPath src/components/sketchmath/SketchMathWorkspace.test.tsx`
+- `cd frontend && npm run build`
+
+### Evidence and Boundary
+- Native 20×10×10 mm fixture with 1 mm thickness validates at 704 mm³, unchanged outer bounds, and exact cavity `[1,19] × [1,9] × [1,10]`.
+- Curved/non-rectangular shells, multiple openings, other body graphs, variable thickness, general face matching, and shell STL remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Canonical Hole Feature Mirror
 
 ### What Changed

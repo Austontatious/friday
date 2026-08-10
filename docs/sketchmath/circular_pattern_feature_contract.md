@@ -38,7 +38,7 @@ The guarded feature-history panel exposes count, center X/Y, and ordered directi
 
 ## Current Boundary
 
-This checkpoint is full-circle and hole-only. Partial arcs, 3D axis references, patterns of other feature types, nested pattern execution, shell, and pattern STL/STEP remain open. The bounded sketch-line hole mirror is documented separately in `mirror_feature_contract.md`.
+This checkpoint is full-circle and hole-only. Partial arcs, 3D axis references, patterns of other feature types, nested pattern execution, and pattern STL/STEP remain open. The bounded sketch-line hole mirror and rectangular shell are documented separately in `mirror_feature_contract.md` and `shell_feature_contract.md`.
 
 ## Verification
 

@@ -16,6 +16,7 @@ Both flags are required for the browser workflow:
 - chamfers additionally require backend `FRIDAY_SKETCHMATH_CHAMFER_FEATURES_ENABLED=1` and frontend `REACT_APP_SKETCHMATH_CHAMFER_FEATURES_ENABLED=1`
 - feature patterns additionally require backend `FRIDAY_SKETCHMATH_PATTERN_FEATURES_ENABLED=1` and frontend `REACT_APP_SKETCHMATH_PATTERN_FEATURES_ENABLED=1`
 - feature mirrors additionally require backend `FRIDAY_SKETCHMATH_MIRROR_FEATURES_ENABLED=1` and frontend `REACT_APP_SKETCHMATH_MIRROR_FEATURES_ENABLED=1`
+- shells additionally require backend `FRIDAY_SKETCHMATH_SHELL_FEATURES_ENABLED=1` and frontend `REACT_APP_SKETCHMATH_SHELL_FEATURES_ENABLED=1`
 
 Both default to off. The existing `FRIDAY_SKETCHMATH_ENABLED` and `REACT_APP_SKETCHMATH_ENABLED` gates are still required. With document v1 off, legacy sessions keep their prior response and persistence shape.
 
@@ -80,9 +81,11 @@ Typed chamfer parameters carry a positive distance and reuse that exact edge sel
 
 Typed linear-pattern parameters carry a bounded count, positive spacing, non-zero 2D direction, and `modify` operation. The current stable envelope patterns one terminal hole across its extrusion target, computes exact additional volume/bounds/topology, refuses overlap or target-boundary crossings atomically, and supports browser creation/replacement plus undo/redo/reload. See `linear_pattern_feature_contract.md`. Feature mirror, shell, broader seeds, and kernel artifacts remain open.
 
-Typed circular-pattern parameters carry a bounded count, finite sketch-plane center, fixed 360-degree sweep, ordered direction, and `modify` operation. The bounded hole-seed envelope rotates exact instance centers, records signed rotation/offset topology, refuses a seed on the axis plus overlap/boundary violations, and uses the same history/UI lifecycle. See `circular_pattern_feature_contract.md`. Partial arcs, 3D axes, shell, broader seeds, and kernel artifacts remain open.
+Typed circular-pattern parameters carry a bounded count, finite sketch-plane center, fixed 360-degree sweep, ordered direction, and `modify` operation. The bounded hole-seed envelope rotates exact instance centers, records signed rotation/offset topology, refuses a seed on the axis plus overlap/boundary violations, and uses the same history/UI lifecycle. See `circular_pattern_feature_contract.md`. Partial arcs, 3D axes, broader seeds, and kernel artifacts remain open.
 
-Typed mirror parameters name one stable sketch axis/line and carry `modify` operation. The bounded hole-seed envelope reflects the exact center, records normalized line/offset topology, refuses missing or degenerate lines plus on-line/overlap/boundary failures, and supports guarded create/replace/reload. See `mirror_feature_contract.md`. Plane/face mirrors, other seeds, shell, and kernel artifacts remain open.
+Typed mirror parameters name one stable sketch axis/line and carry `modify` operation. The bounded hole-seed envelope reflects the exact center, records normalized line/offset topology, refuses missing or degenerate lines plus on-line/overlap/boundary failures, and supports guarded create/replace/reload. See `mirror_feature_contract.md`. Plane/face mirrors, other seeds, and mirror kernel artifacts remain open.
+
+Typed shell parameters carry positive wall/floor thickness, a top opening, and `modify` operation. The supported base-only rectangular graph requires one semantic top-face selector, computes exact cavity volume/bounds and inner topology, refuses invalid profiles/graphs/thickness, and materializes a native FreeCAD cavity cut validated against the analytic ledger before STEP export. See `shell_feature_contract.md`.
 
 Preview is side-effect free. Feature commits, rebuild, undo, redo, and reload never invoke FreeCAD. Kernel work runs only through an explicit revision-bound artifact job; the legacy `extrude_profile` preview/STEP workflow remains a separate compatibility path.
 

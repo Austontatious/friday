@@ -34,7 +34,7 @@ The guarded feature-history panel selects from stable construction lines, create
 
 ## Current Boundary
 
-This checkpoint is hole-only and sketch-line-based. Plane/face mirrors, other feature seeds, nested mirror execution, shell, and mirror STL/STEP remain open.
+This checkpoint is hole-only and sketch-line-based. Plane/face mirrors, other feature seeds, nested mirror execution, and mirror STL/STEP remain open. The bounded rectangular shell is documented separately in `shell_feature_contract.md`.
 
 ## Verification
 
