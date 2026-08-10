@@ -3,6 +3,7 @@ import { Box, Button, Heading, HStack, Input, Link, Select, Text, VStack } from 
 
 import type {
   SketchMathArtifactJobManifest,
+  SketchMathCircularPatternParameters,
   SketchMathDocument,
   SketchMathFeature,
   SketchMathFeatureBuildRecord,
@@ -30,6 +31,7 @@ type HoleDraft = {
 type RevolveDraft = { axisId: string; angle: string };
 type ExtrusionDraft = { depth: string; extent: SketchMathExtrudeParameters["extent"]; secondDepth: string; direction: SketchMathExtrudeParameters["direction"] };
 type LinearPatternDraft = { count: string; spacing: string; directionX: string; directionY: string };
+type CircularPatternDraft = { count: string; centerX: string; centerY: string; direction: SketchMathCircularPatternParameters["direction"] };
 
 type FeatureHistoryPanelProps = {
   document: SketchMathDocument;
@@ -73,6 +75,14 @@ type FeatureHistoryPanelProps = {
   onUpdateLinearPattern: (
     feature: Extract<SketchMathFeature, { feature_type: "linear_pattern" }>,
     parameters: SketchMathLinearPatternParameters,
+  ) => void;
+  onAddCircularPattern: (
+    feature: Extract<SketchMathFeature, { feature_type: "hole" }>,
+    parameters: SketchMathCircularPatternParameters,
+  ) => void;
+  onUpdateCircularPattern: (
+    feature: Extract<SketchMathFeature, { feature_type: "circular_pattern" }>,
+    parameters: SketchMathCircularPatternParameters,
   ) => void;
   onUpdateFullRevolve: (
     feature: Extract<SketchMathFeature, { feature_type: "revolve" }>,
@@ -118,6 +128,7 @@ const featureTypeLabel = (feature: SketchMathFeature): string => ({
   fillet: "Fillet",
   chamfer: "Chamfer",
   linear_pattern: "Linear pattern",
+  circular_pattern: "Circular pattern",
 })[feature.feature_type];
 
 const featurePropertySummary = (feature: SketchMathFeature): string => {
@@ -129,7 +140,8 @@ const featurePropertySummary = (feature: SketchMathFeature): string => {
   if (feature.feature_type === "revolve") return `Angle ${feature.parameters.angle_deg}° · construction axis`;
   if (feature.feature_type === "fillet") return `Radius ${feature.parameters.radius_mm} mm`;
   if (feature.feature_type === "chamfer") return `Distance ${feature.parameters.distance_mm} mm`;
-  return `${feature.parameters.count} instances · ${feature.parameters.spacing_mm} mm spacing`;
+  if (feature.feature_type === "linear_pattern") return `${feature.parameters.count} instances · ${feature.parameters.spacing_mm} mm spacing`;
+  return `${feature.parameters.count} instances · full circle`;
 };
 
 const FeatureHistoryPanel = ({
@@ -158,6 +170,8 @@ const FeatureHistoryPanel = ({
   onUpdateHole,
   onAddLinearPattern,
   onUpdateLinearPattern,
+  onAddCircularPattern,
+  onUpdateCircularPattern,
   onUpdateFullRevolve,
   onSetDesignParameter,
   onRenameFeature,
@@ -175,6 +189,7 @@ const FeatureHistoryPanel = ({
   const [parameterDrafts, setParameterDrafts] = useState<Record<string, string>>({});
   const [revolveDrafts, setRevolveDrafts] = useState<Record<string, RevolveDraft>>({});
   const [linearPatternDrafts, setLinearPatternDrafts] = useState<Record<string, LinearPatternDraft>>({});
+  const [circularPatternDrafts, setCircularPatternDrafts] = useState<Record<string, CircularPatternDraft>>({});
   const [revolveAxisId, setRevolveAxisId] = useState("");
   const [newExtrusionOperation, setNewExtrusionOperation] = useState<"new_body" | "add" | "cut">(
     document.features.length === 0 ? "new_body" : "add",
@@ -307,6 +322,30 @@ const FeatureHistoryPanel = ({
         ]),
     ));
   }, [document.features]);
+
+  useEffect(() => {
+    setCircularPatternDrafts((current) => Object.fromEntries(
+      document.features
+        .filter((feature) => feature.feature_type === "hole" || feature.feature_type === "circular_pattern")
+        .map((feature) => {
+          if (feature.feature_type === "circular_pattern") {
+            return [feature.feature_id, {
+              count: String(feature.parameters.count),
+              centerX: String(feature.parameters.center_mm[0]),
+              centerY: String(feature.parameters.center_mm[1]),
+              direction: feature.parameters.direction,
+            }];
+          }
+          const targetBounds = buildRecords[feature.dependencies[0]]?.measurements?.bounds_mm;
+          return [feature.feature_id, current[feature.feature_id] || {
+            count: "4",
+            centerX: targetBounds ? String((targetBounds[0] + targetBounds[1]) / 2) : "0",
+            centerY: targetBounds ? String((targetBounds[2] + targetBounds[3]) / 2) : "0",
+            direction: "counterclockwise",
+          }];
+        }),
+    ));
+  }, [buildRecords, document.features]);
 
   const newDepth = validDepth(newDepthValue);
   const effectiveNewExtrusionOperation = document.features.length === 0
@@ -738,6 +777,24 @@ const FeatureHistoryPanel = ({
               operation: "modify",
             }
             : null;
+          const circularPatternDraft = circularPatternDrafts[feature.feature_id];
+          const circularPatternCount = Number(circularPatternDraft?.count);
+          const circularPatternCenterX = Number(circularPatternDraft?.centerX);
+          const circularPatternCenterY = Number(circularPatternDraft?.centerY);
+          const nextCircularPatternParameters: SketchMathCircularPatternParameters | null = circularPatternDraft
+            && Number.isInteger(circularPatternCount)
+            && circularPatternCount >= 2
+            && circularPatternCount <= 128
+            && Number.isFinite(circularPatternCenterX)
+            && Number.isFinite(circularPatternCenterY)
+            ? {
+              count: circularPatternCount,
+              center_mm: [circularPatternCenterX, circularPatternCenterY],
+              angle_deg: 360,
+              direction: circularPatternDraft.direction,
+              operation: "modify",
+            }
+            : null;
           return (
             <Box
               key={feature.feature_id}
@@ -754,6 +811,7 @@ const FeatureHistoryPanel = ({
                 {feature.feature_type === "fillet" ? ` · radius ${feature.parameters.radius_mm} mm` : ""}
                 {feature.feature_type === "chamfer" ? ` · distance ${feature.parameters.distance_mm} mm` : ""}
                 {feature.feature_type === "linear_pattern" ? ` · ${feature.parameters.count} instances at ${feature.parameters.spacing_mm} mm` : ""}
+                {feature.feature_type === "circular_pattern" ? ` · ${feature.parameters.count} instances around ${feature.parameters.center_mm.join(", ")}` : ""}
                 {record ? ` · ${record.generated_topology.length} semantic refs` : ""}
               </Text>
               {record?.measurements ? (
@@ -927,6 +985,25 @@ const FeatureHistoryPanel = ({
                   </Button>
                 </HStack>
               ) : null}
+              {patternFeaturesEnabled && feature.feature_type === "circular_pattern" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-circular-pattern-editor-${feature.feature_id}`}>
+                  <Input type="number" min="2" max="128" step="1" aria-label={`Circular pattern count ${feature.name}`} value={circularPatternDraft?.count || ""} onChange={(event) => setCircularPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], count: event.target.value } }))} width="90px" />
+                  <Input type="number" step="0.01" aria-label={`Circular pattern center X ${feature.name}`} value={circularPatternDraft?.centerX || ""} onChange={(event) => setCircularPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], centerX: event.target.value } }))} width="90px" />
+                  <Input type="number" step="0.01" aria-label={`Circular pattern center Y ${feature.name}`} value={circularPatternDraft?.centerY || ""} onChange={(event) => setCircularPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], centerY: event.target.value } }))} width="90px" />
+                  <Select aria-label={`Circular pattern direction ${feature.name}`} value={circularPatternDraft?.direction || "counterclockwise"} onChange={(event) => setCircularPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], direction: event.target.value as SketchMathCircularPatternParameters["direction"] } }))} width="165px">
+                    <option value="counterclockwise">Counterclockwise</option>
+                    <option value="clockwise">Clockwise</option>
+                  </Select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => nextCircularPatternParameters && onUpdateCircularPattern(feature, nextCircularPatternParameters)}
+                    isDisabled={!nextCircularPatternParameters || JSON.stringify(nextCircularPatternParameters) === JSON.stringify(feature.parameters) || busy}
+                  >
+                    Apply circular pattern
+                  </Button>
+                </HStack>
+              ) : null}
               {holeFeaturesEnabled && feature.feature_type === "hole" ? (
                 <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-existing-hole-editor-${feature.feature_id}`}>
                   <Select
@@ -1071,6 +1148,25 @@ const FeatureHistoryPanel = ({
                     Pattern hole
                   </Button>
                   <Text fontSize="xs">Count includes the seed hole.</Text>
+                </HStack>
+              ) : null}
+              {patternFeaturesEnabled && feature.feature_type === "hole" ? (
+                <HStack spacing={2} flexWrap="wrap" mt={2} data-testid={`sketchmath-circular-pattern-create-${feature.feature_id}`}>
+                  <Input type="number" min="2" max="128" step="1" aria-label={`New circular pattern count ${feature.name}`} value={circularPatternDraft?.count || ""} onChange={(event) => setCircularPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], count: event.target.value } }))} width="90px" />
+                  <Input type="number" step="0.01" aria-label={`New circular pattern center X ${feature.name}`} value={circularPatternDraft?.centerX || ""} onChange={(event) => setCircularPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], centerX: event.target.value } }))} width="90px" />
+                  <Input type="number" step="0.01" aria-label={`New circular pattern center Y ${feature.name}`} value={circularPatternDraft?.centerY || ""} onChange={(event) => setCircularPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], centerY: event.target.value } }))} width="90px" />
+                  <Select aria-label={`New circular pattern direction ${feature.name}`} value={circularPatternDraft?.direction || "counterclockwise"} onChange={(event) => setCircularPatternDrafts((current) => ({ ...current, [feature.feature_id]: { ...current[feature.feature_id], direction: event.target.value as SketchMathCircularPatternParameters["direction"] } }))} width="165px">
+                    <option value="counterclockwise">Counterclockwise</option>
+                    <option value="clockwise">Clockwise</option>
+                  </Select>
+                  <Button
+                    size="sm"
+                    onClick={() => nextCircularPatternParameters && onAddCircularPattern(feature, nextCircularPatternParameters)}
+                    isDisabled={!nextCircularPatternParameters || laterBodyFeatures.length > 0 || record?.status !== "succeeded" || busy}
+                  >
+                    Circular pattern hole
+                  </Button>
+                  <Text fontSize="xs">Full 360°; count includes the seed.</Text>
                 </HStack>
               ) : null}
               {revolveFeaturesEnabled && feature.feature_type === "revolve" ? (

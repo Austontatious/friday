@@ -325,6 +325,14 @@ export type SketchMathLinearPatternParameters = {
   operation: "modify";
 };
 
+export type SketchMathCircularPatternParameters = {
+  count: number;
+  center_mm: [number, number];
+  angle_deg: 360;
+  direction: "counterclockwise" | "clockwise";
+  operation: "modify";
+};
+
 export type SketchMathTopologyReferenceSelector = {
   reference_id: string;
   owner_feature_id: string;
@@ -392,7 +400,13 @@ export type SketchMathLinearPatternFeature = SketchMathFeatureBase & {
   parameters: SketchMathLinearPatternParameters;
 };
 
-export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature | SketchMathRevolveFeature | SketchMathFilletFeature | SketchMathChamferFeature | SketchMathLinearPatternFeature;
+export type SketchMathCircularPatternFeature = SketchMathFeatureBase & {
+  feature_type: "circular_pattern";
+  profile_id?: null;
+  parameters: SketchMathCircularPatternParameters;
+};
+
+export type SketchMathFeature = SketchMathExtrudeFeature | SketchMathHoleFeature | SketchMathRevolveFeature | SketchMathFilletFeature | SketchMathChamferFeature | SketchMathLinearPatternFeature | SketchMathCircularPatternFeature;
 
 export type SketchMathFeatureBuildRecord = {
   feature_id: string;

@@ -16,6 +16,7 @@ import type {
   SketchMathArtifactJobManifest,
   SketchMathCommand,
   SketchMathCommandResponse,
+  SketchMathCircularPatternParameters,
   SketchMathEntity,
   SketchMathDocument,
   SketchMathFeature,
@@ -2111,6 +2112,58 @@ const SketchMathWorkspace = () => {
   const handleUpdateLinearPattern = async (
     feature: Extract<SketchMathFeature, { feature_type: "linear_pattern" }>,
     parameters: SketchMathLinearPatternParameters,
+  ) => {
+    if (!sketchDocument || !patternFeaturesEnabled) return;
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `replace_${feature.feature_id}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "replace_feature",
+      target_id: feature.feature_id,
+      parameters: { feature: { ...feature, parameters } },
+    });
+  };
+
+  const handleAddCircularPattern = async (
+    seed: Extract<SketchMathFeature, { feature_type: "hole" }>,
+    parameters: SketchMathCircularPatternParameters,
+  ) => {
+    if (!sketchDocument || !patternFeaturesEnabled) return;
+    const stem = `circular_pattern_${seed.feature_id.replace(/[^a-zA-Z0-9_-]+/g, "_")}`;
+    const existingIds = new Set(sketchDocument.features.map((feature) => feature.feature_id));
+    let featureId = stem;
+    let suffix = 2;
+    while (existingIds.has(featureId)) {
+      featureId = `${stem}_${suffix}`;
+      suffix += 1;
+    }
+    const feature: SketchMathFeature = {
+      feature_id: featureId,
+      feature_type: "circular_pattern",
+      name: `Circular pattern ${sketchDocument.features.filter((item) => item.feature_type === "circular_pattern").length + 1}`,
+      body_id: seed.body_id,
+      sketch_id: seed.sketch_id,
+      profile_id: null,
+      source_region_id: null,
+      dependencies: [seed.feature_id],
+      topology_references: [],
+      parameters,
+      suppressed: false,
+    };
+    await commitFeatureOperation({
+      version: "1.0",
+      operation_id: `add_${featureId}_${Date.now().toString(36)}`,
+      mode: "commit",
+      base_revision: sketchDocument.revision,
+      operation_type: "add_feature",
+      parameters: { feature },
+    });
+  };
+
+  const handleUpdateCircularPattern = async (
+    feature: Extract<SketchMathFeature, { feature_type: "circular_pattern" }>,
+    parameters: SketchMathCircularPatternParameters,
   ) => {
     if (!sketchDocument || !patternFeaturesEnabled) return;
     await commitFeatureOperation({
@@ -4398,6 +4451,12 @@ const SketchMathWorkspace = () => {
                   )}
                   onUpdateLinearPattern={(feature, parameters) => (
                     void handleUpdateLinearPattern(feature, parameters)
+                  )}
+                  onAddCircularPattern={(feature, parameters) => (
+                    void handleAddCircularPattern(feature, parameters)
+                  )}
+                  onUpdateCircularPattern={(feature, parameters) => (
+                    void handleUpdateCircularPattern(feature, parameters)
                   )}
                   onUpdateFullRevolve={(feature, axisId, angle) => (
                     void handleUpdateFullRevolve(feature, axisId, angle)

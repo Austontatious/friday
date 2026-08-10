@@ -1205,6 +1205,8 @@ describe("SketchMath workspace", () => {
       onUpdateHole: jest.fn(),
       onAddLinearPattern: jest.fn(),
       onUpdateLinearPattern: jest.fn(),
+      onAddCircularPattern: jest.fn(),
+      onUpdateCircularPattern: jest.fn(),
       onUpdateFullRevolve,
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1256,7 +1258,7 @@ describe("SketchMath workspace", () => {
     expect(onUpdateFullRevolve).toHaveBeenCalledWith(revolveFeature, secondAxis.id, 360);
   });
 
-  it("creates and edits a guarded feature-level linear hole pattern", async () => {
+  it("creates and edits guarded feature-level linear and circular hole patterns", async () => {
     const holeFeature = {
       feature_id: "feature_hole_seed",
       feature_type: "hole" as const,
@@ -1314,6 +1316,8 @@ describe("SketchMath workspace", () => {
     };
     const onAddLinearPattern = jest.fn();
     const onUpdateLinearPattern = jest.fn();
+    const onAddCircularPattern = jest.fn();
+    const onUpdateCircularPattern = jest.fn();
     const props: any = {
       document,
       activeProfile: null,
@@ -1340,6 +1344,8 @@ describe("SketchMath workspace", () => {
       onUpdateHole: jest.fn(),
       onAddLinearPattern,
       onUpdateLinearPattern,
+      onAddCircularPattern,
+      onUpdateCircularPattern,
       onUpdateFullRevolve: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1361,6 +1367,18 @@ describe("SketchMath workspace", () => {
       direction_xy: [1, 0],
       operation: "modify",
     });
+    await userEvent.clear(screen.getByRole("spinbutton", { name: "New circular pattern center X Mount hole" }));
+    await userEvent.type(screen.getByRole("spinbutton", { name: "New circular pattern center X Mount hole" }), "5");
+    await userEvent.clear(screen.getByRole("spinbutton", { name: "New circular pattern center Y Mount hole" }));
+    await userEvent.type(screen.getByRole("spinbutton", { name: "New circular pattern center Y Mount hole" }), "5");
+    await userEvent.click(screen.getByRole("button", { name: "Circular pattern hole" }));
+    expect(onAddCircularPattern).toHaveBeenCalledWith(holeFeature, {
+      count: 4,
+      center_mm: [5, 5],
+      angle_deg: 360,
+      direction: "counterclockwise",
+      operation: "modify",
+    });
 
     rerender(<FeatureHistoryPanel {...props} document={{ ...document, revision: 3, features: [holeFeature, patternFeature] }} />);
     const editor = screen.getByTestId("sketchmath-linear-pattern-editor-feature_pattern");
@@ -1370,6 +1388,22 @@ describe("SketchMath workspace", () => {
     expect(onUpdateLinearPattern).toHaveBeenCalledWith(patternFeature, {
       ...patternFeature.parameters,
       count: 2,
+    });
+
+    const circularFeature = {
+      ...patternFeature,
+      feature_id: "feature_circular_pattern",
+      feature_type: "circular_pattern" as const,
+      name: "Bolt circle",
+      parameters: { count: 4, center_mm: [5, 5] as [number, number], angle_deg: 360 as const, direction: "counterclockwise" as const, operation: "modify" as const },
+    };
+    rerender(<FeatureHistoryPanel {...props} document={{ ...document, revision: 4, features: [holeFeature, circularFeature] }} />);
+    const circularEditor = screen.getByTestId("sketchmath-circular-pattern-editor-feature_circular_pattern");
+    await userEvent.selectOptions(within(circularEditor).getByRole("combobox", { name: "Circular pattern direction Bolt circle" }), "clockwise");
+    await userEvent.click(within(circularEditor).getByRole("button", { name: "Apply circular pattern" }));
+    expect(onUpdateCircularPattern).toHaveBeenCalledWith(circularFeature, {
+      ...circularFeature.parameters,
+      direction: "clockwise",
     });
   });
 
@@ -1456,6 +1490,8 @@ describe("SketchMath workspace", () => {
       onUpdateHole: jest.fn(),
       onAddLinearPattern: jest.fn(),
       onUpdateLinearPattern: jest.fn(),
+      onAddCircularPattern: jest.fn(),
+      onUpdateCircularPattern: jest.fn(),
       onUpdateFullRevolve: jest.fn(),
       onSetDesignParameter: jest.fn(),
       onRenameFeature: jest.fn(),
@@ -1655,6 +1691,8 @@ describe("SketchMath workspace", () => {
       onUpdateHole={onUpdateHole}
       onAddLinearPattern={jest.fn()}
       onUpdateLinearPattern={jest.fn()}
+      onAddCircularPattern={jest.fn()}
+      onUpdateCircularPattern={jest.fn()}
       onUpdateFullRevolve={jest.fn()}
       onSetDesignParameter={onSetDesignParameter}
       onRenameFeature={onRenameFeature}
