@@ -5,7 +5,7 @@ Status: canonical development specification
 Spec version: `0.1`
 
 Baseline audited commit: `21b8153`
-Last validated SketchMath code milestone: `1e8a064` (golden/feature property acceptance, extrusion cut STL/STEP, full-revolve STEP, and advanced-hole STEP; see `golden_mounting_plate_v1.md` and `status.md`)
+Last validated SketchMath code milestone: `b22e27c` (completed Gate B → general topology → bounded feature-history release train, including golden/cut/revolve/hole/edge-finish/shell STEP evidence; see `release_train_completion.md`, `golden_mounting_plate_v1.md`, and `status.md`)
 
 ## Mission
 

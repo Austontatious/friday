@@ -46,6 +46,6 @@ Document schema `1.1` defines `plate_width_mm` and `corner_hole_diameter_mm` as 
 
 The live browser workflow commits 80→100 mm and Ø5→Ø6, verifies the canonical sketch and feature state, undoes/redoes the diameter change, reloads both values, builds revision-12 STEP, and downloads it with zero relevant console/page errors. Native inspection reports approximately `(0,100,0,50,0,13)` bounds, five holes, four Ø6 corner-hole cylinders, the Ø10 boss hole, the Ø30 boss, four 2 mm fillets, and final volume `24920 + 1315π mm³` within `1e-5`.
 
-This closes Sections 28–30 for the documented golden model. The broader release train remains open for the bounded feature-property, revolve/kernel, multi-sketch, AI, and final full-regression requirements recorded in status/traceability.
+This closes Sections 28–30 for the documented golden model. The bounded feature-property and revolve/kernel work plus the final engineering regression are now complete for the SDD execution-sheet release train. The broader full-product specification remains open for multi-sketch, CAD-grade viewport, concurrent document, units, AI, and final hardening requirements recorded in status/traceability.
 
 Evidence: `sketchmath/features/golden_mounting_plate.py`, `sketchmath/cad/freecad_feature_graph.py`, `tests/test_sketchmath_golden_mounting_plate.py`, `frontend/e2e/sketchmath.spec.ts`; checkpoints `5973c89`, `3e309de`, `d74a10f`, and `f445b0c`.

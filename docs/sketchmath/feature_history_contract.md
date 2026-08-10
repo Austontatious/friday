@@ -2,7 +2,7 @@
 
 Updated: 2026-08-09
 
-Status: passed for the default-off v1 single-sketch extrusion/hole/full-revolve/terminal-fillet-or-chamfer rebuild envelope (`SM-FEAT-001`, semantic-reference subset; partial `SM-FEAT-002` through `SM-FEAT-005`)
+Status: passed for the default-off v1 single-sketch extrusion/hole/full-revolve/terminal-edge-finish/hole-pattern/hole-mirror/rectangular-shell rebuild envelope (`SM-FEAT-001`, semantic-reference subset; bounded `SM-FEAT-002` through `SM-FEAT-005`)
 
 ## Enablement
 
@@ -79,7 +79,7 @@ Typed fillet parameters carry a positive radius and semantic convex outer-vertic
 
 Typed chamfer parameters carry a positive distance and reuse that exact edge selector/recovery contract. Rebuild generates `chamfer_surface` references, enforces the same adjacent-edge bound, and leaves measurements `kernel_required`. The bounded job invokes native FreeCAD `makeChamfer`; see `chamfer_feature_contract.md`.
 
-Typed linear-pattern parameters carry a bounded count, positive spacing, non-zero 2D direction, and `modify` operation. The current stable envelope patterns one terminal hole across its extrusion target, computes exact additional volume/bounds/topology, refuses overlap or target-boundary crossings atomically, and supports browser creation/replacement plus undo/redo/reload. See `linear_pattern_feature_contract.md`. Feature mirror, shell, broader seeds, and kernel artifacts remain open.
+Typed linear-pattern parameters carry a bounded count, positive spacing, non-zero 2D direction, and `modify` operation. The current stable envelope patterns one terminal hole across its extrusion target, computes exact additional volume/bounds/topology, refuses overlap or target-boundary crossings atomically, and supports browser creation/replacement plus undo/redo/reload. See `linear_pattern_feature_contract.md`. Broader seeds and pattern kernel artifacts remain open.
 
 Typed circular-pattern parameters carry a bounded count, finite sketch-plane center, fixed 360-degree sweep, ordered direction, and `modify` operation. The bounded hole-seed envelope rotates exact instance centers, records signed rotation/offset topology, refuses a seed on the axis plus overlap/boundary violations, and uses the same history/UI lifecycle. See `circular_pattern_feature_contract.md`. Partial arcs, 3D axes, broader seeds, and kernel artifacts remain open.
 
@@ -127,5 +127,5 @@ A revision conflict refreshes the backend-authoritative session before the user 
 
 - The adapter supports one sketch and one process-authoritative session cache.
 - Deterministic layered STL materializes supported vertical new-body/add/cut extrusion and simple-hole graphs. STEP materializes bounded terminal solid graphs with positive adds/simple holes/negative top-face cuts, or the prior positive additive/simple-hole graph with one terminal fillet or chamfer. Cut-before-edge-finish, other intermediate feature types, and general full-graph STEP remain open.
-- Partial revolve, revolve add/cut boolean validation, revolve STL/multi-feature graphs, broader fillet/chamfer, shell, and feature pattern/mirror operations remain open.
+- Partial revolve, revolve add/cut boolean validation, revolve STL/multi-feature graphs, broader fillet/chamfer/shell graphs, non-hole pattern/mirror operations, and pattern/mirror kernel artifacts remain open.
 - Semantic source/role/signature recovery is implemented for generated extrusion/hole/revolve/edge-finish-input topology. Fillet/chamfer artifact execution uniquely reconciles supported edges by endpoints; arbitrary browser picking and general kernel-topology reconciliation remain open.

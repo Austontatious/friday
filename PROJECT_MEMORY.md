@@ -7,6 +7,26 @@
 
 ---
 
+## 2026-08-09 - SketchMath Gate B to Feature-History Release Train Complete
+
+### What Changed
+- Completed and published the bounded execution-sheet train across Gate B, safe sketch editing, general planar topology, canonical feature history, semantic references, editable golden mounting plate, and validated CAD artifacts.
+- Closed the final `SM-FEAT-005` absent families in this train with canonical linear/full-circle hole patterns, sketch-line hole mirror, and a native STEP-validated rectangular top-open shell.
+- Added `docs/sketchmath/release_train_completion.md` and reconciled canonical status/traceability without claiming the later full-product phases complete.
+
+### Why
+- The execution sheet requires an evidence-backed completion verdict only after the centerpiece golden workflow and all engineering gates pass; earlier phase and feature commits were checkpoints, not completion.
+
+### Verification
+- 274 SketchMath Python tests, 66 semantic evals, 64 focused frontend tests, and 25 live SketchMath Playwright workflows passed.
+- Generated schemas, TypeScript, optimized build, Compose, Python compile, and 13 standards checks passed.
+- Native golden/cut/revolve/advanced-hole/fillet/chamfer/shell geometry checks passed inside the Python suite.
+
+### Boundary
+- This completes the Gate B → topology → first feature-history release train only. Multi-sketch/reference planes, CAD-grade viewport behavior, robust concurrent document semantics, units, model-aware AI, complete artifact lifecycle, and full-product hardening remain open.
+
+---
+
 ## 2026-08-09 - SketchMath Kernel-Validated Rectangular Shell
 
 ### What Changed

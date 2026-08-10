@@ -6,7 +6,7 @@ SketchMath uses narrow, headless FreeCAD workers for legacy `extrude_profile` an
 
 - Input stays typed and deterministic inside SketchMath.
 - The extrusion worker receives a single closed outer `profile_2d` plus optional closed hole profiles.
-- The feature-graph worker receives ordered canonical extrusions, typed simple/counterbore/countersink holes, bounded top-face cuts, or one independent full revolve. Edge-finish graphs additionally carry typed finish parameters and semantic edge descriptors.
+- The feature-graph worker receives ordered canonical extrusions, typed simple/counterbore/countersink holes, bounded top-face cuts, one independent full revolve, or one rectangular top-open shell. Edge-finish graphs additionally carry typed finish parameters and semantic edge descriptors.
 - The worker exports STEP and writes validation metadata back to the SketchMath adapter.
 - No GUI, no MCP wrapper, no arbitrary Python execution, and no general feature-tree interpreter.
 
@@ -18,7 +18,7 @@ SketchMath uses narrow, headless FreeCAD workers for legacy `extrude_profile` an
 4. If construction, extrusion, export, validation, bbox, or volume sanity checks fail, fall back to boolean subtraction.
 5. Accept only validated STEP output.
 
-For terminal solid graphs, reconstruct the bounded body in canonical order with native fuse/cut or full face revolve, then validate solid state, analytic volume, and bounds before STEP export. For edge-finish graphs, additionally match every semantic edge descriptor to exactly one unused FreeCAD edge by unordered 3D endpoints, apply native `makeFillet` or `makeChamfer`, and validate unchanged bounds and material removal. FreeCAD edge ordinals are diagnostic output only and never become canonical references.
+For terminal solid graphs, reconstruct the bounded body in canonical order with native fuse/cut, full face revolve, or rectangular cavity subtraction, then validate solid state, analytic volume, and bounds before STEP export. For edge-finish graphs, additionally match every semantic edge descriptor to exactly one unused FreeCAD edge by unordered 3D endpoints, apply native `makeFillet` or `makeChamfer`, and validate unchanged bounds and material removal. FreeCAD edge ordinals are diagnostic output only and never become canonical references.
 
 ## Validation Rules
 

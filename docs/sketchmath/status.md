@@ -2,9 +2,9 @@
 
 Updated: 2026-08-09
 
-Current phase: Phase 3/4/6 bounded solid-feature slice — feature history, semantic references, full revolve, kernel edge finishes, and revisioned artifacts
+Current phase: Gate B → general topology → feature-history release train complete for the documented supported envelopes; full-product phases 5–9 remain active
 
-Gate: `SM-FEAT-001` and the documented generated-reference subset pass; `SM-FEAT-002/003/004/005`, `SM-ART-001`, and golden-part evidence pass only for their documented envelopes
+Gate: the execution-sheet Release Train Completion Gate passes at `b22e27c`; this is not the broader full-product release verdict
 
 ## Baseline
 
@@ -18,7 +18,23 @@ Gate: `SM-FEAT-001` and the documented generated-reference subset pass; `SM-FEAT
 - Validated landing code baseline: `54ff17e`
 - First published landing commit: `1a4c853`
 
-## Current Resumed Release Regression
+## Current Release-Train Regression
+
+### Final release-train audit
+
+On 2026-08-09 at published checkpoint `b22e27c`:
+
+- All 274 SketchMath Python tests passed, including solver, safe editing, topology, feature history, API, native CAD, artifact jobs, and golden-part validation.
+- All 66 deterministic semantic eval cases passed.
+- Generated schemas match the canonical models; TypeScript passed with no errors.
+- All 64 focused frontend tests passed.
+- All 25 live SketchMath Playwright workflows passed serially in 5.0 minutes with no test-reported page/console error. This includes Gate B conflict/recovery/reload, safe editing, nested topology selection, feature/property history, the edited golden STEP, full revolve, advanced holes, fillet, and chamfer.
+- The optimized production build, Docker Compose validation, Python compile, and all 13 repository standards checks passed. The build reports only the existing stale Browserslist-data notice.
+- The prior native golden, cut, revolve, advanced-hole, fillet, and chamfer fixtures remain green; the new rectangular shell fixture additionally validates a 20 × 10 × 10 mm outer solid with 1 mm walls/floor at exactly 704 mm³ and unchanged outer bounds.
+
+This closes the Gate B → general topology → first real feature-history release train described by the SDD execution sheet. The larger full-product specification remains open for multi-sketch/reference-plane workflows, CAD-grade viewport interaction, robust concurrent document semantics, complete artifact lifecycle, units, model-aware AI creation/editing, and final hardening.
+
+## Prior Resumed Release Regression
 
 On 2026-08-09 after published full-revolve property checkpoint `4002b67`:
 
@@ -103,7 +119,7 @@ On 2026-08-09 for the prior hole/artifact foundation through release-spec golden
 - Exact pre-fillet volume is `20000+1350π mm³`; native FreeCAD final volume matches `19920+1370π mm³` within `1e-5`, with bounds `(0,80,0,50,0,13)`, valid solid state, and expected cylindrical face radii.
 - Width 80→100 recenters the boss/boss-hole and keeps right holes at X=93; a following Ø5→Ø6 edit preserves all four 7 mm offsets and stable feature IDs. Semantic face/edge references recover.
 - Revision-8 STEP passes the durable job state machine, idempotent replay, artifact registration, and session reload. Terminal fillet STL is explicitly refused rather than omitted.
-- The focused feature/API/CAD/artifact/golden suite passes all 71 tests. The widened/Ø6 edit still needs one undo/redo browser workflow plus its own final STEP to complete Section 29.
+- The focused feature/API/CAD/artifact/golden suite passes all 71 tests. Later browser checkpoint `f445b0c` closes the widened/Ø6 undo/redo/reload workflow and its final native STEP.
 - Generated schemas, TypeScript, Compose, and all 69 frontend tests remain green at the preceding model-tree checkpoint; the golden changes do not alter those contracts.
 
 ## Current Full-Revolve Validation
@@ -215,6 +231,8 @@ On 2026-08-09 for guarded UI checkpoint `bc650ca`:
 - Typed revolve covers an explicit stable axis, deterministic 360-degree Pappus volume/bounds, semantic generated faces, structured invalid-axis/profile/partial-sweep refusal, persistence, guarded new-body creation, existing-axis replacement, feature undo/redo/reload, and validated new-body STEP.
 - Typed fillet covers convex extrusion vertical edges, semantic adjacency/signature/endpoints, exact/recovered selection, finite radius editing, kernel-required measurement state, and a resumable validated FreeCAD STEP path with guarded browser creation/download.
 - Typed chamfer reuses the stable edge contract with finite distance editing, deterministic `chamfer_surface` identity, native FreeCAD STEP validation, and guarded browser creation/download.
+- Typed linear/full-circle patterns and sketch-line mirror cover bounded terminal hole seeds with exact analytic rebuild, stable instance/reference identity, guarded property editing, and structured containment/overlap/degeneracy refusal.
+- Typed shell covers one rectangular top-open base with exact cavity measurements/topology, guarded thickness editing, and native volume/bounds-validated STEP.
 - Revision-bound artifact jobs persist READY/RUNNING/DONE/FAILED manifests and resumable step markers. Supported terminal vertical new-body/add/cut extrusion and simple-hole graphs produce validated layered STL; bounded terminal solid and terminal-fillet/chamfer graphs produce validated STEP; stale results never register.
 - Legacy FreeCAD `extrude_profile` preview/export remains separate; canonical feature commits never replay external CAD work. See `feature_history_contract.md`, `artifact_job_contract.md`, and `golden_mounting_plate_v1.md`.
 
@@ -240,7 +258,7 @@ Completed and published:
 - Canonical document v1 remains a single-sketch, single-worker compatibility path. The minimum single-body/sketch feature tree passes, while multi-sketch/body workspace behavior and visibility mutation are not implemented.
 - Generated extrusion/hole semantic face/edge references are stable and recoverable, but browser face/edge picking and raw kernel-topology reconciliation are not implemented.
 - Session persistence uses a filesystem store plus in-process cache and is not multi-worker safe.
-- Layered STL supports vertical extrusion/simple-hole graphs. STEP supports bounded terminal extrusion/typed-hole solids, one independent full revolve, and positive graphs with one terminal fillet/chamfer. Advanced-hole/revolve/edge-finish STL, partial/revolve booleans, advanced-hole/cut-before-edge-finish, shell/pattern, and general STEP remain open.
+- Layered STL supports vertical extrusion/simple-hole graphs. STEP supports bounded terminal extrusion/typed-hole solids, one independent full revolve, positive graphs with one terminal fillet/chamfer, and one rectangular top-open shell. Advanced-hole/revolve/edge-finish/shell STL, partial/revolve booleans, advanced-hole/cut-before-edge-finish, pattern/mirror STEP, and general STEP remain open.
 - Artifact cancellation, automatic TTL/quota cleanup, and worker-process isolation are not implemented.
 - 3D camera mechanics pass automation, but CAD-like pan/tilt feel requires explicit manual acceptance.
 - AI translation covers a small command subset and does not yet plan over a canonical feature model.
@@ -257,8 +275,8 @@ Completed and published:
 
 ## Next Highest-Value Work
 
-Run the remaining bounded kernel and release-regression gaps next. Full-revolve creation/axis editing and simple-hole diameter/through/blind/depth editing now pass their supported property envelopes; partial revolve and general kernel/artifact expansion remain explicitly out of scope until implemented and validated.
+Resume the authoritative full-product specification at the next architectural dependency: a typed multi-sketch/principal-plane document workflow with real visibility and feature dependencies. Then introduce the model-aware AI proposal/preview/commit boundary over those same typed operations rather than creating a separate AI geometry path. CAD viewport interaction, multi-worker document correctness, unit expansion, artifact cleanup/cancellation, and broader kernel graphs remain subsequent full-product gates.
 
 ## Release Status
 
-Not release-ready. The full-product and final release gates in `docs/sketchmath/product_spec.md` remain open.
+**SDD execution-sheet release train complete** for its documented supported envelopes. **Full product not release-ready**: the later product gates in `docs/sketchmath/product_spec.md` remain open.
