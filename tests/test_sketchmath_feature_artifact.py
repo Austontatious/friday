@@ -63,6 +63,66 @@ def test_canonical_stl_materialization_uses_revisioned_safe_path_and_validates_g
     assert path.exists()
 
 
+def test_canonical_stl_materializes_a_terminal_semantic_cut_graph(tmp_path) -> None:
+    outer = _profile("base", [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], 100, "counterclockwise")
+    cutter = _profile("pocket", [(3, 3), (7, 3), (7, 7), (3, 7), (3, 3)], 16, "counterclockwise")
+    document = wrap_legacy_selection_context(
+        SelectionContext(selection_set_id="cut_artifact", units="mm", items=[outer, cutter]),
+        document_id="doc_cut_artifact",
+    )
+    base = FeatureRecord.model_validate(
+        {
+            "feature_id": "feature_base",
+            "name": "Base",
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": outer.id,
+            "parameters": {"depth_mm": 10, "operation": "new_body"},
+        }
+    )
+    base_report = rebuild_document(document.model_copy(update={"features": [base]}))
+    top = next(item for item in base_report.records[0].generated_topology if item.role == "top")
+    cut = FeatureRecord.model_validate(
+        {
+            "feature_id": "feature_cut",
+            "name": "Pocket",
+            "body_id": "body_main",
+            "sketch_id": "sketch_main",
+            "profile_id": cutter.id,
+            "dependencies": [base.feature_id],
+            "topology_references": [
+                {
+                    "reference_id": top.reference_id,
+                    "owner_feature_id": base.feature_id,
+                    "topology_type": "face",
+                    "role": top.role,
+                    "source_entity_id": top.source_entity_id,
+                    "expected_signature": top.geometric_signature,
+                }
+            ],
+            "parameters": {"depth_mm": 4, "direction": "negative", "operation": "cut"},
+        }
+    )
+    document = document.model_copy(update={"revision": 2, "features": [base, cut]})
+
+    artifact = materialize_feature_artifact(
+        document,
+        cut.feature_id,
+        "stl",
+        output_root=tmp_path / "artifacts",
+    )
+
+    assert Path(artifact["path"]).exists()
+    assert artifact["measurements"]["is_closed_mesh"] is True
+    assert artifact["measurements"]["volume_mm3"] == pytest.approx(936.0)
+    assert artifact["measurements"]["analytic_volume_mm3"] == pytest.approx(936.0)
+    assert artifact["measurements"]["bbox"] == pytest.approx(
+        {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 10}
+    )
+    assert artifact["measurements"]["feature_ids"] == [base.feature_id, cut.feature_id]
+    assert artifact["measurements"]["layer_count"] == 2
+
+
 def test_layered_stl_rejects_revolve_until_a_supported_mesher_exists(tmp_path) -> None:
     profile = _profile("revolve_profile", [(2, 0), (4, 0), (4, 5), (2, 5), (2, 0)], 10, "counterclockwise")
     selection = SelectionContext.model_validate(

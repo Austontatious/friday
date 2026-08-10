@@ -568,7 +568,9 @@ test.describe("SketchMath workspace", () => {
     expect(sessionId).toBeTruthy();
     type CutSnapshot = {
       document: {
+        revision: number;
         features: Array<{ feature_id: string; dependencies: string[]; parameters: Record<string, any> }>;
+        artifacts: Array<{ feature_id: string; format: string; revision: number }>;
         last_rebuild: { records: Array<{ status: string; measurements: { volume_delta_mm3: number; bounds_mm: number[] }; resolved_references: Array<{ recovery_state: string }> }> };
       };
     };
@@ -591,6 +593,23 @@ test.describe("SketchMath workspace", () => {
     const reloaded = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as CutSnapshot;
     expect(reloaded.document.features[1].parameters.operation).toBe("cut");
     expect(reloaded.document.features[1].feature_id).toBe(cut.document.features[1].feature_id);
+    const cutFeatureId = reloaded.document.features[1].feature_id;
+    const cutRow = page.getByTestId(`sketchmath-feature-${cutFeatureId}`);
+    await cutRow.getByRole("button", { name: "Build STL" }).click();
+    await expect(page.getByTestId(`sketchmath-artifact-status-${cutFeatureId}`)).toContainText(
+      `DONE · complete · revision ${reloaded.document.revision}`,
+      { timeout: 15000 },
+    );
+    const download = page.getByTestId(`sketchmath-artifact-download-${cutFeatureId}`);
+    const downloadPromise = page.waitForEvent("download");
+    await download.click();
+    expect((await downloadPromise).suggestedFilename()).toMatch(/\.stl$/);
+    const withArtifact = await (await page.request.get(`/api/sketchmath/sessions/${sessionId}`)).json() as CutSnapshot;
+    expect(withArtifact.document.artifacts).toContainEqual(expect.objectContaining({
+      feature_id: cutFeatureId,
+      format: "stl",
+      revision: reloaded.document.revision,
+    }));
   });
 
   test("edits a full revolve axis with stable history and reload identity", async ({ page }) => {
