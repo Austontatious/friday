@@ -69,7 +69,7 @@ export const extractRouteLabel = (response: ModelResponse, mode: ChatMode): stri
   const meta = response.meta || {};
   const route = meta.route || meta.router || meta.routing_path || meta.profile || meta.alias;
   const model = meta.model || meta.model_name || meta.route_model || meta.provider_model;
-  return [route, model].filter(Boolean).join(" / ") || (mode === "direct_friday" ? "Direct Friday / default" : "Legacy route");
+  return [route, model].filter(Boolean).join(" / ") || "Direct Friday / default";
 };
 
 export const extractContextUsage = (response: ModelResponse): string => {

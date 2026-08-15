@@ -43,8 +43,6 @@ networks:
   friday_net:
     name: friday_net
     driver: bridge
-  althing_default:
-    external: true
 
 volumes:
   friday_data:

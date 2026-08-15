@@ -43,7 +43,7 @@ curl -sS --max-time 10 "$GATEWAY_HOST_BASE/v1/models" | jq . >/dev/null || fail 
 pass "host gateway models"
 
 # Check containerized backend's ability to reach host gateway
-docker exec "$BACKEND_CONTAINER" python3 - <<PY || fail "backend container cannot reach host gateway"
+docker exec -i "$BACKEND_CONTAINER" python3 - <<PY || fail "backend container cannot reach host gateway"
 import urllib.request
 import sys
 
@@ -59,6 +59,32 @@ for url in [
         sys.exit(1)
 PY
 pass "backend container can reach gateway"
+
+# Validate model identities over the same network path used by Friday. A reachable
+# host port serving a different model is unhealthy.
+docker exec -i "$BACKEND_CONTAINER" python3 - <<'PY' || fail "backend model identity check failed"
+import json
+import os
+import urllib.request
+
+checks = [
+    ("LLM_BASE_URL", "FRIDAY_MODEL_NAME"),
+    ("FRIDAY_CODER_BASE_URL", "FRIDAY_CODER_MODEL_NAME"),
+]
+for base_key, model_key in checks:
+    base = os.environ.get(base_key, "").rstrip("/")
+    expected = os.environ.get(model_key, "").strip()
+    if not base or not expected:
+        raise SystemExit(f"missing {base_key} or {model_key}")
+    url = f"{base}/models" if base.endswith("/v1") else f"{base}/v1/models"
+    with urllib.request.urlopen(url, timeout=10) as response:
+        payload = json.load(response)
+    observed = {str(item.get("id", "")) for item in payload.get("data", []) if isinstance(item, dict)}
+    if expected not in observed:
+        raise SystemExit(f"{base_key} expected {expected!r}, observed {sorted(observed)!r}")
+    print(f"{base_key}: expected model {expected!r} is reachable")
+PY
+pass "backend model identities"
 
 # Check backend health/readiness
 curl -sS --max-time 10 "$BACKEND_BASE/healthz" | jq -e '.ok == true' >/dev/null || fail "backend healthz unhealthy"
@@ -78,15 +104,6 @@ CODER="$(post_json "$BACKEND_BASE/api/chat" '{"message":"Doctor coder smoke. Rep
 echo "$CODER" | jq . >/dev/null || fail "coder chat did not return valid JSON"
 echo "$CODER" | grep -qi "doctor-coder-ok" || fail "coder chat response did not contain expected marker"
 pass "coder route"
-
-# Althing bridge route smoke
-ALTHING_RAW="$(curl -sS -i --max-time 120 "$BACKEND_BASE/api/althing/chat" \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"Doctor Althing smoke. Reply exactly: doctor-althing-ok"}')"
-
-echo "$ALTHING_RAW" | grep -qi "doctor-althing-ok" || fail "althing chat did not return expected marker"
-echo "$ALTHING_RAW" | grep -qi "X-Friday-Bridge-Fallback" || fail "althing chat did not include bridge fallback header"
-pass "althing bridge"
 
 if curl -sS -I --max-time 10 "$FRONTEND_BASE" >/dev/null 2>&1; then
   pass "frontend reachable"

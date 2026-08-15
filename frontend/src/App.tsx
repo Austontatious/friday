@@ -160,7 +160,7 @@ const App = () => {
       }),
       makeTelemetryEvent("request_sent", {
         detail: "POST /chat request sent from the command shell.",
-        raw: { mode, endpoint: mode === "direct_friday" ? "/chat" : "/althing/chat" },
+        raw: { mode, endpoint: "/chat" },
       }),
     ]);
 

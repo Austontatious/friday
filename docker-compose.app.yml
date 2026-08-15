@@ -40,8 +40,10 @@ services:
       sh -lc "apk add --no-cache iptables >/dev/null && \
         iptables -C INPUT -p tcp -s 172.29.0.0/16 --dport 8130 -j ACCEPT 2>/dev/null || \
           iptables -I INPUT 1 -p tcp -s 172.29.0.0/16 --dport 8130 -j ACCEPT; \
-        iptables -C INPUT -p tcp -s 192.168.16.0/20 --dport 8130 -j ACCEPT 2>/dev/null || \
-          iptables -I INPUT 1 -p tcp -s 192.168.16.0/20 --dport 8130 -j ACCEPT"
+        iptables -C INPUT -p tcp -s 172.29.0.0/16 --dport 8104 -j ACCEPT 2>/dev/null || \
+          iptables -I INPUT 1 -p tcp -s 172.29.0.0/16 --dport 8104 -j ACCEPT; \
+        iptables -C INPUT -p tcp -s 172.29.0.0/16 --dport 8105 -j ACCEPT 2>/dev/null || \
+          iptables -I INPUT 1 -p tcp -s 172.29.0.0/16 --dport 8105 -j ACCEPT"
 
   friday-backend:
     build:
@@ -66,8 +68,6 @@ services:
       - FRIDAY_LOG_DIR=/logs
       - FRIDAY_CODER_AUTO_ROUTE=${FRIDAY_CODER_AUTO_ROUTE:-0}
       - FRIDAY_CODER_API_KEY=${FRIDAY_CODER_API_KEY:-}
-      - FRIDAY_ALTHING_BASE_URL=${FRIDAY_ALTHING_BASE_URL:-http://althing_router:8000}
-      - FRIDAY_ALTHING_MODEL_HINT=${FRIDAY_ALTHING_MODEL_HINT:-auto_no_reason}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -90,7 +90,6 @@ services:
       retries: 30
     networks:
       - friday_net
-      - althing_default
 
   friday-frontend:
     build:
@@ -119,8 +118,6 @@ networks:
   friday_net:
     name: friday_net
     driver: bridge
-  althing_default:
-    external: true
 
 volumes:
   friday_data:

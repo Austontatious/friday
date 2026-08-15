@@ -5,12 +5,8 @@ const DEVICE_KEY = "friday_device_id";
 const CHAT_MODE_KEY = "friday_chat_mode";
 const DEVICE_HEADER = "X-Friday-Device";
 
-export type ChatMode = "althing" | "direct_friday";
-const DEFAULT_CHAT_MODE: ChatMode = (
-  (process.env.REACT_APP_DEFAULT_MODE || "direct_friday").trim().toLowerCase() === "althing"
-    ? "althing"
-    : "direct_friday"
-);
+export type ChatMode = "direct_friday";
+const DEFAULT_CHAT_MODE: ChatMode = "direct_friday";
 
 export interface PromptPayload {
   prompt: string;
@@ -64,9 +60,6 @@ export const getStoredChatMode = (): ChatMode => {
     return DEFAULT_CHAT_MODE;
   }
   const raw = (window.localStorage.getItem(CHAT_MODE_KEY) || "").trim().toLowerCase();
-  if (raw === "althing") {
-    return "direct_friday";
-  }
   if (raw === "direct_friday") {
     return "direct_friday";
   }
@@ -80,10 +73,8 @@ export const setStoredChatMode = (mode: ChatMode): void => {
   window.localStorage.setItem(CHAT_MODE_KEY, mode);
 };
 
-const endpointForMode = (mode: ChatMode): string => (mode === "althing" ? "/althing/chat" : "/chat");
-
 export const sendPrompt = async (payload: PromptPayload, mode: ChatMode): Promise<ModelResponse> => {
-  const response = await fetch(`${API_URL}${endpointForMode(mode)}`, {
+  const response = await fetch(`${API_URL}/chat`, {
     method: "POST",
     headers: requestHeaders(),
     body: JSON.stringify({ ...payload, mode }),

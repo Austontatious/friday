@@ -39,13 +39,4 @@ echo "$DIRECT" | jq . >/dev/null || fail "public direct chat did not return vali
 echo "$DIRECT" | grep -qi "public-friday-ok" || fail "public direct chat response did not contain expected marker"
 pass "public direct chat"
 
-# Check Althing route
-ALTHING_RAW="$(curl -sS -i --max-time 120 "$PUBLIC_BASE/api/althing/chat" \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"Public Althing smoke. Reply exactly: public-althing-ok"}')"
-
-echo "$ALTHING_RAW" | grep -qi "public-althing-ok" || fail "public althing chat response did not contain expected marker"
-echo "$ALTHING_RAW" | grep -qi "X-Friday-Bridge-Fallback" || fail "public althing chat response did not contain bridge fallback header"
-pass "public Althing bridge"
-
 echo "Friday public deployment doctor: PASS"

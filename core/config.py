@@ -137,29 +137,6 @@ class HandoffConfig:
 
 
 @dataclass(frozen=True)
-class AlthingBridgeConfig:
-    enabled: bool
-    default_mode: str
-    althing_base_url: str
-    althing_route_path: str
-    timeout_ms: int
-    model_hint: str
-
-    @classmethod
-    def from_env(cls) -> "AlthingBridgeConfig":
-        default_mode_raw = _env_str("FRIDAY_UI_DEFAULT_MODE", default="althing").strip().lower()
-        default_mode = "direct_friday" if default_mode_raw in {"direct_friday", "direct", "friday"} else "althing"
-        return cls(
-            enabled=_env_bool("FRIDAY_ALTHING_BRIDGE_ENABLED", default=True),
-            default_mode=default_mode,
-            althing_base_url=_env_str("FRIDAY_ALTHING_BASE_URL", default="http://localhost:8010"),
-            althing_route_path=_env_str("FRIDAY_ALTHING_ROUTE_PATH", default="/chat/completions"),
-            timeout_ms=max(1000, _env_int("FRIDAY_ALTHING_TIMEOUT_MS", default=45000)),
-            model_hint=_env_str("FRIDAY_ALTHING_MODEL_HINT", default="auto_no_reason"),
-            )
-
-
-@dataclass(frozen=True)
 class CompanionConfig:
     enabled: bool
     default_mode: str
