@@ -2177,3 +2177,31 @@ How to test:
 - `PYTHONPATH=/mnt/data/althing pytest -q /mnt/data/althing/tests/test_router_working_scratchpad.py /mnt/data/althing/tests/test_router_phase2_policy.py /mnt/data/althing/tests/test_router_friday_handoff_contract.py /mnt/data/althing/tests/test_router_control_exposure_calibration.py`
 - `python3 -m py_compile /mnt/data/althing/router/main.py /mnt/data/althing/router/quality.py /mnt/data/althing/router/working_scratchpad.py /mnt/data/althing/tests/test_router_working_scratchpad.py`
 - `bash scripts/mimir_context.sh status`
+
+## 2026-08-15 - Althing Runtime Dependency Retired
+
+### What Changed
+- Removed the dormant `/api/althing/chat` bridge implementation, bridge config,
+  bridge tests, and bridge-specific public/container doctor checks.
+- Removed Friday backend membership in the external `althing_default` network and
+  all Althing bridge environment wiring.
+- Collapsed the frontend to the direct Friday `/api/chat` path.
+- Moved local endpoint discovery to the independently operated `exec` (8104) and
+  `coder` (8105) interfaces and made model identity mismatch fail closed.
+- Extended the container doctor to verify both served model IDs through Friday's
+  real container network path.
+
+### Why
+- Althing is retired and must not remain a router, network, or runtime owner.
+- A healthy host port can serve the wrong internal service; reachability alone is
+  not sufficient readiness evidence.
+
+### New Env Flags
+- None. Existing explicit endpoint/model overrides remain supported.
+
+### How To Test
+- `bash -n scripts/friday_up.sh scripts/doctor_friday_container_online.sh scripts/doctor_friday_public.sh`
+- `docker compose -f docker-compose.app.yml config -q`
+- `python3 -m pytest -q tests/test_model_switching.py tests/test_coder_fallback.py tests/test_prompt_builder.py`
+- `cd frontend && npm test -- --watchAll=false App.test.tsx`
+- Run `scripts/doctor_friday_container_online.sh` after the runtime cutover.
