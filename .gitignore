@@ -1,4 +1,13 @@
 
+# Secrets / local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
 # Bytecode and build junk
 __pycache__/
 *.pyc
